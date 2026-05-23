@@ -43,6 +43,18 @@ User clarifications:
 - ✅ Full data-testid coverage on interactive elements
 - ✅ 100% backend + frontend test pass (20-test pytest suite)
 
+## v1.1 (2026-02-23) — DOS-style Accounting Structure
+After user shared BUSY/FoxPro-style accounting screenshots, added the full structure but kept modern UI per user's "Option B" choice:
+- ✅ **Account Groups** (Tally-style chart of accounts) – 13 default groups seeded by nature (Asset / Liability / Income / Expense)
+- ✅ **Accounts (Khate)** – non-party accounts (Cash, Bank A/C seeded by default) with computed balance from journal + rokad
+- ✅ **Journal Entry** – double-entry voucher with debit==credit validation, voucher_no J00001
+- ✅ **Detailed Purchase Entry** – added fields: E.Date, S.Date, GP No., Truck No., Seller Party, Payment Condition, Bag/Tin Pack, Qty (Bags), Weight, W.B. (Kanta / Weight Bridge)
+- ✅ **Backup / Restore** – full JSON export of all 8 collections (no users), restore round-trip preserves users
+- ✅ **Financial Year settings** – default Apr 1 – Mar 31, firm name, current working date
+- ✅ **Sidebar reorganized** into Operations / Setup / Maintenance sections with keyboard-shortcut letter badges (M, C, D, E, F, G, A, B, P, I, H, J)
+- ✅ **Cash Register** can pick from Cash / Bank accounts
+- ✅ 100% backend (40 tests) + frontend test pass
+
 ## Prioritized Backlog
 ### P1 (next)
 - Atomic bill_no generation (counter collection) to prevent race condition under concurrent creates
