@@ -1,0 +1,106 @@
+{
+  "theme": "light",
+  "archetype": "Archetype 1: Organic & Earthy (The Digital Bahi-Khata)",
+  "context": "Desktop-style accounting software (Electron based) for Kaccha Arhat/Galla businessmen (Indian Mandi). High data density, fast keyboard entry.",
+  "language_strategy": "Hinglish UI. All labels and menus must use traditional business terms.",
+  "hinglish_dictionary": {
+    "Dashboard": "Dashboard / Main",
+    "Cash Book": "Rokad Panna",
+    "Ledger": "Party Khata",
+    "Items Master": "Galla Master",
+    "New Sale/Purchase Bill": "Naya Bill",
+    "Credit/In": "Jama (+)",
+    "Debit/Out": "Kharch (-)",
+    "Balance": "Baki",
+    "Due/Loan": "Udhaar",
+    "Reports": "Reports / Khata Bahi"
+  },
+  "typography": {
+    "rules": "The Anti-Default Rule applied. High legibility for data, authoritative for headings.",
+    "headings": {
+      "font": "Work Sans",
+      "weight": "font-medium to font-bold",
+      "tracking": "tracking-tight"
+    },
+    "body": {
+      "font": "IBM Plex Sans",
+      "weight": "font-normal"
+    },
+    "data_and_numbers": {
+      "font": "IBM Plex Mono",
+      "weight": "font-medium",
+      "note": "CRITICAL: All amounts, rates, weights, and quantities MUST use this monospace font for tabular alignment."
+    }
+  },
+  "colors": {
+    "background": {
+      "app": "#F4F1EA", 
+      "surface": "#FFFFFF",
+      "sidebar": "#2C2A29",
+      "note": "Base app uses a muted parchment/bone-white tone to reduce eye strain during long hours. Sidebar is dark charcoal for contrast."
+    },
+    "text": {
+      "primary": "#1A1A1A",
+      "secondary": "#595959",
+      "sidebar": "#E5E5E5"
+    },
+    "brand": {
+      "primary": "#8B2520",
+      "primary_hover": "#6B1B17",
+      "note": "Traditional 'Lal Bahi' (Red Ledger) terracotta red. Use sparingly for primary actions (Naya Bill, Save)."
+    },
+    "accounting_status": {
+      "jama_credit": "#1B5E20",
+      "jama_bg": "#E8F5E9",
+      "kharch_debit": "#B71C1C",
+      "kharch_bg": "#FFEBEE"
+    },
+    "borders": "#D6D1C4"
+  },
+  "spacing_and_layout": {
+    "strategy": "MODE B: The Control Room Grid (For Dashboards/Data). High density, fast scanning.",
+    "general": "Everything must be accessible on desktop without scrolling where possible. Use full height 'h-screen' layouts.",
+    "sidebar": "Fixed left sidebar ('w-64'), dark theme, clear Hinglish navigation.",
+    "main_content": "Padding 'p-4' or 'p-6' (denser than marketing sites).",
+    "cards_and_surfaces": "Neumorphism is BANNED. Use flat surfaces with sharp 1px borders ('border-[#D6D1C4]'). Rounded corners must not exceed 'rounded-sm' (2px-4px) to maintain a serious software feel."
+  },
+  "components_strategy": {
+    "tables": "MANDATORY. Must be dense ('p-2' or 'p-1.5' padding in cells). Sticky headers. Hover states on rows ('hover:bg-[#F9F8F6]'). Alternating row colors (zebra striping) for readability of long Rokad/Khata lists.",
+    "forms": "Inputs must have 1px solid borders. Focus states must be highly visible ('focus:ring-2 focus:ring-[#8B2520]/20 focus:border-[#8B2520]').",
+    "buttons": "Square or minimal radius ('rounded-sm'). Solid brand color for primary, outline for secondary. Add keyboard shortcut hints (e.g., 'Save (Ctrl+S)') in tooltips or text.",
+    "modals": "Use Shadcn Dialog. Solid white background, hard border, subtle ambient shadow. No glassmorphism.",
+    "shadcn_overrides": "Do not use default rounded-md/lg. Override border radii to 0px or 2px. Remove heavy box-shadows."
+  },
+  "motion_and_interactions": {
+    "rules": "Keep it snappy. No long fades. This is a tool for fast typing.",
+    "hover": "Background darkens slightly. Cursor changes.",
+    "transitions": "Max 150ms ease-in-out."
+  },
+  "icons_and_media": {
+    "icon_library": "@phosphor-icons/react",
+    "icon_style": "Weight: 'regular' for menus, 'bold' for active states.",
+    "media_urls": {
+      "login_background": {
+        "url": "https://static.prod-images.emergentagent.com/jobs/5310cfb1-247e-4bde-89f4-53c2779393b0/images/3a7d9f0a75e96c1d8e8a4a3bd61df26ccfd6fcfc9a9bcd8a4c653ad039d30bc7.png",
+        "category": "auth_background",
+        "description": "Traditional red ledger background for the login screen. Place on the left half of the screen, with a solid white login form on the right half."
+      }
+    }
+  },
+  "accessibility_and_testing": {
+    "contrast": "Ensure IBM Plex Mono numbers in Jama (Green) and Kharch (Red) meet 4.5:1 against white.",
+    "test_ids": "CRITICAL: All inputs, buttons, and table rows MUST have 'data-testid' attributes (e.g., 'data-testid=\"btn-naya-bill\"', 'data-testid=\"input-jama-amount\"').",
+    "keyboard": "Ensure logical tab index through forms (e.g., Party Name -> Item -> Rate -> Weight -> Add)."
+  },
+  "instructions_to_main_agent": [
+    "Install fonts: Work Sans, IBM Plex Sans, IBM Plex Mono from Google Fonts.",
+    "Install Phosphor icons: 'yarn add @phosphor-icons/react'.",
+    "Set up Tailwind config with the specified 'bone-white/parchment' background and 'terracotta' primary color.",
+    "Build a persistent layout with a sidebar containing the Hinglish menu.",
+    "For the Rokad Panna (Cashbook), build a two-column or strictly tabular layout showing Jama on one side/column and Kharch on the other.",
+    "Ensure all numbers are right-aligned in tables.",
+    "Keep the UI dense; do not use excessive padding inside data tables.",
+    "Implement the login screen using the provided login_background URL.",
+    "Apply 'data-testid' universally across all interactive elements."
+  ]
+}
