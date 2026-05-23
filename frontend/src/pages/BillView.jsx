@@ -43,15 +43,20 @@ export default function BillView() {
           </div>
         </div>
 
-        {/* Party */}
+        {/* Party + Bill meta */}
         <div className="grid grid-cols-2 gap-6 py-5 border-b border-khaki">
           <div>
-            <div className="section-title mb-2">{bill.bill_type === "sale" ? "Grahak (Bill To)" : "Supplier (From)"}</div>
+            <div className="section-title mb-2">{bill.bill_type === "sale" ? "Grahak (Bill To)" : "Seller Party"}</div>
             <div className="font-heading font-semibold text-lg">{bill.party_name}</div>
+            {bill.payment_cond && (
+              <div className="text-xs text-muted2 mt-1">Payment: {bill.payment_cond}</div>
+            )}
           </div>
-          <div className="text-right">
-            <div className="section-title mb-2">Bill Date</div>
-            <div className="font-mono-data text-lg">{bill.date}</div>
+          <div className="text-right space-y-1 text-sm">
+            <div><span className="section-title">E.Date:</span> <span className="font-mono-data ml-2">{bill.date}</span></div>
+            {bill.s_date && <div><span className="section-title">S.Date:</span> <span className="font-mono-data ml-2">{bill.s_date}</span></div>}
+            {bill.gp_no && <div><span className="section-title">GP No.:</span> <span className="font-mono-data ml-2">{bill.gp_no}</span></div>}
+            {bill.truck_no && <div><span className="section-title">Truck:</span> <span className="font-mono-data ml-2">{bill.truck_no}</span></div>}
           </div>
         </div>
 
@@ -59,10 +64,12 @@ export default function BillView() {
         <table className="dense w-full my-4">
           <thead>
             <tr>
-              <th style={{ width: 36 }}>#</th>
+              <th style={{ width: 32 }}>#</th>
               <th>Galla</th>
-              <th>Unit</th>
-              <th className="num">Qty</th>
+              <th>Pack</th>
+              <th className="num">Bags</th>
+              <th className="num">Weight</th>
+              <th className="num">W.B.</th>
               <th className="num">Rate</th>
               <th className="num">Amount</th>
             </tr>
@@ -72,8 +79,10 @@ export default function BillView() {
               <tr key={i}>
                 <td className="font-mono-data text-muted2">{i + 1}</td>
                 <td className="font-medium">{it.item_name}</td>
-                <td className="text-[11px] uppercase tracking-wider text-muted2">{it.unit}</td>
-                <td className="num">{inr(it.qty)}</td>
+                <td className="text-[11px] text-muted2">{it.bag_pack || "—"}</td>
+                <td className="num">{inr(it.qty || 0)}</td>
+                <td className="num">{inr(it.weight || 0)}</td>
+                <td className="num">{inr(it.wb || 0)}</td>
                 <td className="num">₹ {inr(it.rate)}</td>
                 <td className="num font-medium">₹ {inr(it.amount)}</td>
               </tr>

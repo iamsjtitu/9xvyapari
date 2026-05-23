@@ -11,6 +11,11 @@ import GallaMaster from "@/pages/GallaMaster";
 import NayaBill from "@/pages/NayaBill";
 import BillView from "@/pages/BillView";
 import Reports from "@/pages/Reports";
+import AccountGroups from "@/pages/AccountGroups";
+import Accounts from "@/pages/Accounts";
+import JournalEntry from "@/pages/JournalEntry";
+import Backup from "@/pages/Backup";
+import Settings from "@/pages/Settings";
 import "@/App.css";
 
 function Protected({ children }) {
@@ -50,12 +55,17 @@ function App() {
           >
             <Route index element={<Dashboard />} />
             <Route path="rokad" element={<RokadPanna />} />
+            <Route path="journal" element={<JournalEntry />} />
             <Route path="parties" element={<PartyKhata />} />
             <Route path="parties/:id" element={<PartyLedger />} />
             <Route path="items" element={<GallaMaster />} />
             <Route path="bills" element={<NayaBill />} />
             <Route path="bills/:id" element={<BillView />} />
             <Route path="reports" element={<Reports />} />
+            <Route path="account-groups" element={<AccountGroups />} />
+            <Route path="accounts" element={<Accounts />} />
+            <Route path="backup" element={<Backup />} />
+            <Route path="settings" element={<Settings />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

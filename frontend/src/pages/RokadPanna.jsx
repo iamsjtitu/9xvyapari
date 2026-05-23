@@ -7,6 +7,7 @@ export default function RokadPanna() {
   const [date, setDate] = useState(todayISO());
   const [entries, setEntries] = useState([]);
   const [parties, setParties] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({
     date: todayISO(),
@@ -16,6 +17,8 @@ export default function RokadPanna() {
     party_name: "",
     description: "",
     mode: "Cash",
+    cash_account_id: "",
+    cash_account_name: "",
   });
 
   const load = async () => {
@@ -29,7 +32,11 @@ export default function RokadPanna() {
   }, [date]);
 
   useEffect(() => {
-    api.get("/parties").then((r) => setParties(r.data));
+    Promise.all([api.get("/parties"), api.get("/accounts")]).then(([p, a]) => {
+      setParties(p.data);
+      // only cash/bank accounts
+      setAccounts(a.data.filter((x) => /cash|bank/i.test(x.group_name || "")));
+    });
   }, []);
 
   const totals = useMemo(() => {
@@ -63,6 +70,8 @@ export default function RokadPanna() {
         party_name: "",
         description: "",
         mode: "Cash",
+        cash_account_id: "",
+        cash_account_name: "",
       });
       load();
     } catch (err) {
@@ -145,9 +154,9 @@ export default function RokadPanna() {
     <div className="space-y-5" data-testid="page-rokad">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <div className="section-title">Rokad Panna · रोकड़ पन्ना</div>
+          <div className="section-title">Operations · Cash Register / Rokad Panna</div>
           <h1 className="font-heading font-semibold text-3xl tracking-tight">
-            Daily Cash Book
+            Cash Book — रोकड़ पन्ना
           </h1>
         </div>
         <div className="flex items-end gap-3">
@@ -212,7 +221,7 @@ export default function RokadPanna() {
           list={jamaList}
           color="#1B5E20"
           bg="#E8F5E9"
-          label="Jama (आमद) — Money In"
+          label="Receipt / Jama (आमद) — Money In"
           icon={ArrowDown}
         />
         <Side
@@ -220,7 +229,7 @@ export default function RokadPanna() {
           list={kharchList}
           color="#B71C1C"
           bg="#FFEBEE"
-          label="Kharch (खर्च) — Money Out"
+          label="Payment / Kharch (खर्च) — Money Out"
           icon={ArrowUp}
         />
       </div>
@@ -259,7 +268,7 @@ export default function RokadPanna() {
                       }`}
                       data-testid="btn-type-jama"
                     >
-                      Jama (+)
+                      Receipt (R) · Jama
                     </button>
                     <button
                       type="button"
@@ -271,7 +280,7 @@ export default function RokadPanna() {
                       }`}
                       data-testid="btn-type-kharch"
                     >
-                      Kharch (-)
+                      Payment (P) · Kharch
                     </button>
                   </div>
                 </div>
@@ -313,6 +322,29 @@ export default function RokadPanna() {
                     <option>Cheque</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="lbl">Cash / Bank Account</label>
+                <select
+                  className="input-dense"
+                  value={form.cash_account_id}
+                  onChange={(e) => {
+                    const a = accounts.find((x) => x.id === e.target.value);
+                    setForm({
+                      ...form,
+                      cash_account_id: e.target.value,
+                      cash_account_name: a ? a.name : "",
+                      mode: a ? (/bank/i.test(a.group_name || "") ? "Bank" : "Cash") : form.mode,
+                    });
+                  }}
+                  data-testid="select-cash-account"
+                >
+                  <option value="">— Default Cash —</option>
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name} ({a.group_name})</option>
+                  ))}
+                </select>
               </div>
 
               <div>

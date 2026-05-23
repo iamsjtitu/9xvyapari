@@ -1,0 +1,50 @@
+{
+  "summary": "v1.1 end-to-end testing complete. Backend: 40/40 pytest tests pass (extended suite covers v1.0 + new account_groups CRUD with delete-blocking, accounts CRUD with group validation, journal double-entry validation/voucher_no J00001, bills with DOS fields (gp_no, truck_no, s_date, payment_cond, bag_pack, weight, wb) AND backward compatibility, settings default FY 2026-04-01..2027-03-31, backup with all 8 collections, restore round-trip preserving users, auth required on all v1.1 endpoints). Frontend: login works (admin@galla.com/admin123), sidebar has 3 sections (Operations/Setup/Maintenance) with keyboard shortcut letters (M,C,D,E,F,G,A,B,P,I,H,J), new routes /account-groups (13 seeded), /accounts (2 seeded - Cash + Bank A/C), /journal (modal validates unbalanced -> keeps open; balanced 100/100 -> saved as J00001 with toast), /backup (download triggers galla-bahi-backup-YYYY-MM-DD.json, restore upload UI present), /settings (firm_name + FY dates + current_date render). Purchase Entry modal has all DOS fields (s-date, gp-no, truck-no, bag_pack, weight, wb) with correct data-testid attributes.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/bills POST", "issue": "_next_bill_no still uses count_documents (not race-safe) - carry-over from v1.0"},
+      {"endpoint": "/api/journal POST", "issue": "voucher_no uses count_documents({}) - same race condition; concurrent creates could produce duplicate J00001"},
+      {"endpoint": "/api/restore POST", "issue": "No validation of payload shape. If 'data' missing keys, silently keeps existing collections; if extra keys present, ignored. Acceptable but consider sanity check + atomic transaction (currently delete_many then insert_many - failure between leaves partial state)"},
+      {"endpoint": "/api/backup GET", "issue": "Returns all bills/rokad/journal with no pagination - could be large for long-running businesses. Acceptable for kaccha arhat single-user."},
+      {"endpoint": "/api/auth/login", "issue": "Still no brute-force lockout (carry-over from iteration_1)"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "JournalEntry", "issues": ["React hydration warning in console: '<span> cannot be a child of <option>' caused by Emergent dev instrumentation injecting <span data-ve-dynamic> inside <option> for o.name. Warning only - functionally fine. Could break SSR if ever enabled."]},
+      {"screen": "All modals", "issues": ["Continues to use native <select>/<input type=date> (browser default) instead of shadcn Select/Calendar - intentional per design but inconsistent with shadcn UI library shipped in /components/ui/."]},
+      {"screen": "Journal modal validation", "issues": ["Uses window.alert() for unbalanced/zero amount (deduced from page.dialog handling). Toast would be more on-brand."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Make bill_no & voucher_no race-safe via atomic counter collection ($inc findOneAndUpdate) or unique index + retry.",
+    "Add brute-force lockout on /api/auth/login (5 fails per 15 min).",
+    "Optional: replace window.alert in JournalEntry validation with toast for consistency.",
+    "Optional: validate /api/restore payload shape and wrap in pseudo-transaction for safety."
+  ],
+  "critical_code_review_comments": [
+    "server.py grew to 793 lines. Recommend splitting into routers: auth.py, parties.py, items.py, bills.py, rokad.py, accounts.py, journal.py, backup.py, summary.py - to stay <700 lines per file.",
+    "_compute_account_balance scans ALL journal entries and rokad for each account in list_accounts -> O(N*M) - acceptable for kaccha arhat scale but flagged.",
+    "Default FY computation in get_settings uses datetime.now(utc) — fine but year boundary edge cases around Apr 1 should be tested with timezone awareness if business is non-UTC.",
+    "/api/restore replaces every collection except users; this is correct per spec but no audit log of who restored or when (only timestamp via exported_at). Consider storing a backup history doc.",
+    "All POST handlers use {'_id': 0} projection properly. New v1.1 endpoints follow the established pattern. Good consistency.",
+    "BillItem fields are backward compatible (all optional defaults 0/''). Verified with test_old_bill_format_still_works."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (extended with 16 new tests for v1.1: AccountGroups, Accounts, Journal, BillsV11, Settings, BackupRestore)"
+  ],
+  "success_rate": {"backend": "100% (40/40)", "frontend": "100% on all v1.1 flows tested"},
+  "test_credentials": "admin@galla.com / admin123 (from /app/memory/test_credentials.md - matches backend seed)",
+  "seed_data_creation": "Test created TEST_ prefixed parties, items, account groups, accounts, journal entries, bills. All cleaned via test_zz_cleanup teardown. One UI-saved journal entry J00001 remains (100/100 Bank A/C dr - Cash cr) for visual verification.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "v1.1 fully verified. Backend test suite at /app/backend/tests/backend_test.py (40 tests, ~17s runtime) is comprehensive - covers seeded groups (13), seeded accounts (Cash + Bank A/C), group-with-accounts delete blocking, journal double-entry validation (unbalanced/zero rejected), bill DOS fields round-trip, backward compatibility of old bill format, settings default FY computation, backup with 8 collections, restore preserves users. Frontend has working data-testid on every interactive element. One leftover artifact: a single journal voucher J00001 was created via UI test and not deleted (no delete button tested). Run backend tests again before re-testing UI to ensure no state drift.",
+  "rca of the issue": "No bugs found in v1.1. Initial pytest had one orphan assertion left over from insertion (assert data['items_count']>=6 from TestDashboard scope); removed and now 40/40 pass. Initial UI test hit a 5s timeout for /backup navigation because journal modal stayed open after the unbalanced-save validation (correct behavior). Second run used direct page.goto() per route and all v1.1 pages loaded and worked end-to-end."
+}

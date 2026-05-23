@@ -1,21 +1,50 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import api from "@/lib/api";
 import {
   House, Notebook, UsersThree, Package, Receipt, ChartBar, SignOut, Storefront,
+  TreeStructure, IdentificationCard, BookOpenText, CloudArrowUp, Calendar, Power,
 } from "@phosphor-icons/react";
 
-const nav = [
-  { to: "/", label: "Dashboard", labelHi: "मुख्य", icon: House, end: true, tid: "nav-dashboard" },
-  { to: "/rokad", label: "Rokad Panna", labelHi: "रोकड़ पन्ना", icon: Notebook, tid: "nav-rokad" },
-  { to: "/parties", label: "Party Khata", labelHi: "पार्टी खाता", icon: UsersThree, tid: "nav-parties" },
-  { to: "/items", label: "Galla Master", labelHi: "गल्ला", icon: Package, tid: "nav-items" },
-  { to: "/bills", label: "Naya Bill", labelHi: "नया बिल", icon: Receipt, tid: "nav-bills" },
-  { to: "/reports", label: "Reports", labelHi: "रिपोर्ट", icon: ChartBar, tid: "nav-reports" },
+const sections = [
+  {
+    title: "Operations",
+    items: [
+      { to: "/", label: "Dashboard", key: "M", icon: House, end: true, tid: "nav-dashboard" },
+      { to: "/rokad", label: "Cash Register", key: "C", icon: Notebook, tid: "nav-rokad" },
+      { to: "/journal", label: "Journal Entry", key: "D", icon: BookOpenText, tid: "nav-journal" },
+      { to: "/bills?type=purchase", label: "Purchase Entry", key: "E", icon: Package, tid: "nav-purchase" },
+      { to: "/bills?type=sale", label: "Sale / Bill Entry", key: "F", icon: Receipt, tid: "nav-sale" },
+      { to: "/reports", label: "Reports", key: "G", icon: ChartBar, tid: "nav-reports" },
+    ],
+  },
+  {
+    title: "Setup",
+    items: [
+      { to: "/account-groups", label: "Account Group", key: "A", icon: TreeStructure, tid: "nav-groups" },
+      { to: "/accounts", label: "Accounts", key: "B", icon: IdentificationCard, tid: "nav-accounts" },
+      { to: "/parties", label: "Party Khata", key: "P", icon: UsersThree, tid: "nav-parties" },
+      { to: "/items", label: "Galla Master", key: "I", icon: Package, tid: "nav-items" },
+    ],
+  },
+  {
+    title: "Maintenance",
+    items: [
+      { to: "/backup", label: "Backup / Restore", key: "H", icon: CloudArrowUp, tid: "nav-backup" },
+      { to: "/settings", label: "Settings / Date", key: "J", icon: Calendar, tid: "nav-settings" },
+    ],
+  },
 ];
 
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [settings, setSettings] = useState(null);
+
+  useEffect(() => {
+    api.get("/settings").then((r) => setSettings(r.data)).catch(() => {});
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -24,13 +53,12 @@ export default function Layout() {
 
   return (
     <div className="h-screen flex paper-bg" data-testid="app-shell">
-      {/* Sidebar */}
       <aside
         className="w-64 flex flex-col text-[#E5E5E5] flex-shrink-0"
         style={{ background: "#2C2A29" }}
         data-testid="app-sidebar"
       >
-        <div className="px-5 py-5 border-b border-white/10">
+        <div className="px-5 py-4 border-b border-white/10">
           <div className="flex items-center gap-2">
             <div
               className="h-9 w-9 grid place-items-center rounded-sm"
@@ -40,46 +68,56 @@ export default function Layout() {
             </div>
             <div className="leading-tight">
               <div className="font-heading font-semibold text-[15px] text-white">
-                Galla Bahi
+                {settings?.firm_name || "Galla Bahi"}
               </div>
               <div className="text-[10px] uppercase tracking-widest text-white/50">
-                Hisab Kitab
+                Hisab Kitab v1.1
               </div>
             </div>
           </div>
+          {settings?.fy_start && (
+            <div className="mt-3 text-[10px] font-mono-data text-white/40 border-t border-white/10 pt-2">
+              FY: {settings.fy_start} → {settings.fy_end}
+            </div>
+          )}
         </div>
 
-        <nav className="flex-1 py-3">
-          {nav.map((n) => {
-            const Icon = n.icon;
-            return (
-              <NavLink
-                key={n.to}
-                to={n.to}
-                end={n.end}
-                data-testid={n.tid}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 mx-2 my-0.5 px-3 py-2.5 rounded-sm transition-colors text-[13px] font-heading font-medium ${
-                    isActive
-                      ? "bg-white/10 text-white"
-                      : "text-white/70 hover:bg-white/5 hover:text-white"
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <Icon size={18} weight={isActive ? "bold" : "regular"} />
-                    <div className="flex-1">
-                      <div>{n.label}</div>
-                    </div>
-                    <div className="font-mono-data text-[10px] text-white/30">
-                      {n.labelHi}
-                    </div>
-                  </>
-                )}
-              </NavLink>
-            );
-          })}
+        <nav className="flex-1 py-2 overflow-y-auto">
+          {sections.map((sec) => (
+            <div key={sec.title} className="mb-2">
+              <div className="px-4 py-1.5 text-[10px] uppercase tracking-[0.15em] text-white/35 font-heading font-semibold">
+                {sec.title}
+              </div>
+              {sec.items.map((n) => {
+                const Icon = n.icon;
+                return (
+                  <NavLink
+                    key={n.to}
+                    to={n.to}
+                    end={n.end}
+                    data-testid={n.tid}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 mx-2 my-0.5 px-3 py-2 rounded-sm transition-colors text-[13px] font-heading font-medium ${
+                        isActive
+                          ? "bg-white/10 text-white"
+                          : "text-white/70 hover:bg-white/5 hover:text-white"
+                      }`
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <Icon size={16} weight={isActive ? "bold" : "regular"} />
+                        <div className="flex-1">{n.label}</div>
+                        <span className="kbd text-white/50 border-white/15 bg-transparent" style={{ borderColor: "rgba(255,255,255,0.15)" }}>
+                          {n.key}
+                        </span>
+                      </>
+                    )}
+                  </NavLink>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="px-3 py-3 border-t border-white/10">
@@ -95,19 +133,18 @@ export default function Layout() {
             <button
               onClick={handleLogout}
               className="p-2 rounded-sm hover:bg-white/10 text-white/70 hover:text-white"
-              title="Logout"
+              title="Quit / Logout"
               data-testid="btn-logout"
             >
-              <SignOut size={16} />
+              <Power size={16} />
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Main */}
       <main className="flex-1 overflow-auto">
         <div className="px-6 py-5 max-w-[1500px] mx-auto animate-fade-in">
-          <Outlet />
+          <Outlet context={{ settings }} />
         </div>
       </main>
     </div>

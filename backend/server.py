@@ -117,16 +117,23 @@ class ItemOut(ItemIn):
 class BillItem(BaseModel):
     item_id: str
     item_name: str
-    qty: float
-    unit: str
-    rate: float
-    amount: float
+    qty: float = 0.0          # number of bags / units
+    bag_pack: Optional[str] = ""  # e.g. "50 Kg", "Tin", "Bori"
+    weight: float = 0.0       # declared / package weight (quintals)
+    wb: float = 0.0           # weight bridge (kanta) weight (quintals)
+    unit: str = "Quintal"
+    rate: float = 0.0
+    amount: float = 0.0
 
 class BillIn(BaseModel):
     bill_type: Literal["sale", "purchase"]
     party_id: str
     party_name: str
-    date: str  # ISO date
+    date: str  # ISO date - E.Date (entry date)
+    s_date: Optional[str] = ""        # supply date / bill date
+    gp_no: Optional[str] = ""         # gate-pass / GP No.
+    truck_no: Optional[str] = ""      # vehicle / truck number
+    payment_cond: Optional[str] = ""  # payment condition (eg. "30 days credit")
     items: List[BillItem]
     subtotal: float
     commission_pct: float = 0.0
@@ -151,10 +158,45 @@ class RokadIn(BaseModel):
     description: str = ""
     ref_bill_id: Optional[str] = None
     mode: str = "Cash"  # Cash, UPI, Bank
+    cash_account_id: Optional[str] = None
+    cash_account_name: Optional[str] = ""
+    counter_account_id: Optional[str] = None
+    counter_account_name: Optional[str] = ""
 
 class RokadOut(RokadIn):
     id: str
     created_at: str
+
+
+class AccountGroupIn(BaseModel):
+    name: str
+    nature: Literal["asset", "liability", "income", "expense"] = "asset"
+
+class AccountIn(BaseModel):
+    name: str
+    group_id: str
+    opening_balance: float = 0.0
+    phone: Optional[str] = ""
+    address: Optional[str] = ""
+    notes: Optional[str] = ""
+
+class JournalLine(BaseModel):
+    account_id: str
+    account_name: str
+    debit: float = 0.0
+    credit: float = 0.0
+
+class JournalIn(BaseModel):
+    date: str
+    narration: str = ""
+    lines: List[JournalLine]
+    ref: Optional[str] = ""
+
+class SettingsIn(BaseModel):
+    firm_name: Optional[str] = "Galla Bahi"
+    fy_start: str = ""   # ISO date
+    fy_end: str = ""     # ISO date
+    current_date: str = ""
 
 
 # --- App / Router ---
@@ -444,6 +486,186 @@ async def party_ledger(pid: str, current=Depends(get_current_user)):
     return {"party": party, "bills": bills, "rokad": rokads}
 
 
+# ---------- ACCOUNT GROUPS ----------
+@api.get("/account-groups")
+async def list_groups(current=Depends(get_current_user)):
+    groups = await db.account_groups.find({}, {"_id": 0}).sort("name", 1).to_list(500)
+    return groups
+
+@api.post("/account-groups")
+async def create_group(body: AccountGroupIn, current=Depends(get_current_user)):
+    doc = body.model_dump()
+    doc["id"] = str(uuid.uuid4())
+    doc["created_at"] = now_iso()
+    await db.account_groups.insert_one(doc.copy())
+    doc.pop("_id", None)
+    return doc
+
+@api.put("/account-groups/{gid}")
+async def update_group(gid: str, body: AccountGroupIn, current=Depends(get_current_user)):
+    res = await db.account_groups.update_one({"id": gid}, {"$set": body.model_dump()})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Group not found")
+    return await db.account_groups.find_one({"id": gid}, {"_id": 0})
+
+@api.delete("/account-groups/{gid}")
+async def delete_group(gid: str, current=Depends(get_current_user)):
+    in_use = await db.accounts.count_documents({"group_id": gid})
+    if in_use:
+        raise HTTPException(400, f"{in_use} accounts is group me hain – pehle hatayein")
+    await db.account_groups.delete_one({"id": gid})
+    return {"ok": True}
+
+
+# ---------- ACCOUNTS (Chart of Accounts) ----------
+@api.get("/accounts")
+async def list_accounts(group_id: Optional[str] = None, current=Depends(get_current_user)):
+    q = {}
+    if group_id:
+        q["group_id"] = group_id
+    accounts = await db.accounts.find(q, {"_id": 0}).sort("name", 1).to_list(2000)
+    # join group name + compute live balance
+    group_map = {g["id"]: g for g in await db.account_groups.find({}, {"_id": 0}).to_list(500)}
+    for a in accounts:
+        g = group_map.get(a.get("group_id"))
+        a["group_name"] = g["name"] if g else ""
+        a["balance"] = await _compute_account_balance(a["id"], a.get("opening_balance", 0.0))
+    return accounts
+
+@api.post("/accounts")
+async def create_account(body: AccountIn, current=Depends(get_current_user)):
+    if not await db.account_groups.find_one({"id": body.group_id}):
+        raise HTTPException(400, "Group invalid hai")
+    doc = body.model_dump()
+    doc["id"] = str(uuid.uuid4())
+    doc["created_at"] = now_iso()
+    await db.accounts.insert_one(doc.copy())
+    doc.pop("_id", None)
+    return doc
+
+@api.put("/accounts/{aid}")
+async def update_account(aid: str, body: AccountIn, current=Depends(get_current_user)):
+    res = await db.accounts.update_one({"id": aid}, {"$set": body.model_dump()})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Account not found")
+    return await db.accounts.find_one({"id": aid}, {"_id": 0})
+
+@api.delete("/accounts/{aid}")
+async def delete_account(aid: str, current=Depends(get_current_user)):
+    await db.accounts.delete_one({"id": aid})
+    return {"ok": True}
+
+async def _compute_account_balance(aid: str, opening: float) -> float:
+    """Compute account balance from journal entries + rokad with cash_account_id."""
+    bal = opening
+    # journal lines
+    async for j in db.journal.find({}, {"_id": 0}):
+        for line in j.get("lines", []):
+            if line.get("account_id") == aid:
+                bal += line.get("debit", 0) - line.get("credit", 0)
+    # rokad mapped to this cash account
+    async for r in db.rokad.find({"cash_account_id": aid}, {"_id": 0}):
+        if r["type"] == "jama":
+            bal += r["amount"]    # receipt – cash account debited (increases)
+        else:
+            bal -= r["amount"]    # payment – cash account credited (decreases)
+    return round(bal, 2)
+
+
+# ---------- JOURNAL ENTRIES ----------
+@api.get("/journal")
+async def list_journal(date_from: Optional[str] = None, date_to: Optional[str] = None,
+                       current=Depends(get_current_user)):
+    q = {}
+    if date_from or date_to:
+        q["date"] = {}
+        if date_from:
+            q["date"]["$gte"] = date_from
+        if date_to:
+            q["date"]["$lte"] = date_to
+    entries = await db.journal.find(q, {"_id": 0}).sort("date", -1).to_list(5000)
+    return entries
+
+@api.post("/journal")
+async def create_journal(body: JournalIn, current=Depends(get_current_user)):
+    # double-entry validation
+    tot_d = sum(ln.debit for ln in body.lines)
+    tot_c = sum(ln.credit for ln in body.lines)
+    if round(tot_d, 2) != round(tot_c, 2):
+        raise HTTPException(400, f"Debit ({tot_d}) aur Credit ({tot_c}) match nahi karte")
+    if tot_d <= 0:
+        raise HTTPException(400, "Amount > 0 hona chahiye")
+    doc = body.model_dump()
+    doc["id"] = str(uuid.uuid4())
+    doc["voucher_no"] = f"J{(await db.journal.count_documents({}) + 1):05d}"
+    doc["total"] = round(tot_d, 2)
+    doc["created_at"] = now_iso()
+    await db.journal.insert_one(doc.copy())
+    doc.pop("_id", None)
+    return doc
+
+@api.delete("/journal/{jid}")
+async def delete_journal(jid: str, current=Depends(get_current_user)):
+    await db.journal.delete_one({"id": jid})
+    return {"ok": True}
+
+
+# ---------- SETTINGS (Financial Year etc.) ----------
+@api.get("/settings")
+async def get_settings(current=Depends(get_current_user)):
+    s = await db.settings.find_one({"id": "default"}, {"_id": 0})
+    if not s:
+        # default FY: Apr 1 – Mar 31 of current year
+        today = datetime.now(timezone.utc).date()
+        fy_year = today.year if today.month >= 4 else today.year - 1
+        s = {
+            "id": "default",
+            "firm_name": "Galla Bahi",
+            "fy_start": f"{fy_year}-04-01",
+            "fy_end": f"{fy_year + 1}-03-31",
+            "current_date": today.isoformat(),
+        }
+        await db.settings.insert_one(s.copy())
+        s.pop("_id", None)
+    return s
+
+@api.put("/settings")
+async def update_settings(body: SettingsIn, current=Depends(get_current_user)):
+    update = {k: v for k, v in body.model_dump().items() if v not in (None, "")}
+    await db.settings.update_one({"id": "default"}, {"$set": update}, upsert=True)
+    return await db.settings.find_one({"id": "default"}, {"_id": 0})
+
+
+# ---------- BACKUP / RESTORE ----------
+@api.get("/backup")
+async def backup(current=Depends(get_current_user)):
+    """Export full database (except users) as JSON."""
+    collections = ["account_groups", "accounts", "parties", "items",
+                   "bills", "rokad", "journal", "settings"]
+    data = {"exported_at": now_iso(), "version": "1.1", "data": {}}
+    for c in collections:
+        data["data"][c] = await db[c].find({}, {"_id": 0}).to_list(50000)
+    return data
+
+@api.post("/restore")
+async def restore(payload: dict, current=Depends(get_current_user)):
+    """Restore from backup JSON. Wipes existing app data (not users)."""
+    data = payload.get("data") or {}
+    collections = ["account_groups", "accounts", "parties", "items",
+                   "bills", "rokad", "journal", "settings"]
+    summary = {}
+    for c in collections:
+        await db[c].delete_many({})
+        docs = data.get(c, [])
+        if docs:
+            await db[c].insert_many(docs)
+        summary[c] = len(docs)
+    return {"ok": True, "restored": summary}
+
+
+# Add cash_account_id to rokad – update field if not set by client (handled in model fallback)
+
+
 # ---------- ROOT ----------
 @api.get("/")
 async def root():
@@ -476,6 +698,9 @@ async def on_start():
     await db.items.create_index("id", unique=True)
     await db.bills.create_index("id", unique=True)
     await db.rokad.create_index("id", unique=True)
+    await db.account_groups.create_index("id", unique=True)
+    await db.accounts.create_index("id", unique=True)
+    await db.journal.create_index("id", unique=True)
 
     # Seed admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@galla.com").lower()
@@ -513,6 +738,53 @@ async def on_start():
             s["created_at"] = now_iso()
         await db.items.insert_many(samples)
         logger.info("Seeded sample galla items")
+
+    # Seed default Account Groups (Tally-style)
+    if await db.account_groups.count_documents({}) == 0:
+        groups = [
+            {"name": "Cash-in-Hand", "nature": "asset"},
+            {"name": "Bank Accounts", "nature": "asset"},
+            {"name": "Sundry Debtors", "nature": "asset"},
+            {"name": "Sundry Creditors", "nature": "liability"},
+            {"name": "Capital Account", "nature": "liability"},
+            {"name": "Loans (Liability)", "nature": "liability"},
+            {"name": "Direct Expenses", "nature": "expense"},
+            {"name": "Indirect Expenses", "nature": "expense"},
+            {"name": "Direct Incomes", "nature": "income"},
+            {"name": "Indirect Incomes", "nature": "income"},
+            {"name": "Sales Account", "nature": "income"},
+            {"name": "Purchase Account", "nature": "expense"},
+            {"name": "Commission (Arhat)", "nature": "income"},
+        ]
+        for g in groups:
+            g["id"] = str(uuid.uuid4())
+            g["created_at"] = now_iso()
+        await db.account_groups.insert_many(groups)
+        logger.info("Seeded default account groups")
+
+    # Seed default cash account
+    if await db.accounts.count_documents({}) == 0:
+        cash_group = await db.account_groups.find_one({"name": "Cash-in-Hand"}, {"_id": 0})
+        bank_group = await db.account_groups.find_one({"name": "Bank Accounts"}, {"_id": 0})
+        if cash_group:
+            await db.accounts.insert_one({
+                "id": str(uuid.uuid4()),
+                "name": "Cash",
+                "group_id": cash_group["id"],
+                "opening_balance": 0.0,
+                "phone": "", "address": "", "notes": "Default cash account",
+                "created_at": now_iso(),
+            })
+        if bank_group:
+            await db.accounts.insert_one({
+                "id": str(uuid.uuid4()),
+                "name": "Bank A/C",
+                "group_id": bank_group["id"],
+                "opening_balance": 0.0,
+                "phone": "", "address": "", "notes": "",
+                "created_at": now_iso(),
+            })
+        logger.info("Seeded default accounts")
 
 
 @app.on_event("shutdown")
