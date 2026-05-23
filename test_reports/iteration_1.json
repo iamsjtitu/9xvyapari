@@ -1,0 +1,49 @@
+{
+  "summary": "First iteration end-to-end review. Backend: 20/20 pytest tests passed (auth + cookies, parties CRUD with computed balance, items CRUD with seeded data, sale/purchase bills with bill_no generation S00001/P00001, auto-rokad linkage on payment_received, dashboard summary, party ledger, auth-required on all non-auth endpoints). Frontend: login -> dashboard -> party create -> item visibility (6 seeded) -> rokad entry -> bill creation -> bill view all PASS. All testid selectors match spec.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/summary/dashboard", "issue": "Computes party balance for ALL parties on every dashboard call via _compute_party_balance which itself loads all bills/rokad per party. O(N^2) - will get slow with many parties/bills. Consider aggregation pipeline or denormalized balance field."},
+      {"endpoint": "/api/bills (create)", "issue": "_next_bill_no uses count_documents which is NOT race-safe under concurrent requests; two simultaneous creates of same bill_type could produce duplicate bill_no. Use an atomic counter collection (findOneAndUpdate $inc) or unique index + retry."},
+      {"endpoint": "/api/auth/login", "issue": "No rate limiting / brute force lockout. Auth playbook recommends lockout after 5 failed attempts."},
+      {"endpoint": "All endpoints", "issue": "current=Depends(get_current_user) result is unused but evaluated for auth check - fine, just noting param naming could be clearer (_=Depends)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "NayaBill modal", "issues": ["Uses native browser <select> for Party and Item dropdowns - acceptable but inconsistent with shadcn-style controls available; also uses native <input type='date'> (browser default picker) instead of shadcn calendar - acceptable for desktop but not consistent with design system."]},
+      {"screen": "NayaBill modal", "issues": ["Date input default value comes from todayISO() which uses local time; ensure consistent ISO date handling across timezones."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Consider making bill_no generation race-safe (atomic counter) before production load.",
+    "Add brute force lockout per /app/auth_testing.md (5 fails -> temporary lock).",
+    "Optimize dashboard balance aggregation if party count grows >100.",
+    "Optional: replace native date input with shadcn calendar to align with design system."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 521 lines - acceptable; if more features are added, split into routers (auth, parties, items, bills, rokad, reports).",
+    "_compute_party_balance is called inside list_parties for every party (loop) - causes N+1 query pattern. Consider single aggregation or caching.",
+    "Bills POST returns doc with _id removed AFTER insert - good. All endpoints correctly exclude _id via projection {'_id':0} - GOOD pattern.",
+    "JWT secret hardcoded length in .env - long random string - acceptable.",
+    "CORS allow_credentials=True with explicit origin list - correct for cookie auth.",
+    "set_auth_cookies uses samesite='none' + secure=True which requires HTTPS (production preview URL is HTTPS - OK).",
+    "Frontend api wrapper sends withCredentials + Bearer fallback - dual auth supported correctly."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin@galla.com / admin123 (loaded from /app/memory/test_credentials.md - matches backend seed)",
+  "seed_data_creation": "Test created and cleaned up: TEST_ prefixed parties, items, bills, rokad entries via pytest fixtures. All cleaned. Browser-test party 'DirectTest' and any bills also cleaned via curl after run.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "App is solid. 20-test pytest suite at /app/backend/tests/backend_test.py covers auth, all CRUD, computed party balance, sale/purchase bill_no generation, auto-rokad linkage, dashboard. Backend reseeds 6 galla items if items collection empty. DO NOT save/touch files in /app/backend/* during browser UI tests - uvicorn --reload restarts the backend and creates race conditions for in-flight requests. The empty parties dropdown observed once during testing was caused by such a race (pytest file modified while browser test was running); subsequent runs with stable backend pass. Cookie auth uses samesite=none + secure=true so requests over HTTP will not set cookies - always use the HTTPS preview URL.",
+  "rca of the issue": "No production bugs found. One transient test failure (parties dropdown empty in NayaBill modal) had root cause: backend was hot-reloading because tests/backend_test.py was being edited mid-test, dropping new party POSTs. After backend stabilized and a party was created via curl, full bill creation flow (party select -> item select -> qty/payment -> save -> navigate to /bills/:id -> render BillView S00001) passes end-to-end."
+}
