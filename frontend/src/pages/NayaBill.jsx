@@ -4,6 +4,7 @@ import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, Trash, Receipt, X, MagnifyingGlass } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
+import PartyAutocomplete from "@/components/PartyAutocomplete";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useTableNav } from "@/hooks/useTableNav";
 
@@ -257,13 +258,10 @@ export default function NayaBill() {
       description: "Add line item" },
   ], [open, filter]);
 
-  // Filter party options based on group nature
-  const sellerOptions = parties.filter((p) =>
-    isPurchase ? /purchase party/i.test(p.group_name || "") || !p.group_name
-               : /sales party/i.test(p.group_name || "") || !p.group_name
-  );
-  const buyerOptions = parties.filter((p) => /sales party/i.test(p.group_name || ""));
-  const agentOptions = parties; // any party can be agent
+  // All parties available in every party field — user filters via typing.
+  const sellerOptions = parties;
+  const buyerOptions = parties;
+  const agentOptions = parties;
 
   // Arrow-key table navigation
   const { rowProps } = useTableNav({
@@ -458,47 +456,50 @@ export default function NayaBill() {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="lbl">{isPurchase ? "Seller Party" : "Customer / Party"} *</label>
-                  <select className="input-dense" value={form.party_id}
-                    onChange={(e) => {
-                      const p = parties.find((x) => x.id === e.target.value);
-                      setForm({ ...form, party_id: e.target.value, party_name: p?.name || "" });
-                    }} data-testid="select-bill-party">
-                    <option value="">— Party chunein —</option>
-                    {sellerOptions.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.code ? `${p.code} · ` : ""}{p.name}{p.place ? ` (${p.place})` : ""}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="lbl">Seller Party *</label>
+                  <PartyAutocomplete
+                    value={form.party_name}
+                    selectedId={form.party_id}
+                    options={sellerOptions}
+                    onPick={(p) => setForm({ ...form, party_id: p.id, party_name: p.name })}
+                    onChangeText={(t) => setForm((f) => ({
+                      ...f, party_name: t,
+                      party_id: f.party_name === t ? f.party_id : "",
+                    }))}
+                    placeholder="Naam likhein (auto suggest)..."
+                    testId="select-bill-party"
+                    required
+                  />
                 </div>
-                {isPurchase && (
-                  <div className="md:col-span-2">
-                    <label className="lbl">Buyer Party (Final Customer)</label>
-                    <select className="input-dense" value={form.buyer_id}
-                      onChange={(e) => {
-                        const p = parties.find((x) => x.id === e.target.value);
-                        setForm({ ...form, buyer_id: e.target.value, buyer_name: p?.name || "" });
-                      }} data-testid="select-buyer">
-                      <option value="">— Koi nahi (apne stock me) —</option>
-                      {buyerOptions.map((p) => (
-                        <option key={p.id} value={p.id}>{p.code ? `${p.code} · ` : ""}{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                <div className="md:col-span-2">
+                  <label className="lbl">Buyer Party (Final Customer)</label>
+                  <PartyAutocomplete
+                    value={form.buyer_name}
+                    selectedId={form.buyer_id}
+                    options={buyerOptions}
+                    onPick={(p) => setForm({ ...form, buyer_id: p.id, buyer_name: p.name })}
+                    onChangeText={(t) => setForm((f) => ({
+                      ...f, buyer_name: t,
+                      buyer_id: f.buyer_name === t ? f.buyer_id : "",
+                    }))}
+                    placeholder="Optional — final customer ka naam"
+                    testId="select-buyer"
+                  />
+                </div>
                 <div className="md:col-span-2">
                   <label className="lbl">Agent / Dalal</label>
-                  <select className="input-dense" value={form.agent_id}
-                    onChange={(e) => {
-                      const p = parties.find((x) => x.id === e.target.value);
-                      setForm({ ...form, agent_id: e.target.value, agent_name: p?.name || "" });
-                    }}>
-                    <option value="">— Koi nahi —</option>
-                    {agentOptions.map((p) => (
-                      <option key={p.id} value={p.id}>{p.code ? `${p.code} · ` : ""}{p.name}</option>
-                    ))}
-                  </select>
+                  <PartyAutocomplete
+                    value={form.agent_name}
+                    selectedId={form.agent_id}
+                    options={agentOptions}
+                    onPick={(p) => setForm({ ...form, agent_id: p.id, agent_name: p.name })}
+                    onChangeText={(t) => setForm((f) => ({
+                      ...f, agent_name: t,
+                      agent_id: f.agent_name === t ? f.agent_id : "",
+                    }))}
+                    placeholder="Agent ka naam likhein..."
+                    testId="select-agent"
+                  />
                 </div>
               </div>
             </div>

@@ -1,117 +1,66 @@
-# Galla Bahi – Kaccha Arhat Hisab Kitab
+# Galla Bahi – Hisab Kitab Software (PRD)
 
 ## Original Problem Statement
-"Ek hisab kitab software banana h mujhe electron based galla businessman ke liye same jaise jama kharch rokad panna banate h"
+User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla / Kaccha Arhat businessmen — exactly like his old DOS-based FoxPro 2.6 system. Same 18-group ledger structure, detailed Purchase/Sale entry with Hamali/Dalali/Bhada/Mandi Tax etc., DOS-style A4 landscape Jama/Kharch print, Rokad Panna (cash book) bank-wise filtering, Trial Balance, GST Returns, and DBF data import. Hindi/Hinglish UI.
 
-User clarifications:
-- Platform: Electron-style desktop (delivered as web app, can be wrapped in Electron later)
-- Language: Hinglish (UI in English script with traditional terms)
-- Scope: Full Kaccha Arhat workflow (commission agent in Indian grain mandi)
+## Tech Stack
+- Frontend: React + Tailwind + Shadcn UI (`/app/frontend`)
+- Backend: FastAPI + Motor MongoDB (`/app/backend/server.py`)
+- DBF parsing: `dbfread`
+- Exports: PDF/Print (CSS), XLSX (`xlsx`), Word (`docx`)
+- Auth: JWT (admin@galla.com / admin123 — see `/app/memory/test_credentials.md`)
+
+## What's Implemented
+- FoxPro-matching schema: 18 Account Groups, Parties, Items, detailed Bills with 30+ fields
+- DBF Import for LEDGR/CASHBOOK/TRANSPR/TRANSPUR
+- Rokad Panna (Cash Book) with bank-wise filter, opening/closing balance, per-cash voucher numbering
+- DOS-style Jama/Kharch side-by-side A4 landscape print/PDF
+- Trial Balance grouped by FoxPro master ranges
+- GST Returns, Inward Register, Journal Entry, Galla Master
+- Global keyboard shortcuts (Alt+C, Alt+M, etc.) + ShortcutHelp overlay
+- Arrow-key table navigation (`useTableNav.js`)
+- Payment Cond → auto-compute Due Date in bills
+- Dashboard "Bills Due" notifications (overdue / today / 7-day soon)
+- PDF/Excel/Word exports on every register
+- **NEW (Feb 2026): Auto-suggesting Party fields in Sale/Purchase entry**
+  - Sale and Purchase forms now both show 3 fields: Seller Party* / Buyer Party (Final Customer) / Agent (Dalal)
+  - Each field has type-ahead autocomplete (`PartyAutocomplete.jsx`) — code + name + place, keyboard nav (Up/Down/Enter/Esc/Tab)
 
 ## Architecture
-- **Backend**: FastAPI + MongoDB (motor async driver), UUID-string IDs, JWT auth (httpOnly cookies + Bearer fallback). All routes under `/api`.
-- **Frontend**: React 19, React Router 7, Tailwind, shadcn primitives, Phosphor icons, IBM Plex Sans/Mono + Work Sans fonts, sonner toasts. Parchment + terracotta "digital Bahi-Khata" theme.
-- **DB Collections**: `users`, `parties`, `items`, `bills`, `rokad`.
+```
+/app
+├── backend/server.py          # Single-file FastAPI app
+└── frontend/src
+    ├── components/
+    │   ├── Layout.jsx
+    │   ├── ExportBar.jsx
+    │   ├── ShortcutHelp.jsx
+    │   └── PartyAutocomplete.jsx   # NEW – reusable name autosuggest
+    ├── hooks/
+    │   ├── useKeyboardShortcuts.js
+    │   └── useTableNav.js
+    └── pages/
+        ├── Dashboard.jsx, Login.jsx, Settings.jsx, Backup.jsx
+        ├── RokadPanna.jsx (Cash Book), PartyKhata.jsx, PartyLedger.jsx
+        ├── Accounts.jsx, AccountGroups.jsx, GallaMaster.jsx
+        ├── NayaBill.jsx (Sale + Purchase entry)
+        ├── BillView.jsx, Inward.jsx, JournalEntry.jsx
+        ├── TrialBalance.jsx, GSTReturns.jsx, Reports.jsx
+        └── ImportDBF.jsx
+```
 
-## User Personas
-- **Galla Arhati / Commission Agent**: Records daily cash (Jama/Kharch), creates Sale & Purchase bills with arhat commission, tracks party-wise udhaar.
-- **Farmer / Kisan & Trader / Grahak**: Reflected as Parties (supplier / customer / both).
+## Roadmap / Backlog
+- **P0**: Electron desktop packaging (.exe for Windows) — user's original ask, deferred
+- **P1**: Per-party ledger printout in FoxPro Mahajani format
+- **P1**: Auto-suggest items in line-item dropdown (same pattern as PartyAutocomplete)
+- **P2**: Year-end carry-forward of balances
+- **P2**: Multi-user / role-based access
+- **P2**: SMS/WhatsApp reminders for overdue bills
 
-## Core Requirements (static)
-- Daily Rokad Panna (two-column Jama | Kharch ledger with daily summary)
-- Party Khata (CRUD + chronological ledger per party with running balance)
-- Galla Master (items with unit + rate)
-- Naya Bill (Sale/Purchase) with multi-line items, arhat %, other charges, partial payment
-- Bill view + Print (browser print → PDF)
-- Reports (date-range Jama/Kharch totals, Sales/Purchase totals, commission earned, daily breakup)
-- Dashboard KPIs (today, this month, udhaar, owed)
-- Auth (email/password JWT)
+## Verification Status
+- Web app smoke-tested via screenshot tool — login/dashboard/bill modal all working.
+- Last feature (PartyAutocomplete) verified live: 12 suggestions on "tar", selection populates field, both Sale and Purchase modes show all 3 party fields.
 
-## What's Implemented (2026-02-23 — v1.0)
-- ✅ Full auth flow (login, register, logout, /me) with cookies + Bearer fallback
-- ✅ Admin seeding from `.env` (admin@galla.com / admin123)
-- ✅ 6 sample galla items auto-seeded (Gehu, Chana, Sarson, Chawal, Bajra, Makka)
-- ✅ Parties CRUD with computed live balance
-- ✅ Items CRUD
-- ✅ Bills (Sale + Purchase) with bill_no auto-generation (S00001 / P00001), commission, payment, balance
-- ✅ Auto rokad entry creation when bill has `payment_received > 0`
-- ✅ Rokad entries CRUD with date filter
-- ✅ Dashboard summary, party ledger summary
-- ✅ Reports page with KPIs + daily breakup
-- ✅ Printable bill view (PDF via browser print)
-- ✅ Desktop-style dense UI: dark sidebar, parchment paper background, two-column rokad ledger, IBM Plex Mono numbers, terracotta accents
-- ✅ Full data-testid coverage on interactive elements
-- ✅ 100% backend + frontend test pass (20-test pytest suite)
-
-## v1.4 (2026-02-23) — Print + PDF + Excel Export Everywhere
-- ✅ **3-button `ExportBar`** (Print / PDF / Excel) added to all major pages
-- ✅ **FoxPro AA.TXT-style print** — monospaced (IBM Plex Mono), `GALLA BAHI | DATE | TIME` header, centered title with `----` underline, dense monochrome tables, dotted row separators, group totals with double underline. Matches the original software output exactly.
-- ✅ **PDF export** — uses browser print-to-PDF (cleanest, no extra library needed; user picks "Save as PDF" in print destination)
-- ✅ **Excel export** — uses `xlsx` library, multi-sheet support (e.g. Cash Book has Receipts + Payments sheets, Reports has Daily Summary + Bills Summary)
-- ✅ **Reusable `FoxProPrintHeader`** component with firm name, phone, date/time, title, subtitle
-- ✅ Global print CSS hides sidebar, action buttons, search bars; force monospace + B/W rendering
-- ✅ Added to: Trial Balance, GST Returns, Master Ledger (Party Khata), Cash Register (Rokad), Bills list, Bill View, Inward Register, Reports, Galla Master, Journal Entry, Party Ledger, Account Groups, Accounts (12 pages)
-
-## v1.3 (2026-02-23) — Full Data Migration from FoxPro
-- ✅ **5 new DBF import endpoints**: /import-dbf/cashbook (→ rokad), /inward (→ inward), /items (→ items), /gst (→ gst_returns), /transactions (→ bills with full TRANSPR mapping)
-- ✅ **Per-cash-account voucher numbering** — `GET /api/cash-accounts/{pid}/next-voucher` returns next max voucher_no + 1 for that cash account. Rokad model now has voucher_no + chq_no fields. Frontend auto-suggests voucher when cash a/c selected.
-- ✅ **GST Returns page** (/gst-returns) with GSTR-1 style table + totals (Taxable, CGST, SGST, IGST, Invoice Amt).
-- ✅ **Real production data migrated** from user's FoxPro WS2026/:
-  - 527 parties (LEDGR.DBF)
-  - 15 items (PROFIT.DBF: DHAN, CHAWAL, KHANDA, BARDANA etc.)
-  - 42 inward entries (INWARDS+INWARDP — CHOUPAL/SALASAR/BAHUBALI/AQUA COLD)
-  - 16 rokad entries (CASHBOOK+CASHTEM with V.117/134/135/136 per SBI cash account)
-  - 4 purchase bills (TRANSTEM) with full Hamali/Discount/Dalali charges
-  - 50 GST returns (AAGSTRET — PRAKASH INDUSTRIES, REAL ISPAT, BALAJI LOHA etc.)
-- ✅ Trial Balance reflects real numbers: SALES PARTY Dr ₹55.35 Cr, PURCHASE PARTY Cr ₹59.13 Cr, COLD STORAGE Dr ₹3.40 Cr, CASH & BANK BALANCE Dr ₹1.30 Cr / Cr ₹2.86 Cr
-- ✅ Auto-seed of CASH IN HAND in legacy accounts collection skipped when party with code 301 exists
-- ✅ ImportDBF page supports 13 FoxPro tables with auto-routing to correct endpoint
-- ✅ 100% pass: 51/51 backend pytest + full frontend e2e on iteration_4
-
-## v1.2 (2026-02-23) — Deep FoxPro Audit + Replication
-User shared original FoxPro 2.6 DOS-based "Galla Hisab" software (ZIP with `.DBF`, `.FXP`, `.PRG` files). Did full audit of the 544-row LEDGR.DBF, GROUPTEM.DBF, TRANSPR.DBF (purchase entry with 40+ fields), CASHBOOK.DBF, PARAMET.DBF, INWARDS.DBF, AAGSTRET.DBF.
-
-- ✅ **18 exact account groups with FCODE-LCODE code ranges** (CAPITAL A/C 1-50, LOANS 51-100, OTHER DEPOSITS 101-200, FIXED ASSETS 201-250, CURRENT ASSETS 251-299, CASH & BANK BALANCE 300-349, SALES PARTY 350-1199, PURCHASE PARTY 1200-2199, COLD STORAGE 2200-2400, LOANS & ADVANCES 2500-2899, SALES A/C 3001-3034, INDIRECT INCOMES 3035-3049, PURCHASE A/C 3050-3099, INDIRECT EXP 3100-3149, OTHER EXP 3150-3199, SALARY A/C 3200-3249, DIRECT EXPENSES 3250-3299, STAFF ADVANCE 3300-3400)
-- ✅ **Unified Master Ledger** (parties = LEDGR.DBF) with `code` (numeric), `group_id`, `place`, `gstin` (F_G_L_NO), `pan`, `cstno`, `mpstno`, `opening_balance`, `opening_qty`, `rate`, `alt_name` (GL_NAME1), `address`, `address2`
-- ✅ **Auto next-code suggestion** when creating ledger under a group
-- ✅ **Detailed Purchase Entry** with full TRANSPR.DBF fields: E.Date, S.Date, Lot No., GP No., Due Date, Payment Cond., Seller Party, Buyer Party, Agent/Dalal, Truck No (TNO), Driver Name, Bilty No (BUILTY), Garage, No. of Bags, Bag Pack Q; per-line **Bag, Pack, Weight, W.B., Ghat, Net Wt, Rate, Amount**; charges sections **Additions** (Hamali rt+amt × bags, Cartage rt+amt × bags, Bhada rt+amt × Qtl, Mandi Tax %, Dalali/Arhat %, Garage rt+amt, Loading, Brokerage Dalali, Other) + **Deductions** (Discount rt+amt × Qtl, Rebate rt+amt × Qtl, Less, Advance); Remark 1, Remark 2
-- ✅ **Inward Register** (cold storage stock tracking with Lot, Bags, Weight)
-- ✅ **Trial Balance Report** (matches FoxPro AA.TXT) — grouped sections sorted by fcode with Code/Narration/Debit/Credit columns + Group totals + Grand totals
-- ✅ **DBF Import** (parses uploaded `.DBF` files; LEDGR.DBF auto-imports as parties with group auto-detected by code range) — successfully imported user's 544-row LEDGR.DBF → 526 ledgers
-- ✅ Sidebar reorganized with Import (DBF) in Maintenance section
-- ✅ 100% backend (31/31 tests) + frontend pass on iteration_3
-- ✅ **Account Groups** (Tally-style chart of accounts) – 13 default groups seeded by nature (Asset / Liability / Income / Expense)
-- ✅ **Accounts (Khate)** – non-party accounts (Cash, Bank A/C seeded by default) with computed balance from journal + rokad
-- ✅ **Journal Entry** – double-entry voucher with debit==credit validation, voucher_no J00001
-- ✅ **Detailed Purchase Entry** – added fields: E.Date, S.Date, GP No., Truck No., Seller Party, Payment Condition, Bag/Tin Pack, Qty (Bags), Weight, W.B. (Kanta / Weight Bridge)
-- ✅ **Backup / Restore** – full JSON export of all 8 collections (no users), restore round-trip preserves users
-- ✅ **Financial Year settings** – default Apr 1 – Mar 31, firm name, current working date
-- ✅ **Sidebar reorganized** into Operations / Setup / Maintenance sections with keyboard-shortcut letter badges (M, C, D, E, F, G, A, B, P, I, H, J)
-- ✅ **Cash Register** can pick from Cash / Bank accounts
-- ✅ 100% backend (40 tests) + frontend test pass
-
-## Prioritized Backlog
-### P1 (next)
-- Atomic bill_no generation (counter collection) to prevent race condition under concurrent creates
-- Brute-force lockout on `/api/auth/login` (5 fails → 15 min lock)
-- Bill edit (currently only create + delete)
-- GST/Tax fields on bill (separate from arhat)
-
-### P2
-- Export reports to Excel/CSV
-- Stock tracking per item (running balance from bills)
-- Multi-user roles (manager vs munim)
-- Backup / restore JSON
-- Keyboard shortcuts (Ctrl+N for new bill, etc.)
-- Replace native `<select>` with shadcn Select where dense lookup is heavy
-
-### P3 (future)
-- Electron desktop packaging (wrap React build in Electron shell)
-- WhatsApp share for bill (via wa.me link)
-- Multi-firm support
-- E-invoicing / e-way bill generation
-
-## Next Action Items
-1. Wait for user feedback on what they want next (edit bills, GST, exports, etc.)
-2. Optionally optimize dashboard balance aggregation for >100 parties
-3. Optionally add atomic bill_no counter before scaling
+## Test Credentials
+See `/app/memory/test_credentials.md`
+- admin@galla.com / admin123
