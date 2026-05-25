@@ -1449,12 +1449,13 @@ async def list_gst_returns(current=Depends(get_current_user)):
 # ---------- AN.DBF (Journal / Transaction history) ----------
 @api.post("/import-dbf/journal")
 async def import_dbf_journal(payload: dict, current=Depends(get_current_user)):
-    """Import AN.DBF (journal/transaction history) rows.
+    """Import AN.DBF / AN1.DBF (journal/transaction history) rows.
     Each row is one side of a double-entry transaction. We store them in
     `dos_journal` collection so the user retains every line; pairing into
     balanced journal entries is done lazily for display.
     """
     rows = payload.get("rows") or []
+    source = (payload.get("source") or "AN.DBF").upper()
     if not rows:
         raise HTTPException(400, "Koi rows nahi hain")
 
@@ -1500,11 +1501,11 @@ async def import_dbf_journal(payload: dict, current=Depends(get_current_user)):
                 "chq_no": (r.get("CHQ_NO") or "").strip(),
                 "weight": float(r.get("WGT") or 0),
                 "rate": float(r.get("RATE") or 0),
-                "imported_from": "AN.DBF",
+                "imported_from": source,
                 "row_index": idx,
             }
-            # Upsert by (row_index, imported_from) — each AN.DBF row is unique
-            key = {"row_index": idx, "imported_from": "AN.DBF"}
+            # Upsert by (source file, row_index) — each row is unique
+            key = {"row_index": idx, "imported_from": source}
             existing = await db.dos_journal.find_one(key)
             if existing:
                 await db.dos_journal.update_one({"id": existing["id"]}, {"$set": doc})
@@ -1547,7 +1548,7 @@ async def migrate_dos_data(payload: dict = None, current=Depends(get_current_use
     except ImportError:
         raise HTTPException(500, "dbfread not installed")
 
-    folder = (payload or {}).get("folder") or "/tmp/galla_audit/FOXPRO2/WS2026"
+    folder = (payload or {}).get("folder") or "/app/backend/dos_backup/FOXPRO2/WS2026"
     if not _os.path.isdir(folder):
         raise HTTPException(400, f"DOS folder not found: {folder}")
 
@@ -1561,7 +1562,10 @@ async def migrate_dos_data(payload: dict = None, current=Depends(get_current_use
         ("INWARDS.DBF", "inward",       {}),
         ("AAGSTRET.DBF","gst",          {"replace": True}),
         ("TRANSTEM - Copy.DBF", "transactions", {"bill_type": "purchase"}),
+        ("TRANSTEM.DBF",        "transactions", {"bill_type": "purchase"}),
         ("AN.DBF",      "journal",      {}),
+        ("AN1.DBF",     "journal",      {}),
+        ("AN2.DBF",     "journal",      {}),
     ]
 
     def _read_dbf(path):
@@ -1604,6 +1608,8 @@ async def migrate_dos_data(payload: dict = None, current=Depends(get_current_use
                                         "count": 0})
                 continue
             body = {"rows": rows, **extra}
+            if kind == "journal":
+                body["source"] = fname.upper()
             fn = DISPATCH.get(kind)
             if not fn:
                 report["steps"].append({"file": fname, "kind": kind, "status": "unsupported"})

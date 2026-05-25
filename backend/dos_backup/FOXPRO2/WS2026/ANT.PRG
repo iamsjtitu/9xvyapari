@@ -1,0 +1,19 @@
+SELE 1
+USE LEDGRMAS ALIAS A
+SELE 2
+USE OUTPREPO ALIAS B
+repl all gl_y_op with gl_y_op+tr_amnt_db-tr_amnt_cd
+SELE 1
+GO TOP
+DO WHILE .NOT. EOF()
+	SELE 2
+	LOCATE FOR A->TR_GL_CODE=B->TR_GL_CODE
+	IF FOUND()
+		REPL A->GL_Y_OP WITH B->GL_y_OP
+	ENDIF
+	SELE 1
+	SKIP
+ENDDO
+
+
+

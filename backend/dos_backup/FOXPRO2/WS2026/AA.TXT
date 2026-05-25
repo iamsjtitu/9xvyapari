@@ -1,0 +1,518 @@
+
+ TESTING DATA                                                                                
+
+ Trial Balance From : 01/04/2026 To : 08/05/2026
+ FINANCIAL YEAR : 2026-2026                                           Page No:  1
+ -------------------------------------------------------------------------------
+ Code    Narretion                            Debits        Credits
+ -------------------------------------------------------------------------------
+
+   CAPITAL A/C
+
+    2 B M,                                                              160
+                                                       --------------------
+                                                                        160
+                                                       ---------------------
+   LOANS (LIABILITY)
+
+
+                                                                           
+
+   OTHER DEPOSITS
+
+  102 BC ACCOUNT.,                                                   74,000
+  103 ADVANCE TAX(MM/MTL/SK),                23,38,430
+  105 TDS A/C,                                  99,123
+  106 KOTAK-SK TRADERS.,                      2,83,760
+                                     ----------------- --------------------
+                                             27,21,313               74,000
+                                     ---------------------------------------
+   FIXED ASSETS
+
+
+                                                                           
+
+   CURRENT ASSETS
+
+
+                                                                           
+
+   CASH & BANK BALANCE
+
+  301 CASH IN HAND,                          96,99,945
+  302 HDFC M M TRADERS.,                     17,78,546
+  303 HDFC MITTAL TRADERS.,                  13,76,683
+  304 AXIS SK TRADERS.,                         47,691
+  306 SBICR-MM TRADERS,                       1,08,872
+  307 SBICC-M M TRD.,                                           2,86,16,472
+                                     ----------------- --------------------
+                                           1,30,11,737          2,86,16,472
+                                     ---------------------------------------
+   SALES PARTY
+
+  355 GUD SHUBHAM ENTERPRISES JHADGR,        12,96,683
+  356 RP AWDHESH JAIN RP,                                          1,15,282
+  359 D.TARAI DEV CHHETIJA,                                               5
+  360 SURENDAR KESINGA,                                            5,91,725
+  361 MANISH BHATAPARA,                       5,80,000
+  362 RP SAKET JAIN RP,                                                  12
+  363 GOPAL BABU (RAJIV GOYAL),                                   12,81,000
+  364 RAMOTAR BAGRI,                         59,89,094
+ -------------------------------------------------------------------------------
+ TESTING DATA                                                                                
+
+ Trial Balance From : 01/04/2026 To : 08/05/2026
+ FINANCIAL YEAR : 2026-2026                                           Page No:  2
+ -------------------------------------------------------------------------------
+ Code    Narretion                            Debits        Credits
+ -------------------------------------------------------------------------------
+
+  366 D.TARAI GOPAL SALES,                           1
+  370 RP GYANU TAWARI,                       66,70,165
+  371 D.TARAI VIVEK JAIN,                           15
+  374 BAJRANG TAU,                                                11,49,971
+  375 D.TARAI JAY SHANKAR,                           5
+  377 BALURAM MANGAT JHADGRAM,                                    95,45,667
+  378 MOHAPATRA JAGGERY,                     35,01,878
+  379 VAIBHAV DALAL,                         11,24,990
+  380 GUD AARNA TRADING JHARSUGUDA,             36,512
+  381 UMA KAKA,                              17,21,350
+  383 GUD AJAY SHARMA,                       12,81,325
+  385 D.TARAI ALWA BROTHERS,                         9
+  386 D.TARAI BHARAT KUKREJA,                                      3,05,074
+  388 SURESH SJR,                               21,960
+  389 D.TARAI SHUBH TRADERS,                                         58,515
+  390 D.TARAI SACHIN JI,                      8,00,015
+  391 HELP JEETU BHAIYA,                        88,600
+  392 OWNER SHYAM COLD,                      75,89,330
+  393 OM PRAKASH STORE TATA,                 24,82,555
+  395 HARIPRIYA,                                                          7
+  396 GUD LALIT LADDUGAON,                   11,40,710
+  398 D.TARAI SANJAY CHHETIJA,                                            5
+  400 D.TARAI SONU GOYAL,                 14,79,20,135
+  401 D.TARAI OM TRADERS,                    12,00,000
+  403 NAVIN DEVKAR,                                             2,56,57,586
+  404 PRATIK INDUSTRIES,                         7,000
+  405 D.TARAI RAJKUMAR DANUMAL,                     14
+  406 D.TARAI DANUMAL & SONS,                       17
+  408 MANISH BARGARH,                                             30,93,548
+  411 VINOD DALL MILL BHATAPARA,                                  55,00,000
+  412 KAPIL JI DHARAMGARH,                   14,37,488
+  413 SUBHASH FUFA SPL.,                     71,10,000
+  414 OWNER CG COLD,                            25,103
+  415 HARESH BABA SPL,                       17,57,983
+  416 ANIL KBJ(MANOJ HARISHANKAR),            7,18,900
+  418 JAI PAHADI MATA KASHIPUR,                      1
+  421 DEEPAK LATHOR,                             4,042
+  422 GUD AALEKH JI,                                              12,24,645
+  423 TITU SINDHIKELA,                                          1,17,00,114
+  424 BHARAT BANSAL JI,                    1,27,20,690
+  425 D.TARAI ANAND AARANG,                                          20,000
+  426 RAMAVTAR DALAL,                            2,002
+  427 D.TARAI LALCHAND JI,                   92,10,280
+  430 RP ABHAY JAIN RP,                          1,251
+  431 D.TARAI M B SAREE,                            20
+  433 BANDI KRISHNAMURTHY ANDHRA,                                    96,000
+  434 KAILASH MAMA KBJ.,                      5,00,038
+  438 SHRI RAM BHANDAR PRATAPUR(P.BO,        12,95,180
+  439 NIRMALA TRADING COM.AMBODULA,          22,27,865
+  441 PRAKASH TRADERS-P.BOTHRA,               2,90,254
+  442 MURLI RADHA KISHAN,                    49,65,000
+ -------------------------------------------------------------------------------
+ TESTING DATA                                                                                
+
+ Trial Balance From : 01/04/2026 To : 08/05/2026
+ FINANCIAL YEAR : 2026-2026                                           Page No:  3
+ -------------------------------------------------------------------------------
+ Code    Narretion                            Debits        Credits
+ -------------------------------------------------------------------------------
+
+  443 PADNABHA LITTIGUDA(RAHUL TRD),          9,36,000
+  445 D.TARAI JYOTI SALES.,                          5
+  448 MANISH SINDHIKELA,                     27,57,000
+  449 D.TARAI BAJRANGI TRADERS,                      3
+  450 RAMU DHALMUDIYA.,                                            5,00,000
+  451 SHANTI TRADERS ISLAMPUR.,               2,04,946
+  452 KRISHNA MURTHY ANDHRA,                     9,421
+  453 NEHA STORE SAHIBGANJ(P.BOTHRA),        13,04,124
+  454 RINKY AGRAWAL,                                            2,99,70,000
+  459 PRADEEP BOTHRA DALAL(GUD),             43,15,102
+  460 RP VINOD SHARMA,                               7
+  461 ISWAR VIJAYNAGRAM.,                    21,07,000
+  462 SHIV GUPTA,                                                 87,82,709
+  463 OWNER OSWAL COLD(HEMANT JI),                  12
+  464 BALAJI PEDI(RICE MILL GOLBAZAR,                2
+  465 JP TAYAL.,                                                         15
+  470 MM A/C,                              2,37,05,665
+  471 GUD MAHENDRA PRASAD&SONS-BOTHR,        10,69,800
+  472 INDER BHAIYA SINGJHAR,                                       1,72,450
+  475 RP RAHUL B.M.COMPLEX,                   9,05,000
+  478 BASUDEV PRASAD BHAGAT-BOTHRA,                                   2,840
+  479 GUD KALU BABU PAPDAHANDI,                                    7,34,045
+  481 MAHENDAR BHAIYA RP.,                 1,36,96,269
+  482 SHYAM SUNDER SONPUR.,                  15,90,000
+  484 PRAMOD PRASAD AMARKUMAR.,                  5,223
+  485 D.GOYAL SALES GUDIYARI,                                             2
+  486 PAWAN BHAIYA BODEN.,                                           60,000
+  487 CHANDU AGR.CHAANDU TARA.,                                   15,90,000
+  488 RP ASHOK MIDAS RP.,                    28,04,300
+  489 GUD SHANKAR STORE.,                       11,180
+  491 OWNER M.A.COLD DEVESH JI.,                                        325
+  492 MAA SHARDEY BHANDAR SITAMARI P,                1
+  493 MAA BAMLESWARI TRD.,                    2,97,500
+  495 ARIF BHAI JHAKARPARA.,                                      14,48,016
+  496 PRAVIN KHARIYAR.,                                            1,40,260
+  497 MUKESH KIRANA DV.,                                             20,200
+  500 RP PINKU JOSHI.,                                          4,09,50,368
+  501 RP UMESH GANDAWALI,                           25
+  503 RP MANOJ SAKLEJA.,                     14,40,000
+  504 GAJJU KAKA.,                         6,96,70,973
+  506 BINOD MEDICAL.,                                             39,89,090
+  507 BHAVI JI.,                                                  52,10,000
+  512 KRISHNA TRADING CO.UMERIYA,                2,480
+  513 D.TARAI DB&SONS.,                              5
+  516 GUD NIKHIL DALAL DELHI.,                  19,305
+  518 CHANDI WASHIM KHAN,                        8,700
+  520 RP AMIT BHATAPARA.,                                                 3
+  524 RAKHI KA SASUR.,                                          1,84,85,000
+  525 RP JITU THAKUR.,                               9
+  526 GUD SK TRADERS GOLAPUR-BOTHRA.,                1
+  527 RP WASHIM KHAN,                      7,35,99,325
+ -------------------------------------------------------------------------------
+ TESTING DATA                                                                                
+
+ Trial Balance From : 01/04/2026 To : 08/05/2026
+ FINANCIAL YEAR : 2026-2026                                           Page No:  4
+ -------------------------------------------------------------------------------
+ Code    Narretion                            Debits        Credits
+ -------------------------------------------------------------------------------
+
+  528 MOHAN KANTABANJI.,                                             90,000
+  530 RAJU MAHRAJ DHURWAGUDI.,                                     7,54,590
+  531 SHRI SAI VARSITA ANDHRA.,                                      25,896
+  533 MAHAVER PANKAJ 2,                                                   8
+  534 GUD MM SUGAR LLP. ANDHRA,                  1,098
+  539 RP BABLU(BAHUBALICOLD),                       25
+  540 HELP HARI BABA.,                    10,00,00,000
+  544 D.TARAI KANTILAL.,                                              5,000
+  546 RP RAKESH GUPTA.,                              3
+  548 D.TARAI SHANTI BHAIYA.,                                            10
+  549 GUD SHRI LAXMI BHANDAR-BOTHRA,                               5,49,999
+  552 KHAN WASHIM 4.,                                                     1
+  553 RP ASHOK SHONI JWELLERS,               89,70,350
+  555 GUD LAXMI GALLA BHANDAR BOTHRA,            2,075
+  559 KANCHAN A/C.,                                             4,99,55,163
+  560 KHAN WASHIM 5,                                27
+  562 MANGAT RAI BALURAM.,                 1,25,07,058
+  563 RP SRAWAN GOYAL GUD,                                        40,05,000
+  564 HANUMAN PRASAD TENDUKONA,                                           5
+  567 RP PRAVIN AGRAWAL.,                                                 4
+  568 ANUP JAIN HARISANKAR ROAD.,                  164
+  570 GUD SATYA BHAMA TRADERS.,               9,92,163
+  571 SATYA MUND BARGAON,                                         22,84,400
+  575 D.TARAI SANJAY AHUJA.,                                             20
+  580 MAHAVER TINKU 2,                               1
+  584 HELP MADAN BABA.,                      34,42,000
+  585 CHINTU BHAIYA POWDER A/C.,              4,21,602
+  586 HELP UMA KAKA,                         20,00,000
+  587 MAA LAXMI BHANDAR BOKARO-BOTHR,         5,00,000
+  589 GUD BIJAY KUMAR BIBHUTI-BOTHRA,         3,32,500
+  590 RP PRAMOD JAIN.,                              10
+  591 D.TARAI PINTU DALAL,                                        82,55,675
+  592 D.TARAI RAJESH SALES,                   1,20,840
+  593 SADANI THEKEDAR MURARIJI,               1,01,000
+  594 CAR LOAN 9222,                            30,920
+  595 GUD SANTOSH PATRA,AMBADOLA,                                  4,00,000
+  596 KRISHNA KESINGA,                                               25,200
+  597 UJWAL BINOD S.KELA,                                       1,53,10,560
+  598 SANJAYA AG. KHR,                                            14,88,000
+  599 RP HITESH JAIN,                                           4,05,75,141
+  600 RP CHINTU BHAIYA,                                         4,39,70,913
+  601 KOMAL BHAIYA L.GAON,                                      4,02,00,000
+  602 SUSPANCE A/C VATSAL,                                        12,98,871
+                                     ----------------- --------------------
+                                          55,55,99,679         38,15,88,935
+                                     ---------------------------------------
+   PURCHASE PARTY
+
+ 1204 MIDAS ASHOK RP,                               14
+ 1205 JR MAHENDAR,                                   2
+ 1207 MAHESH BEMETARA,                                            38,73,618
+ -------------------------------------------------------------------------------
+ TESTING DATA                                                                                
+
+ Trial Balance From : 01/04/2026 To : 08/05/2026
+ FINANCIAL YEAR : 2026-2026                                           Page No:  5
+ -------------------------------------------------------------------------------
+ Code    Narretion                            Debits        Credits
+ -------------------------------------------------------------------------------
+
+ 1208 D.TARAI MALANI JI,                                                  3
+ 1210 D.TARAI SURESH PATEL,                        105
+ 1211 SONU VIZAG,                             4,89,401
+ 1214 KOMAL CHANDRAVANSI,                    45,73,310
+ 1215 TRADERS SATGURU D.TARAI.,                      5
+ 1217 MANISH BABU,                         6,52,71,000
+ 1218 NANDU BHAIYA,                                                6,08,843
+ 1219 SHUSHIL PARAKH,                                                     2
+ 1220 FINANCE NANDU UNCLE,                   35,55,749
+ 1221 D.TARAI MANSHA RAM,                                                65
+ 1224 RP GOPAL PANDIT RP,                    61,41,081
+ 1225 JOSHI PINKU RP,                                3
+ 1226 SAHU RP,                                                        1,956
+ 1227 RAVI NASHIK,                         3,09,58,203
+ 1228 HELP BIKRAM KEGAON,                     6,00,000
+ 1229 KAKA GAJJU.,                                   2
+ 1230 D.TARAI SHANKAR DALAL,                        20
+ 1231 RP RISHABH CHOPDA,                                          29,63,696
+ 1232 KAILADEVI SHIVA GOYAL.,                                             8
+ 1234 D.TARAI DELUX TRADING,                         1
+ 1236 SATISH GUPTA PIPARIYA,                                      11,13,519
+ 1237 D.TARAI BINOD DALAL,                   11,14,788
+ 1238 KHAN WASHIM.,                                 19
+ 1239 RAMU JHARWALIYA,                                          3,03,25,035
+ 1242 HELP MANOJ FUFA NILJEE,                 3,00,000
+ 1243 D.TARAI SURYA MARKETING,                                            2
+ 1246 PRATHAM,                                                 19,98,91,177
+ 1248 BABLU LADDUGAON,                        2,24,730
+ 1249 D.TARAI PRAMOD DALAL,                  13,50,440
+ 1250 D.TARAI SAJJAN JI,                                                  3
+ 1251 D.TARAI AMAR DALAL,                            3
+ 1252 MUKESH JIJA LADDUGAON,                  7,03,120
+ 1254 RAM KUMAR & COMPANY,                   13,81,231
+ 1255 D.TARAI BALAJI DHANIYA NILESH,          1,60,180
+ 1257 BAJJU KEGAON,                                             1,19,01,750
+ 1258 D.TARAI RINKKU JI,                                                  5
+ 1260 MANOJ GUD KESINGA,                      3,34,502
+ 1261 ANKIT KBJ,                                                  28,82,065
+ 1263 SHIV LADDUGAON,                                              7,52,487
+ 1264 D.TARAI MADAN VIVEK,                   79,49,126
+ 1266 GUD KOMAL LADDUGAON,                   15,96,940
+ 1267 PRAKASH AGRAWAL(MANISHBABU),                                58,50,000
+ 1271 OWNER S.VINAYAK COLD,                                               2
+ 1272 HELP SURESH SINDHIKELA,                 8,16,600
+ 1276 MEDICAL BINOD.,                        44,51,020
+ 1277 RP SATYAM TRADERS.,                                            47,152
+ 1278 TARUN(ARUN)KANTABANJI,                                         98,638
+ 1279 REKHA JAIN RAIPUR.,                                       1,26,00,000
+ 1280 D.TARAI SINGHANIA TRADERS.,            18,00,470
+ 1283 HELP BAJJU KEGAON.,                                         15,00,000
+ 1284 M M TRADERS.,                          36,97,924
+ -------------------------------------------------------------------------------
+ TESTING DATA                                                                                
+
+ Trial Balance From : 01/04/2026 To : 08/05/2026
+ FINANCIAL YEAR : 2026-2026                                           Page No:  6
+ -------------------------------------------------------------------------------
+ Code    Narretion                            Debits        Credits
+ -------------------------------------------------------------------------------
+
+ 1285 MITTAL TRADERS.,                       56,84,320
+ 1286 SK TRADERS SPL.,                                            40,09,244
+ 1287 SUSPENS A/C.MTL,                                                6,287
+ 1288 RUPRA ROAD(ELAICHI),                 1,67,45,370
+ 1289 POWDER RAKESH GUPTA,                                                7
+ 1290 NILJEE SURESH,                          1,72,450
+ 1291 RP SANTOSH YADAV,                              1
+ 1294 OWNER SALASAR(DEEPAK JI),            3,84,13,642
+ 1298 FINANCE RAJESWARI COLD.,             2,44,23,235
+ 1299 OWNER MAYANK GOYAL (SHRI FOOD),                2
+ 1300 AYUSH BHAIYA,                           3,26,000
+ 1301 HELP NANDU UNCLE.,                     27,16,450
+ 1303 RP NIKKI SHARMA,                                               42,567
+ 1304 RUPU BHAI LATHOR,                                            2,69,118
+ 1305 HALDI SAKET JAIN,                      30,00,000
+ 1306 KHR ASHOK MITTAL,                      41,96,770
+ 1307 FINANCE S.VINAYAK(TINKU)COLD,          39,30,590
+ 1308 PRAKASH CHOUDHARY KHR.,                                             7
+ 1309 HELP HIRO SPL.,                         9,10,000
+ 1316 AAKASH BARGARH.,                             670
+ 1318 MUDIT JAIN.,                                  14
+ 1319 DABBU BHAIYA SPL.,                     82,54,410
+ 1320 HELP BABLI DV.,                                             79,56,000
+ 1321 GUD PRATHAM GOVIL.,                            2
+ 1322 ASHISH TENDUKONA.,                     41,35,949
+ 1324 HELP KAILASH UNCLE.,                                      1,63,45,900
+ 1325 HELP RUPU BHAI LATHORE.,                                    26,45,000
+ 1326 HELP RAICHAND JI.,                      3,12,000
+ 1327 GUD GOVINDRAJ TRADERS.,                 1,35,740
+ 1329 HELP ALOK JI.,                          5,30,000
+ 1330 GUPTA RAKESH 2,                                                     3
+ 1333 HELP BABEE.,                                                 3,00,000
+ 1334 HELP BARKHA.,                                                2,50,000
+ 1335 HELP SWEETY.,                                                2,00,000
+ 1338 HELP SHYAM COLD.,                                           70,00,000
+ 1341 HELP BINOD SKELA.,                                          75,05,000
+ 1342 HELP KAPIL DH.GARH.,                                        30,59,000
+ 1343 HELP PREM SETH KHR.,                    8,73,330
+ 1344 HELP ANIL SETH DV.,                     2,00,000
+ 1346 D.RAJESH SALES.,                                                    7
+ 1347 HELP BHARAT BANSAL.,                   95,85,085
+ 1350 HARI OM JINDAL SPL.,                    8,96,350
+ 1351 D.TARAI KISHAN LAL.,                          20
+ 1353 RP KRISHNA AGRAWAL.,                    4,50,000
+ 1356 RISHABH GOYAL(SANJAY).,                                   2,89,72,822
+ 1363 HELP ANIL BANSAL KBJ.,                 85,00,000
+ 1364 RP JK TRADERS DURG.,                                               10
+ 1365 GUD TRAMBAK TRADERS.,                                           3,424
+ 1366 GUD DR.SHANKAR RAO.,                   48,76,210
+ 1367 PRAMIT KHR.,                            8,15,956
+ 1371 GUD YASHWANT AGRO.,                    12,07,191
+ -------------------------------------------------------------------------------
+ TESTING DATA                                                                                
+
+ Trial Balance From : 01/04/2026 To : 08/05/2026
+ FINANCIAL YEAR : 2026-2026                                           Page No:  7
+ -------------------------------------------------------------------------------
+ Code    Narretion                            Debits        Credits
+ -------------------------------------------------------------------------------
+
+ 1374 PANKAJ POWDER A/C.,                                                45
+ 1375 GANESH BABU DHARAMGARH.,                                       25,700
+ 1376 D.TARAI SHOP RATAN KUNDAN,              4,71,500
+ 1377 HELP MURLI BABA KHR.,                  10,98,830
+ 1378 HELP SURESH TIKRAPADA.,                 4,75,000
+ 1380 VASTALYA NEW COLD.,                  6,11,01,000
+ 1381 JAMIN WASHIM KHAN.,                                       1,65,85,000
+ 1382 SUMIT KAKENADA.,                                            20,01,328
+ 1384 RAJU MAHRAJ.,                                                      16
+ 1385 PRAGYA (ASHOK JAIN).,                1,73,07,460
+ 1386 D.TARAI AKASH KIRANA,                         50
+ 1388 RP GOLDY SURANA,                                                    1
+ 1389 PREM KHARIYAR.,                                                20,150
+ 1392 HELP PINTU SHAH.,                         85,500
+ 1393 RAJESH BHAI.,                                            10,92,91,000
+ 1395 RP PANCHAM DALAL,                                               2,430
+ 1397 SHIVA GOYAL KDCOLD.,                                     11,16,13,123
+ 1398 PLOT SUDHIR UNCLE,                      6,50,000
+ 1399 RP PANKAJ MAHAVER.,                            5
+ 1400 HELP RATNA COLD.,                       9,25,000
+ 1401 RP SACHIN AGRAWAL,                             2
+ 1403 MAHAWAR CHINTU,                            1,237
+                                     ----------------- --------------------
+                                          36,08,77,330         59,25,13,215
+                                     ---------------------------------------
+   COLD STORAGE
+
+ 2202 BAHUBALI COLD,                         10,49,581
+ 2203 MAA ANNPURNA COLD,                                           6,23,986
+ 2204 KBJ MS COLD,                            2,76,931
+ 2205 RAJESWARI COLD,                        13,26,730
+ 2206 BALAJI COLD,                           14,72,639
+ 2207 GODAM(WAREHOUSE),TP NAGAR                 88,007
+ 2208 MAA SARDA COLD,                           19,048
+ 2209 SALASAR COLD,                           3,86,705
+ 2210 SIDHI VINAYAK COLD,                     6,23,120
+ 2211 STOCK MATAR A/C,                                                6,383
+ 2213 STOCK ELAICHI A/C,                            80
+ 2214 AQUA COLD.,                               98,686
+ 2215 KAILA DEVI COLD.,                       1,19,400
+ 2217 RADHEMANI COLD,                        14,55,080
+ 2218 SHYAM COLD.,                            6,73,460
+ 2219 SHREE COLD.,                            1,89,915
+ 2220 CHOUPAL COLD.,                          1,32,470
+ 2221 D.TARAI SHOP(SACHIN/JACKY).,           60,19,300
+ 2222 RAJDHANI COLD.,                         7,88,741
+ 2223 G N COLD.,                                46,190
+ 2224 OSWAL COLD.,                            3,06,525
+ 2225 DHASMESH COLD.,                           43,150
+ 2227 STOCK KAILASH KBJ.,                                                30
+ 2228 S.K COLD STORAGE RP.,                1,35,01,000
+ -------------------------------------------------------------------------------
+ TESTING DATA                                                                                
+
+ Trial Balance From : 01/04/2026 To : 08/05/2026
+ FINANCIAL YEAR : 2026-2026                                           Page No:  8
+ -------------------------------------------------------------------------------
+ Code    Narretion                            Debits        Credits
+ -------------------------------------------------------------------------------
+
+ 2229 RAIPUR LOGISTIC COLD.,                  4,64,650
+ 2230 GURUNANK COLD.,                           43,270
+ 2231 SURANA COLD.,                           2,78,780
+ 2232 J R COLD.,                              9,92,660
+ 2233 LINGRAJ COLD.,                         16,63,051
+ 2234 VATSAL COLD GODHI.,                       22,566
+ 2235 AMRIT COLD RP.,                         9,08,090
+ 2236 SP COLD STORAGE,                        6,61,800
+ 2237 GOYAL COLD STORAGE.,                    3,59,940
+                                     ----------------- --------------------
+                                           3,40,11,565             6,30,399
+                                     ---------------------------------------
+   LOANS & ADVANCES
+
+
+                                                                           
+
+   SALES A/C
+
+ 3012 TINA GUD,                                             39,17,78,22,837
+                                                       --------------------
+                                                            39,17,78,22,837
+                                                       ---------------------
+   INDIRECT INCOMES
+
+ 3036 BHOLENATH TRADERS(SHOP RENT),DUMERTARAI                   1,79,39,000
+                                                       --------------------
+                                                                1,79,39,000
+                                                       ---------------------
+   PURCHASE A/C
+
+
+                                                                           
+
+   INDIRECT EXP.
+
+ 3102 BANK CHARGES.,                         31,26,241
+ 3103 AKHILESH AGRAWAL.,                      2,11,650
+                                     -----------------
+                                             33,37,891                     
+                                     ------------------
+   OTHER EXP
+
+ 3151 COMMISION A/C(DUMARTARAI DALAL,        78,42,040
+ 3152 KADIR BHAI RTO,                           35,000
+ 3153 COLD KHARCHA KHATA.,                   44,38,895
+                                     -----------------
+                                           1,23,15,935                     
+                                     ------------------
+   SALARY A/C
+
+ -------------------------------------------------------------------------------
+ TESTING DATA                                                                                
+
+ Trial Balance From : 01/04/2026 To : 08/05/2026
+ FINANCIAL YEAR : 2026-2026                                           Page No:  9
+ -------------------------------------------------------------------------------
+ Code    Narretion                            Debits        Credits
+ -------------------------------------------------------------------------------
+
+ 3201 YASHWANT SAHU,                          4,11,000
+ 3202 ROHIT LAHRE,                            2,53,500
+ 3203 DHANESH DEEP,                           2,63,000
+ 3204 RAJA MISHRA,                            2,40,500
+ 3205 RAM PANDEY,                             7,27,100
+ 3206 THABIRA(9444),                          2,81,500
+ 3207 RAMU(9333),                             2,55,000
+ 3208 AJIT DV 5819,                           1,22,000
+ 3209 ABHISHEK HARPAL,                        1,20,400
+ 3210 KAPIL DRIVER,                           2,15,700
+ 3211 TUMESWAR SAHU,                            18,200
+                                     -----------------
+                                             29,07,900                     
+                                     ------------------
+   DIRECT EXPENSES
+
+ 3251 BHABHI JI,                                                  21,43,352
+ 3252 CA PAWAN K AGRAWAL,                     4,43,100
+                                     ----------------- --------------------
+                                              4,43,100            21,43,352
+                                     ---------------------------------------
+   STAFF ADVANCE
+
+
+                                                                           
+
+ -------------------------------------------------------------------------------
+                            TOTAL :     98,52,26,450     40,20,13,28,370
+ -------------------------------------------------------------------------------
