@@ -25,6 +25,7 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - **NEW (Feb 2026): Auto-suggesting Party fields in Sale/Purchase entry**
   - Sale and Purchase forms now both show 3 fields: Seller Party* / Buyer Party (Final Customer) / Agent (Dalal)
   - Each field has type-ahead autocomplete (`PartyAutocomplete.jsx`) — code + name + place, keyboard nav (Up/Down/Enter/Esc/Tab)
+  - **Inline "+ Add 'XYZ' as new party"** — when typed name doesn't exist, dropdown shows a create button; one click POSTs to `/api/parties`, adds it to local list, auto-selects in the field, and shows a toast. Enter key triggers the same flow.
 
 ## Architecture
 ```

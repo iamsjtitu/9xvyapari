@@ -258,6 +258,30 @@ export default function NayaBill() {
       description: "Add line item" },
   ], [open, filter]);
 
+  // Inline create-party handler — POSTs to /parties, adds to local options,
+  // and returns the new party (consumer's onPick is called separately).
+  const createParty = async (name, fieldKey) => {
+    const cleaned = String(name || "").trim();
+    if (!cleaned) return;
+    try {
+      const { data } = await api.post("/parties", { name: cleaned });
+      setParties((prev) => [...prev, data].sort((a, b) =>
+        (a.name || "").localeCompare(b.name || "")
+      ));
+      // Auto-select in the calling field
+      if (fieldKey === "party") {
+        setForm((f) => ({ ...f, party_id: data.id, party_name: data.name }));
+      } else if (fieldKey === "buyer") {
+        setForm((f) => ({ ...f, buyer_id: data.id, buyer_name: data.name }));
+      } else if (fieldKey === "agent") {
+        setForm((f) => ({ ...f, agent_id: data.id, agent_name: data.name }));
+      }
+      toast.success(`Party "${data.name}" add ho gayi`);
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
+    }
+  };
+
   // All parties available in every party field — user filters via typing.
   const sellerOptions = parties;
   const buyerOptions = parties;
@@ -466,6 +490,7 @@ export default function NayaBill() {
                       ...f, party_name: t,
                       party_id: f.party_name === t ? f.party_id : "",
                     }))}
+                    onCreate={(name) => createParty(name, "party")}
                     placeholder="Naam likhein (auto suggest)..."
                     testId="select-bill-party"
                     required
@@ -482,6 +507,7 @@ export default function NayaBill() {
                       ...f, buyer_name: t,
                       buyer_id: f.buyer_name === t ? f.buyer_id : "",
                     }))}
+                    onCreate={(name) => createParty(name, "buyer")}
                     placeholder="Optional — final customer ka naam"
                     testId="select-buyer"
                   />
@@ -497,6 +523,7 @@ export default function NayaBill() {
                       ...f, agent_name: t,
                       agent_id: f.agent_name === t ? f.agent_id : "",
                     }))}
+                    onCreate={(name) => createParty(name, "agent")}
                     placeholder="Agent ka naam likhein..."
                     testId="select-agent"
                   />

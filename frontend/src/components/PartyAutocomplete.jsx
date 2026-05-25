@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from "react";
-import { CaretDown, X } from "@phosphor-icons/react";
+import { CaretDown, X, Plus } from "@phosphor-icons/react";
 
 /**
  * Auto-suggesting text input for parties (or any name-list).
@@ -12,6 +12,9 @@ import { CaretDown, X } from "@phosphor-icons/react";
  *  - onPick(opt)  : called when user selects a party (opt = full party obj)
  *  - onChangeText(t): called as user types (parent should clear selectedId
  *                    when t no longer matches the selected name)
+ *  - onCreate(name): if provided, shows "+ Add '<name>' as new party" footer when
+ *                    no exact match exists. Parent should create on server and
+ *                    then call onPick with the newly-created party.
  *  - placeholder, testId, required, disabled
  *  - allowFreeText: if true, leaves whatever user types as-is (no clearing)
  */
@@ -21,6 +24,7 @@ export default function PartyAutocomplete({
   options = [],
   onPick,
   onChangeText,
+  onCreate,
   placeholder = "Type name to search...",
   testId,
   required = false,
@@ -29,6 +33,7 @@ export default function PartyAutocomplete({
 }) {
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(0);
+  const [creating, setCreating] = useState(false);
   const wrapRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -45,6 +50,15 @@ export default function PartyAutocomplete({
       .slice(0, 12);
   }, [value, options]);
 
+  // Show "+ Add new" footer when onCreate is provided AND typed text doesn't match
+  // any party name exactly (case-insensitive).
+  const trimmed = (value || "").trim();
+  const exactMatch = useMemo(
+    () => options.some((p) => (p.name || "").trim().toLowerCase() === trimmed.toLowerCase()),
+    [options, trimmed]
+  );
+  const canCreate = !!onCreate && trimmed.length > 0 && !exactMatch && !creating;
+
   useEffect(() => { setHi(0); }, [value]);
 
   useEffect(() => {
@@ -60,6 +74,17 @@ export default function PartyAutocomplete({
     onPick && onPick(opt);
     setOpen(false);
     setHi(0);
+  };
+
+  const handleCreate = async () => {
+    if (!canCreate) return;
+    try {
+      setCreating(true);
+      await onCreate(trimmed);
+      setOpen(false);
+    } finally {
+      setCreating(false);
+    }
   };
 
   const clear = () => {
@@ -81,6 +106,9 @@ export default function PartyAutocomplete({
       if (open && filtered[hi]) {
         e.preventDefault();
         pick(filtered[hi]);
+      } else if (canCreate) {
+        e.preventDefault();
+        handleCreate();
       }
     } else if (e.key === "Escape") {
       setOpen(false);
@@ -143,9 +171,9 @@ export default function PartyAutocomplete({
         </div>
       </div>
 
-      {open && filtered.length > 0 && (
+      {open && (filtered.length > 0 || canCreate) && (
         <div
-          className="absolute z-50 mt-0.5 w-full bg-white border border-khaki rounded-sm shadow-lg max-h-64 overflow-y-auto"
+          className="absolute z-50 mt-0.5 w-full bg-white border border-khaki rounded-sm shadow-lg max-h-72 overflow-y-auto"
           data-testid={testId ? `${testId}-list` : undefined}
         >
           {filtered.map((opt, idx) => {
@@ -173,10 +201,26 @@ export default function PartyAutocomplete({
               </button>
             );
           })}
+
+          {canCreate && (
+            <button
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); handleCreate(); }}
+              className="w-full text-left px-2.5 py-2 text-xs flex items-center gap-2 border-t border-khaki bg-jama-bg/40 hover:bg-jama-bg text-jama font-medium"
+              data-testid={testId ? `${testId}-create` : undefined}
+              disabled={creating}
+            >
+              <Plus size={12} weight="bold" />
+              <span>
+                {creating ? "Adding..." : <>Add <span className="font-mono-data text-ink">"{trimmed}"</span> as new party</>}
+              </span>
+              <span className="ml-auto text-[10px] text-muted2 font-mono-data">Enter</span>
+            </button>
+          )}
         </div>
       )}
 
-      {open && filtered.length === 0 && value && (
+      {open && filtered.length === 0 && !canCreate && value && (
         <div className="absolute z-50 mt-0.5 w-full bg-white border border-khaki rounded-sm shadow-lg px-3 py-2 text-xs text-muted2">
           Koi party nahi mili — "<span className="font-medium text-ink">{value}</span>"
         </div>
