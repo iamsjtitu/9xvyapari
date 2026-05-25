@@ -5,6 +5,7 @@ import { Plus, PencilSimple, Trash, X, MagnifyingGlass } from "@phosphor-icons/r
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useTableNav } from "@/hooks/useTableNav";
 
 const EMPTY = {
   code: "",
@@ -131,6 +132,14 @@ export default function PartyKhata() {
       description: "Close dialog" },
   ], []);
 
+  // Arrow-key table navigation
+  const { rowProps } = useTableNav({
+    rows: filtered,
+    onEdit: (p) => startEdit(p),
+    onDelete: (p) => del(p.id),
+    enabled: editing === null,
+  });
+
   const totalUdhaar = parties.reduce((s, p) => s + Math.max(0, p.balance || 0), 0);
   const totalOwed = parties.reduce((s, p) => s + Math.max(0, -(p.balance || 0)), 0);
 
@@ -227,8 +236,8 @@ export default function PartyKhata() {
                   Koi ledger nahi. <button className="text-terracotta" onClick={startNew}>Add karein</button>
                 </td>
               </tr>
-            ) : filtered.map((p) => (
-              <tr key={p.id} data-testid={`party-row-${p.id}`}>
+            ) : filtered.map((p, idx) => (
+              <tr key={p.id} data-testid={`party-row-${p.id}`} {...rowProps(idx)}>
                 <td className="font-mono-data text-terracotta">{p.code || "—"}</td>
                 <td>
                   <Link to={`/parties/${p.id}`} className="font-medium text-ink hover:text-terracotta">

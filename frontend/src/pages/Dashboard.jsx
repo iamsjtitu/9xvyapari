@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api, { inr } from "@/lib/api";
 import {
   ArrowDown, ArrowUp, UsersThree, Package, Receipt, CurrencyInr, Wallet, Plus,
+  Bell, WarningCircle, Clock, CalendarCheck,
 } from "@phosphor-icons/react";
 
 const Stat = ({ icon: Icon, label, value, accent, testid }) => (
@@ -23,15 +24,18 @@ const Stat = ({ icon: Icon, label, value, accent, testid }) => (
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [bills, setBills] = useState([]);
+  const [dueData, setDueData] = useState(null);
 
   useEffect(() => {
     (async () => {
-      const [s, b] = await Promise.all([
+      const [s, b, due] = await Promise.all([
         api.get("/summary/dashboard"),
         api.get("/bills"),
+        api.get("/summary/due-bills"),
       ]);
       setData(s.data);
       setBills(b.data.slice(0, 6));
+      setDueData(due.data);
     })();
   }, []);
 
@@ -97,6 +101,12 @@ export default function Dashboard() {
           testid="stat-total-udhaar"
         />
       </div>
+
+      {/* Due-date Notifications */}
+      {dueData && (dueData.overdue.length > 0 || dueData.due_today.length > 0 || dueData.due_soon.length > 0) && (
+        <DueBillsNotifier data={dueData} />
+      )}
+
 
       {/* Month */}
       <div className="card-flat p-5">
@@ -202,3 +212,121 @@ export default function Dashboard() {
     </div>
   );
 }
+
+function DueBillsNotifier({ data }) {
+  const { overdue, due_today, due_soon, totals } = data;
+  const totalCount = (overdue?.length || 0) + (due_today?.length || 0) + (due_soon?.length || 0);
+
+  const Section = ({ label, items, color, bg, icon: Icon, accent }) => (
+    items.length > 0 && (
+      <div className="card-flat overflow-hidden" style={{ borderLeftWidth: 4, borderLeftColor: color }}>
+        <div className="px-4 py-3 border-b border-khaki flex items-center justify-between" style={{ background: bg }}>
+          <div className="flex items-center gap-2">
+            <Icon size={18} color={color} weight="bold" />
+            <div className="font-heading font-semibold text-sm" style={{ color }}>{label}</div>
+          </div>
+          <div className="text-xs font-mono-data" style={{ color }}>
+            {items.length} bill{items.length > 1 ? "s" : ""} · ₹ {inr(items.reduce((s, b) => s + (b.balance || 0), 0))}
+          </div>
+        </div>
+        <table className="dense w-full" data-testid={`due-${accent}`}>
+          <thead>
+            <tr>
+              <th>Bill No.</th>
+              <th>Party</th>
+              <th>Due Date</th>
+              <th className="num">Days</th>
+              <th className="num">Baki (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((b) => (
+              <tr key={b.id} data-testid={`due-bill-${b.id}`}>
+                <td>
+                  <Link to={`/bills/${b.id}`} className="font-mono-data text-terracotta hover:underline">
+                    {b.bill_no}
+                  </Link>
+                </td>
+                <td>
+                  {b.party_id ? (
+                    <Link to={`/parties/${b.party_id}`} className="font-medium hover:text-terracotta hover:underline">
+                      {b.party_name}
+                    </Link>
+                  ) : (
+                    <span className="font-medium">{b.party_name}</span>
+                  )}
+                </td>
+                <td className="font-mono-data text-xs">{b.due_date}</td>
+                <td className="num font-mono-data" style={{ color }}>
+                  {b.days_diff < 0
+                    ? `${Math.abs(b.days_diff)}d overdue`
+                    : b.days_diff === 0
+                    ? "TODAY"
+                    : `in ${b.days_diff}d`}
+                </td>
+                <td className="num font-medium" style={{ color }}>
+                  ₹ {inr(b.balance)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  );
+
+  return (
+    <div className="space-y-3" data-testid="due-bills-notifier">
+      <div className="flex items-center gap-3 px-1">
+        <div className="relative">
+          <Bell size={22} color="#8B2520" weight="bold" />
+          {totalCount > 0 && (
+            <span className="absolute -top-1.5 -right-2 bg-terracotta text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">
+              {totalCount}
+            </span>
+          )}
+        </div>
+        <div>
+          <div className="font-heading font-semibold text-lg">Bills Due — Notifications</div>
+          <div className="text-xs text-muted2">
+            {totals.overdue_count > 0 && (
+              <span className="text-kharch font-medium">{totals.overdue_count} overdue (₹ {inr(totals.overdue_amount)})</span>
+            )}
+            {totals.today_count > 0 && (
+              <span className="text-terracotta ml-3">{totals.today_count} due today (₹ {inr(totals.today_amount)})</span>
+            )}
+            {totals.soon_count > 0 && (
+              <span className="ml-3">{totals.soon_count} due in 7 days (₹ {inr(totals.soon_amount)})</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <Section
+        label="Overdue · पार हुआ"
+        items={overdue}
+        color="#B71C1C"
+        bg="#FFEBEE"
+        icon={WarningCircle}
+        accent="overdue"
+      />
+      <Section
+        label="Due Today · आज का"
+        items={due_today}
+        color="#8B2520"
+        bg="#FFF3E0"
+        icon={CalendarCheck}
+        accent="today"
+      />
+      <Section
+        label="Due Soon (within 7 days)"
+        items={due_soon}
+        color="#1B5E20"
+        bg="#E8F5E9"
+        icon={Clock}
+        accent="soon"
+      />
+    </div>
+  );
+}
+

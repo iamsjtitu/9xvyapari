@@ -5,6 +5,7 @@ import { Plus, Trash, Receipt, X, MagnifyingGlass } from "@phosphor-icons/react"
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useTableNav } from "@/hooks/useTableNav";
 
 const blankLine = () => ({
   item_id: "", item_name: "",
@@ -92,6 +93,36 @@ export default function NayaBill() {
     });
     setForm({ ...form, lines });
   };
+
+  // Auto-calc Due Date based on Payment Condition
+  const onPaymentCondChange = (cond) => {
+    const baseDate = form.date || form.s_date || todayISO();
+    const daysMatch = String(cond).match(/(\d+)\s*Day/i);
+    let newDue = form.due_date;
+    if (daysMatch) {
+      const days = parseInt(daysMatch[1]);
+      const d = new Date(baseDate);
+      d.setDate(d.getDate() + days);
+      newDue = d.toISOString().slice(0, 10);
+    } else if (/Cash|On Delivery/i.test(cond)) {
+      newDue = baseDate;
+    } else if (/Advance/i.test(cond)) {
+      newDue = baseDate;
+    }
+    setForm({ ...form, payment_cond: cond, due_date: newDue });
+  };
+
+  // When base date changes, recompute due date if a "N Days" condition is set
+  useEffect(() => {
+    const daysMatch = String(form.payment_cond).match(/(\d+)\s*Day/i);
+    if (!daysMatch) return;
+    const days = parseInt(daysMatch[1]);
+    const d = new Date(form.date);
+    d.setDate(d.getDate() + days);
+    const newDue = d.toISOString().slice(0, 10);
+    if (newDue !== form.due_date) setForm((f) => ({ ...f, due_date: newDue }));
+    // eslint-disable-next-line
+  }, [form.date]);
   const addLine = () => setForm({ ...form, lines: [...form.lines, blankLine()] });
   const removeLine = (idx) => setForm({ ...form, lines: form.lines.filter((_, i) => i !== idx) });
 
@@ -234,6 +265,14 @@ export default function NayaBill() {
   const buyerOptions = parties.filter((p) => /sales party/i.test(p.group_name || ""));
   const agentOptions = parties; // any party can be agent
 
+  // Arrow-key table navigation
+  const { rowProps } = useTableNav({
+    rows: filtered,
+    onEdit: (b) => navigate(`/bills/${b.id}`),
+    onDelete: (b) => del(b.id),
+    enabled: !open,
+  });
+
   return (
     <div className="space-y-5" data-testid="page-bills">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -313,11 +352,11 @@ export default function NayaBill() {
           <tbody>
             {filtered.length === 0 ? (
               <tr><td colSpan={11} className="py-10 text-center text-muted2">Koi bill nahi mila.</td></tr>
-            ) : filtered.map((b) => {
+            ) : filtered.map((b, idx) => {
               const bg = (b.items || []).reduce((s, it) => s + (it.bag || 0), 0);
               const tw = (b.items || []).reduce((s, it) => s + (it.wb || it.weight || 0), 0);
               return (
-                <tr key={b.id} data-testid={`bill-row-${b.id}`}>
+                <tr key={b.id} data-testid={`bill-row-${b.id}`} {...rowProps(idx)}>
                   <td><Link to={`/bills/${b.id}`} className="font-mono-data text-terracotta hover:underline">{b.bill_no}</Link></td>
                   <td className="font-mono-data text-xs">{b.date}</td>
                   <td className="font-mono-data text-xs">{b.lot_no || "—"}</td>
@@ -396,21 +435,26 @@ export default function NayaBill() {
                     data-testid="input-gp-no" />
                 </div>
                 <div>
-                  <label className="lbl">Due Date</label>
-                  <input type="date" className="input-dense" value={form.due_date}
-                    onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
-                </div>
-                <div>
                   <label className="lbl">Payment Cond.</label>
                   <select className="input-dense" value={form.payment_cond}
-                    onChange={(e) => setForm({ ...form, payment_cond: e.target.value })}>
+                    onChange={(e) => onPaymentCondChange(e.target.value)}
+                    data-testid="select-payment-cond">
                     <option>Cash</option>
                     <option>7 Days</option>
                     <option>15 Days</option>
                     <option>30 Days</option>
+                    <option>45 Days</option>
+                    <option>60 Days</option>
+                    <option>90 Days</option>
                     <option>On Delivery</option>
                     <option>Advance</option>
                   </select>
+                </div>
+                <div>
+                  <label className="lbl">Due Date <span className="text-[10px] text-muted2">(auto)</span></label>
+                  <input type="date" className="input-dense" value={form.due_date}
+                    onChange={(e) => setForm({ ...form, due_date: e.target.value })}
+                    data-testid="input-due-date" />
                 </div>
 
                 <div className="md:col-span-2">

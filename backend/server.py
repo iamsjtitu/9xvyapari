@@ -1007,6 +1007,76 @@ async def next_cash_voucher(pid: str, current=Depends(get_current_user)):
     return {"next_voucher": str(max_num + 1)}
 
 
+# ---------- DUE BILLS NOTIFICATIONS ----------
+@api.get("/summary/due-bills")
+async def due_bills(current=Depends(get_current_user)):
+    """Returns bills with balance > 0 grouped by due-date proximity:
+       overdue, due_today, due_soon (within 7 days), upcoming (8-30 days)."""
+    today = datetime.now(timezone.utc).date()
+    today_s = today.isoformat()
+
+    bills = await db.bills.find(
+        {"balance": {"$gt": 0}, "due_date": {"$exists": True, "$ne": ""}},
+        {"_id": 0}
+    ).sort("due_date", 1).to_list(5000)
+
+    overdue, due_today, due_soon, upcoming = [], [], [], []
+    for b in bills:
+        d = (b.get("due_date") or "").strip()
+        if not d or len(d) < 10:
+            continue
+        d = d[:10]
+        try:
+            dd = datetime.fromisoformat(d).date()
+        except Exception:
+            continue
+        days_diff = (dd - today).days
+        item = {
+            "id": b["id"], "bill_no": b.get("bill_no", ""),
+            "bill_type": b.get("bill_type", ""),
+            "date": b.get("date", ""),
+            "due_date": d,
+            "party_id": b.get("party_id", ""),
+            "party_name": b.get("party_name", ""),
+            "total": b.get("total", 0),
+            "payment_received": b.get("payment_received", 0),
+            "balance": b.get("balance", 0),
+            "days_diff": days_diff,
+        }
+        if days_diff < 0:
+            item["status"] = "overdue"
+            overdue.append(item)
+        elif days_diff == 0:
+            item["status"] = "today"
+            due_today.append(item)
+        elif days_diff <= 7:
+            item["status"] = "soon"
+            due_soon.append(item)
+        elif days_diff <= 30:
+            item["status"] = "upcoming"
+            upcoming.append(item)
+
+    total_overdue_amt = sum(b["balance"] for b in overdue)
+    total_today_amt = sum(b["balance"] for b in due_today)
+    total_soon_amt = sum(b["balance"] for b in due_soon)
+
+    return {
+        "today": today_s,
+        "overdue": overdue,
+        "due_today": due_today,
+        "due_soon": due_soon,
+        "upcoming": upcoming,
+        "totals": {
+            "overdue_count": len(overdue),
+            "overdue_amount": round(total_overdue_amt, 2),
+            "today_count": len(due_today),
+            "today_amount": round(total_today_amt, 2),
+            "soon_count": len(due_soon),
+            "soon_amount": round(total_soon_amt, 2),
+        },
+    }
+
+
 # ---------- DBF IMPORT: CASHBOOK ----------
 @api.post("/import-dbf/cashbook")
 async def import_dbf_cashbook(payload: dict, current=Depends(get_current_user)):

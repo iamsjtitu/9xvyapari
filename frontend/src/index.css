@@ -89,6 +89,15 @@ table.dense thead th {
 table.dense tbody tr:hover { background: #FBF9F4; }
 table.dense tbody tr:nth-child(even) { background: rgba(244, 241, 234, 0.4); }
 table.dense tbody tr:nth-child(even):hover { background: #FBF9F4; }
+/* Arrow-key navigation selected row */
+table.dense tbody tr.tbl-row-selected,
+table.dense tbody tr.tbl-row-selected:nth-child(even) {
+  background: #FFF3E0 !important;
+  box-shadow: inset 3px 0 0 #8B2520;
+}
+table.dense tbody tr.tbl-row-selected td {
+  font-weight: 500;
+}
 table.dense td.num, table.dense th.num { text-align: right; font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
 
 /* Inputs */

@@ -4,6 +4,7 @@ import { Plus, Trash, X, Truck } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useTableNav } from "@/hooks/useTableNav";
 
 const EMPTY = {
   date: todayISO(),
@@ -104,6 +105,14 @@ export default function Inward() {
       description: "Close modal" },
   ], [open, date]);
 
+  // Arrow-key table navigation
+  const { rowProps } = useTableNav({
+    rows: rows,
+    onEdit: (r) => startEdit(r),
+    onDelete: (r) => del(r.id),
+    enabled: !open,
+  });
+
   return (
     <div className="space-y-5" data-testid="page-inward">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -179,8 +188,8 @@ export default function Inward() {
           <tbody>
             {rows.length === 0 ? (
               <tr><td colSpan={8} className="py-10 text-center text-muted2">Koi entry nahi.</td></tr>
-            ) : rows.map((r) => (
-              <tr key={r.id} data-testid={`inward-row-${r.id}`}>
+            ) : rows.map((r, idx) => (
+              <tr key={r.id} data-testid={`inward-row-${r.id}`} {...rowProps(idx)}>
                 <td className="font-mono-data">{r.date}</td>
                 <td className="font-mono-data">{r.ref_no || "—"}</td>
                 <td className="font-mono-data text-terracotta">{r.lot_no}</td>

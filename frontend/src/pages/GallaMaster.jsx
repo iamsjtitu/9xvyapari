@@ -4,6 +4,7 @@ import { Plus, PencilSimple, Trash, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useTableNav } from "@/hooks/useTableNav";
 
 const EMPTY = { name: "", unit: "Quintal", rate: 0, hsn: "" };
 
@@ -44,6 +45,14 @@ export default function GallaMaster() {
     { key: "Escape", action: () => setEditing(null), allowInInputs: true,
       description: "Close modal" },
   ], []);
+
+  // Arrow-key table navigation
+  const { rowProps } = useTableNav({
+    rows: items,
+    onEdit: (it) => { setEditing(it); setForm(it); },
+    onDelete: (it) => del(it.id),
+    enabled: editing === null,
+  });
 
   return (
     <div className="space-y-5" data-testid="page-items">
@@ -94,8 +103,8 @@ export default function GallaMaster() {
             {items.length === 0 ? (
               <tr><td colSpan={5} className="py-10 text-center text-muted2">Koi item nahi.</td></tr>
             ) : (
-              items.map((it) => (
-                <tr key={it.id} data-testid={`item-row-${it.id}`}>
+              items.map((it, idx) => (
+                <tr key={it.id} data-testid={`item-row-${it.id}`} {...rowProps(idx)}>
                   <td className="font-medium">{it.name}</td>
                   <td className="text-[11px] uppercase tracking-wider text-muted2">{it.unit}</td>
                   <td className="font-mono-data text-muted2">{it.hsn || "—"}</td>
