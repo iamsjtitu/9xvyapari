@@ -3,10 +3,52 @@ import api, { formatApiErrorDetail } from "@/lib/api";
 import { FileArrowUp, Database, CheckCircle, Warning } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
+// Map of FoxPro table -> {label, importEndpoint, extraPayload?}
+const IMPORT_MAP = {
+  LEDGR:    { label: "Master Ledger / Chart of Accounts (LEDGR.DBF)",
+              endpoint: "/import-dbf/ledger", target: "parties" },
+  LEDGRMAS: { label: "Master Ledger (LEDGRMAS.DBF)",
+              endpoint: "/import-dbf/ledger", target: "parties" },
+  LEDGRTEM: { label: "Master Ledger (LEDGRTEM.DBF)",
+              endpoint: "/import-dbf/ledger", target: "parties" },
+  ANT:      { label: "Master Ledger (ANT.DBF)",
+              endpoint: "/import-dbf/ledger", target: "parties" },
+  CASHBOOK: { label: "Cash Book (CASHBOOK.DBF)",
+              endpoint: "/import-dbf/cashbook", target: "rokad entries" },
+  CASHTEM:  { label: "Cash Book Temp (CASHTEM.DBF)",
+              endpoint: "/import-dbf/cashbook", target: "rokad entries" },
+  INWARDS:  { label: "Cold Storage Inward (INWARDS.DBF)",
+              endpoint: "/import-dbf/inward", target: "inward entries" },
+  INWARDP:  { label: "Cold Storage Inward (INWARDP.DBF)",
+              endpoint: "/import-dbf/inward", target: "inward entries" },
+  PROFIT:   { label: "Stock Items (PROFIT.DBF)",
+              endpoint: "/import-dbf/items", target: "stock items" },
+  AAGSTRET: { label: "GST Returns (AAGSTRET.DBF)",
+              endpoint: "/import-dbf/gst", target: "gst returns", payload: { replace: true } },
+  TRANSPR:  { label: "Purchase Transactions (TRANSPR.DBF)",
+              endpoint: "/import-dbf/transactions", target: "bills",
+              payload: { bill_type: "purchase" } },
+  TRANSPUR: { label: "Purchase Transactions (TRANSPUR.DBF)",
+              endpoint: "/import-dbf/transactions", target: "bills",
+              payload: { bill_type: "purchase" } },
+  TRANSTEM: { label: "Transactions Template (TRANSTEM.DBF)",
+              endpoint: "/import-dbf/transactions", target: "bills",
+              payload: { bill_type: "purchase" } },
+};
+
+function tableKey(name) {
+  const up = (name || "").toUpperCase().replace(/\.DBF$/, "").trim();
+  // handle "TRANSTEM - Copy" etc.
+  if (up.startsWith("TRANSTEM")) return "TRANSTEM";
+  if (up.startsWith("TRANSPR")) return "TRANSPR";
+  if (up.startsWith("TRANSPUR")) return "TRANSPUR";
+  return up;
+}
+
 export default function ImportDBF() {
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [preview, setPreview] = useState(null); // {table, count, fields, rows}
+  const [preview, setPreview] = useState(null);
   const [result, setResult] = useState(null);
   const fileRef = useRef(null);
 
@@ -20,16 +62,11 @@ export default function ImportDBF() {
       let bin = "";
       for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
       const b64 = window.btoa(bin);
-      const tableGuess = f.name.replace(/\.DBF$/i, "").toUpperCase();
-      const { data } = await api.post("/import-dbf/upload", null, {
-        params: { file_b64: b64, table: tableGuess },
-        // Workaround: send as query so multipart isn't needed
-      }).catch(async () => {
-        // fall back to body params
-        return api.post("/import-dbf/upload", { file_b64: b64, table: tableGuess });
-      });
+      const t = tableKey(f.name);
+      const { data } = await api.post("/import-dbf/upload", { file_b64: b64, table: t });
+      data.detected_key = t;
       setPreview(data);
-      toast.success(`${data.count} rows parsed from ${data.table}.DBF`);
+      toast.success(`${data.count} rows parsed from ${t}.DBF`);
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
     } finally {
@@ -40,20 +77,24 @@ export default function ImportDBF() {
 
   const doImport = async () => {
     if (!preview) return;
-    if (preview.table !== "LEDGR") {
-      toast.info(`${preview.table}.DBF import abhi LEDGR ke liye supported hai (Phase 1).`);
+    const def = IMPORT_MAP[preview.detected_key];
+    if (!def) {
+      toast.info(`${preview.detected_key}.DBF — import abhi supported nahi. Preview hi available hai.`);
       return;
     }
-    if (!window.confirm(`${preview.count} ledger rows import karein? Existing codes update ho jayenge.`)) return;
+    if (!window.confirm(`${preview.count} rows ko ${def.target} me import karein?`)) return;
     setImporting(true);
     try {
-      const { data } = await api.post("/import-dbf/ledger", { rows: preview.rows });
-      setResult(data);
-      toast.success(`Imported ${data.imported}, Skipped ${data.skipped}`);
+      const body = { rows: preview.rows, ...(def.payload || {}) };
+      const { data } = await api.post(def.endpoint, body);
+      setResult({ ...data, target: def.target });
+      toast.success(`Imported ${data.imported} ${def.target}`);
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
     } finally { setImporting(false); }
   };
+
+  const supported = Object.keys(IMPORT_MAP);
 
   return (
     <div className="space-y-5" data-testid="page-import-dbf">
@@ -64,45 +105,54 @@ export default function ImportDBF() {
           Import from FoxPro
         </h1>
         <div className="text-muted2 text-sm mt-1">
-          Apke purane <span className="font-mono-data">LEDGR.DBF</span> (chart of accounts / parties),
-          <span className="font-mono-data"> CASHBOOK.DBF</span>, <span className="font-mono-data">TRANSPR.DBF</span> etc.
-          ko upload kar ke directly app me import karein.
+          Apke purane FoxPro <span className="font-mono-data">.DBF</span> files ko upload kar ke directly app me import karein.
+          Pehle preview milega, phir confirm karke import hoga.
         </div>
       </div>
 
       <div className="card-flat p-6">
         <div className="flex items-center gap-3 mb-4">
           <FileArrowUp size={22} color="#8B2520" weight="bold" />
-          <div className="font-heading font-semibold text-lg">Step 1 — DBF File Upload</div>
-        </div>
-        <div className="text-sm text-muted2 mb-4">
-          Apni <span className="font-mono-data">FOXPRO2/WS2026/</span> folder se koi bhi <span className="font-mono-data">.DBF</span> file upload karein.
-          Pehle preview dikhega, phir confirm karke import hoga.
+          <div className="font-heading font-semibold text-lg">DBF File Upload</div>
         </div>
         <input ref={fileRef} type="file" accept=".dbf,.DBF" onChange={onPick} className="hidden" />
         <button className="btn-primary" onClick={() => fileRef.current?.click()} disabled={parsing}
           data-testid="btn-pick-dbf">
           <FileArrowUp size={16} weight="bold" /> {parsing ? "Parsing..." : "DBF File Chunein"}
         </button>
-        <div className="mt-3 text-[11px] text-muted2 font-mono-data">
-          Currently supported for IMPORT: LEDGR.DBF (chart of accounts → parties). Other tables show preview only.
+
+        <div className="mt-4 border-t border-khaki pt-3">
+          <div className="section-title mb-2">Supported tables ({supported.length})</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-1 text-xs">
+            {supported.map((k) => (
+              <div key={k} className="flex items-center gap-2 text-muted2">
+                <span className="font-mono-data text-terracotta w-24">{k}.DBF</span>
+                <span>→ {IMPORT_MAP[k].target}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
       {preview && (
         <div className="card-flat overflow-hidden">
-          <div className="px-5 py-3 border-b border-khaki flex items-center justify-between">
+          <div className="px-5 py-3 border-b border-khaki flex items-center justify-between flex-wrap gap-2">
             <div>
-              <div className="section-title">Preview · {preview.table}.DBF</div>
+              <div className="section-title">Preview · {preview.detected_key}.DBF</div>
               <div className="text-xs text-muted2 mt-0.5 font-mono-data">
                 {preview.count} rows · {preview.fields.length} columns
+                {IMPORT_MAP[preview.detected_key] && (
+                  <span className="ml-2 text-terracotta">
+                    → {IMPORT_MAP[preview.detected_key].target}
+                  </span>
+                )}
               </div>
             </div>
-            {preview.table === "LEDGR" && (
+            {IMPORT_MAP[preview.detected_key] && (
               <button className="btn-primary" onClick={doImport} disabled={importing}
                 data-testid="btn-import-dbf">
                 <CheckCircle size={16} weight="bold" />
-                {importing ? "Importing..." : `Import ${preview.count} Ledgers`}
+                {importing ? "Importing..." : `Import ${preview.count} rows`}
               </button>
             )}
           </div>
@@ -141,11 +191,12 @@ export default function ImportDBF() {
         <div className="card-flat p-5 border-l-4 border-jama">
           <div className="flex items-start gap-3">
             <CheckCircle size={22} color="#1B5E20" weight="bold" />
-            <div>
+            <div className="flex-1">
               <div className="font-heading font-semibold">Import Complete</div>
               <div className="text-sm mt-1">
-                <span className="text-jama font-medium">{result.imported} imported</span> ·
-                <span className="text-muted2 ml-2">{result.skipped} skipped</span>
+                <span className="text-jama font-medium">{result.imported} imported</span>
+                {result.target && <span className="text-muted2"> as {result.target}</span>}
+                {result.skipped > 0 && <span className="text-muted2"> · {result.skipped} skipped</span>}
               </div>
               {result.errors?.length > 0 && (
                 <div className="mt-2 text-xs">
@@ -154,7 +205,9 @@ export default function ImportDBF() {
                   </div>
                   <ul className="list-disc pl-5 mt-1 text-muted2">
                     {result.errors.slice(0, 5).map((e, i) => (
-                      <li key={i}>Code {e.code}: {e.error}</li>
+                      <li key={i} className="font-mono-data">
+                        {JSON.stringify(e).slice(0, 100)}
+                      </li>
                     ))}
                   </ul>
                 </div>

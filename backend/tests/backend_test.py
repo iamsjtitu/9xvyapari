@@ -389,14 +389,171 @@ class TestTrialBalance:
         assert row["kind"] == "party"
 
 
-# ---------------- Cash & Bank accounts (seeded) ----------------
+# ---------------- Cash & Bank parties (v1.3: imported real data) ----------------
 class TestSeededAccounts:
-    def test_cash_and_bank_seeded(self, auth_session):
-        r = auth_session.get(f"{API}/accounts")
-        assert r.status_code == 200
-        names = [a["name"] for a in r.json()]
-        assert "CASH IN HAND" in names
-        assert "BANK A/C" in names
+    def test_cash_and_bank_parties_under_group(self, auth_session):
+        """v1.3: CASH IN HAND now lives as a party (code 301) under CASH & BANK BALANCE
+        group (300-349), not in legacy accounts collection."""
+        parties = auth_session.get(f"{API}/parties").json()
+        cash_party = next((p for p in parties if p.get("code") == 301), None)
+        assert cash_party is not None, "CASH IN HAND party with code 301 not found"
+        assert "CASH" in (cash_party.get("name") or "").upper()
+        # Ensure it's in CASH & BANK BALANCE group range
+        groups = auth_session.get(f"{API}/account-groups").json()
+        cb = next(g for g in groups if g["name"] == "CASH & BANK BALANCE")
+        assert cash_party.get("group_id") == cb["id"]
+
+
+# ---------------- v1.3: GST Returns ----------------
+class TestGSTReturns:
+    def test_list_gst_returns(self, auth_session):
+        r = auth_session.get(f"{API}/gst-returns")
+        assert r.status_code == 200, r.text
+        rows = r.json()
+        assert isinstance(rows, list)
+        # Per context: 50 imported GST entries
+        assert len(rows) >= 1, "no gst_returns imported"
+        # Validate row shape
+        sample = rows[0]
+        assert "id" in sample
+        # Should have CGST/SGST or IGST and bill info
+        keys_lower = {k.lower() for k in sample.keys()}
+        assert any("cgst" in k or "sgst" in k or "igst" in k or "tax" in k for k in keys_lower), \
+            f"gst row missing tax keys: {list(sample.keys())}"
+
+    def test_gst_returns_requires_auth(self):
+        r = requests.get(f"{API}/gst-returns")
+        assert r.status_code == 401
+
+
+# ---------------- v1.3: Per-cash-account voucher numbering ----------------
+class TestCashVoucher:
+    def test_next_voucher_for_cash_account(self, auth_session):
+        """For an existing cash/bank party with imported voucher entries,
+        next_voucher should = max(voucher_no)+1."""
+        parties = auth_session.get(f"{API}/parties").json()
+        # find a cash & bank party (codes 300-349) with rokad entries
+        groups = auth_session.get(f"{API}/account-groups").json()
+        cb = next(g for g in groups if g["name"] == "CASH & BANK BALANCE")
+        cb_parties = [p for p in parties if p.get("group_id") == cb["id"]]
+        assert len(cb_parties) >= 1, "no CASH & BANK BALANCE parties"
+        # Pick first one and ensure endpoint returns a string
+        cp = cb_parties[0]
+        r = auth_session.get(f"{API}/cash-accounts/{cp['id']}/next-voucher")
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert "next_voucher" in d
+        assert isinstance(d["next_voucher"], str)
+        # Should parse as int
+        assert int(d["next_voucher"]) >= 1
+
+    def test_next_voucher_increments_with_new_rokad(self, auth_session, created_ids):
+        """Create a fresh cash & bank party, post a rokad with voucher_no=10,
+        next-voucher should return '11'."""
+        groups = auth_session.get(f"{API}/account-groups").json()
+        cb = next(g for g in groups if g["name"] == "CASH & BANK BALANCE")
+        nxt = auth_session.get(f"{API}/account-groups/{cb['id']}/next-code").json()["next_code"]
+        if nxt is None:
+            pytest.skip("CASH & BANK BALANCE group full")
+        cp = auth_session.post(f"{API}/parties", json={
+            "name": "TEST_CB Voucher", "code": nxt, "group_id": cb["id"],
+            "group_name": cb["name"], "type": "both"
+        }).json()
+        created_ids["parties"].append(cp["id"])
+
+        # initially -> 1
+        r0 = auth_session.get(f"{API}/cash-accounts/{cp['id']}/next-voucher")
+        assert r0.json()["next_voucher"] == "1"
+
+        # post a rokad entry with voucher_no=10
+        rokad_payload = {
+            "date": "2026-01-16", "type": "jama", "amount": 500.0,
+            "party_id": cp["id"], "party_name": cp["name"],
+            "cash_account_id": cp["id"], "cash_account_name": cp["name"],
+            "voucher_no": "10", "chq_no": "CHQ-001",
+            "description": "TEST voucher",
+        }
+        rr = auth_session.post(f"{API}/rokad", json=rokad_payload)
+        assert rr.status_code == 200, rr.text
+        created_ids["rokad"].append(rr.json()["id"])
+
+        # next should be 11
+        r2 = auth_session.get(f"{API}/cash-accounts/{cp['id']}/next-voucher")
+        assert r2.json()["next_voucher"] == "11"
+
+
+# ---------------- v1.3: Rokad voucher_no + chq_no round-trip ----------------
+class TestRokadVoucherFields:
+    def test_rokad_has_voucher_and_chq_fields(self, auth_session):
+        rows = auth_session.get(f"{API}/rokad").json()
+        # Per context, 16 rokad entries imported; some have voucher_no like V.117 etc
+        assert isinstance(rows, list)
+        if not rows:
+            pytest.skip("no rokad rows imported")
+        # At least one imported entry must carry voucher_no and chq_no fields (CASHBOOK import).
+        with_voucher = [r for r in rows if r.get("voucher_no")]
+        assert len(with_voucher) >= 1, (
+            f"No imported rokad rows expose voucher_no. Sample keys: "
+            f"{list(rows[0].keys())}"
+        )
+        # chq_no field should exist on the same imported rows (may be empty string)
+        sample = with_voucher[0]
+        assert "chq_no" in sample, f"imported rokad missing chq_no: {list(sample.keys())}"
+        assert "cash_account_id" in sample, f"imported rokad missing cash_account_id"
+
+
+# ---------------- v1.3: DBF import endpoints reachable ----------------
+class TestDBFImportEndpoints:
+    """Verify all import endpoints exist, validate payload, require auth."""
+    @pytest.mark.parametrize("path", [
+        "/import-dbf/ledger", "/import-dbf/cashbook", "/import-dbf/inward",
+        "/import-dbf/items", "/import-dbf/gst", "/import-dbf/transactions",
+    ])
+    def test_import_endpoint_requires_auth(self, path):
+        r = requests.post(f"{API}{path}", json={"rows": []})
+        assert r.status_code == 401, f"{path} should require auth, got {r.status_code}"
+
+    @pytest.mark.parametrize("path", [
+        "/import-dbf/cashbook", "/import-dbf/inward",
+        "/import-dbf/items", "/import-dbf/gst", "/import-dbf/transactions",
+    ])
+    def test_import_endpoint_empty_rows(self, auth_session, path):
+        """Empty rows should be accepted - 0 imported."""
+        r = auth_session.post(f"{API}{path}", json={"rows": []})
+        assert r.status_code == 200, f"{path}: {r.status_code} {r.text}"
+        d = r.json()
+        assert "imported" in d or "count" in d or d == {} or isinstance(d, dict), d
+
+
+# ---------------- v1.3: Imported real data sanity ----------------
+class TestImportedRealData:
+    def test_parties_count(self, auth_session):
+        """Per context: 527 parties imported from LEDGR.DBF."""
+        parties = auth_session.get(f"{API}/parties").json()
+        assert len(parties) >= 100, f"Expected >=100 imported parties, got {len(parties)}"
+
+    def test_inward_imported(self, auth_session):
+        """Per context: 42 inward entries from INWARDS+INWARDP."""
+        rows = auth_session.get(f"{API}/inward").json()
+        assert len(rows) >= 10, f"Expected >=10 inward rows, got {len(rows)}"
+
+    def test_imported_bills_have_foxpro_charges(self, auth_session):
+        """Per context: 4 bills (P00001-P00004) with hamali/discount/cartage/dalali/bhada."""
+        bills = auth_session.get(f"{API}/bills").json()
+        imported = [b for b in bills if (b.get("bill_no") or "").startswith("P0000")]
+        assert len(imported) >= 1, f"No P0000* imported bills, got: {[b.get('bill_no') for b in bills][:10]}"
+
+    def test_trial_balance_cash_bank_section(self, auth_session):
+        """v1.3: CASH & BANK BALANCE section should contain imported ledgers."""
+        tb = auth_session.get(f"{API}/reports/trial-balance").json()
+        cb = next((s for s in tb["sections"] if s["group_name"] == "CASH & BANK BALANCE"), None)
+        assert cb is not None, "CASH & BANK BALANCE section missing in TB"
+        assert cb["fcode"] == 300 and cb["lcode"] == 349
+        # Should have at least the imported cash/bank ledgers
+        names = [r["name"] for r in cb["rows"]]
+        # No duplicates within group
+        assert len(names) == len(set(names)), f"Duplicate names in CASH & BANK BALANCE: {names}"
+        assert len(names) >= 1, "CASH & BANK BALANCE has no rows"
 
 
 # ---------------- Existing v1.0/v1.1 still works ----------------

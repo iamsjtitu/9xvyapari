@@ -20,6 +20,7 @@ const sections = [
       { to: "/inward", label: "Inward Register", key: "N", icon: Truck, tid: "nav-inward" },
       { to: "/reports", label: "Reports", key: "G", icon: ChartBar, tid: "nav-reports" },
       { to: "/trial-balance", label: "Trial Balance", key: "T", icon: Scales, tid: "nav-tb" },
+      { to: "/gst-returns", label: "GST Returns", key: "X", icon: Receipt, tid: "nav-gst" },
     ],
   },
   {

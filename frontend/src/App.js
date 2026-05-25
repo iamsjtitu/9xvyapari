@@ -19,6 +19,7 @@ import Settings from "@/pages/Settings";
 import Inward from "@/pages/Inward";
 import TrialBalance from "@/pages/TrialBalance";
 import ImportDBF from "@/pages/ImportDBF";
+import GSTReturns from "@/pages/GSTReturns";
 import "@/App.css";
 
 function Protected({ children }) {
@@ -69,6 +70,7 @@ function App() {
             <Route path="accounts" element={<Accounts />} />
             <Route path="inward" element={<Inward />} />
             <Route path="trial-balance" element={<TrialBalance />} />
+            <Route path="gst-returns" element={<GSTReturns />} />
             <Route path="import-dbf" element={<ImportDBF />} />
             <Route path="backup" element={<Backup />} />
             <Route path="settings" element={<Settings />} />

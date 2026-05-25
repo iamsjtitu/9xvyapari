@@ -211,11 +211,13 @@ class RokadIn(BaseModel):
     party_name: Optional[str] = ""
     description: str = ""
     ref_bill_id: Optional[str] = None
-    mode: str = "Cash"  # Cash, UPI, Bank
+    mode: str = "Cash"  # Cash, UPI, Bank, Cheque
     cash_account_id: Optional[str] = None
     cash_account_name: Optional[str] = ""
     counter_account_id: Optional[str] = None
     counter_account_name: Optional[str] = ""
+    voucher_no: Optional[str] = ""        # per-cash-account voucher number
+    chq_no: Optional[str] = ""             # cheque number
 
 class RokadOut(RokadIn):
     id: str
@@ -984,6 +986,361 @@ async def import_dbf_upload(payload: dict, current=Depends(get_current_user)):
         _os.unlink(tmp_path)
 
 
+# ---------- PER-CASH-ACCOUNT VOUCHER NUMBERING ----------
+@api.get("/cash-accounts/{pid}/next-voucher")
+async def next_cash_voucher(pid: str, current=Depends(get_current_user)):
+    """Returns next voucher number for a cash/bank ledger (party).
+    FoxPro per-account voucher numbering (every cash a/c has own seq).
+    """
+    rows = await db.rokad.find(
+        {"cash_account_id": pid, "voucher_no": {"$exists": True, "$ne": ""}},
+        {"_id": 0, "voucher_no": 1}
+    ).to_list(10000)
+    max_num = 0
+    for r in rows:
+        try:
+            n = int(str(r.get("voucher_no", "")).strip())
+            if n > max_num:
+                max_num = n
+        except Exception:
+            pass
+    return {"next_voucher": str(max_num + 1)}
+
+
+# ---------- DBF IMPORT: CASHBOOK ----------
+@api.post("/import-dbf/cashbook")
+async def import_dbf_cashbook(payload: dict, current=Depends(get_current_user)):
+    """Import CASHBOOK.DBF / CASHTEM.DBF rows into rokad collection.
+    Mapping:
+      TR_GL_CODE = cash account code (e.g. 307 = SBIMM)
+      TR_GL_CD   = other party code (debit/credit counter)
+      TR_CRDB    = 'D' -> receipt (jama, cash debited)
+                   'C' -> payment (kharch, cash credited)
+      TR_AMNT_DB / TR_AMNT_CD = amount on each side
+      TR_REF_NO  = voucher number (per cash account)
+      CHQ_NO     = cheque number
+    """
+    rows = payload.get("rows") or []
+    party_by_code = {}
+    async for p in db.parties.find({}, {"_id": 0}):
+        if p.get("code"):
+            party_by_code[p["code"]] = p
+
+    imported, skipped, errors = 0, 0, []
+    for r in rows:
+        try:
+            cash_code = int(r.get("TR_GL_CODE") or 0) or None
+            other_code = int(r.get("TR_GL_CD") or 0) or None
+            cash_party = party_by_code.get(cash_code) if cash_code else None
+            other_party = party_by_code.get(other_code) if other_code else None
+            crdb = (r.get("TR_CRDB") or "").upper().strip()
+            amt_db = float(r.get("TR_AMNT_DB") or 0)
+            amt_cd = float(r.get("TR_AMNT_CD") or 0)
+            amount = amt_db if crdb == "D" else amt_cd
+            if not amount or amount <= 0:
+                skipped += 1
+                continue
+
+            # D = cash debited = money came IN to cash a/c = Receipt (jama)
+            # C = cash credited = money went OUT from cash a/c = Payment (kharch)
+            entry_type = "jama" if crdb == "D" else "kharch"
+
+            date = r.get("TR_DATE") or ""
+            if hasattr(date, "isoformat"):
+                date = date.isoformat()
+
+            desc_parts = []
+            for k in ("TR_DESCR", "TR_DESCR1", "TR_DESCR2", "TR_DESCR3"):
+                v = (r.get(k) or "")
+                if isinstance(v, str) and v.strip():
+                    desc_parts.append(v.strip())
+            description = " · ".join(desc_parts)[:300]
+
+            chq_no = str(r.get("CHQ_NO") or "").strip()
+            doc = {
+                "id": str(uuid.uuid4()),
+                "date": str(date),
+                "type": entry_type,
+                "amount": round(amount, 2),
+                "party_id": (other_party["id"] if other_party else None),
+                "party_name": (other_party["name"] if other_party else
+                               (r.get("GL_NAME") or "").strip()),
+                "description": description,
+                "ref_bill_id": None,
+                "mode": ("Cheque" if chq_no else "Cash"),
+                "cash_account_id": (cash_party["id"] if cash_party else None),
+                "cash_account_name": (cash_party["name"] if cash_party else ""),
+                "voucher_no": str(r.get("TR_REF_NO") or "").strip(),
+                "chq_no": chq_no,
+                "imported_from": "cashbook",
+                "created_at": now_iso(),
+            }
+            await db.rokad.insert_one(doc.copy())
+            imported += 1
+        except Exception as e:
+            errors.append({"ref": r.get("TR_REF_NO"), "error": str(e)})
+            skipped += 1
+    return {"imported": imported, "skipped": skipped, "errors": errors[:20]}
+
+
+# ---------- DBF IMPORT: INWARD ----------
+@api.post("/import-dbf/inward")
+async def import_dbf_inward_dbf(payload: dict, current=Depends(get_current_user)):
+    """Import INWARDS.DBF / INWARDP.DBF rows into inward collection."""
+    rows = payload.get("rows") or []
+    party_by_code = {}
+    async for p in db.parties.find({}, {"_id": 0}):
+        if p.get("code"):
+            party_by_code[p["code"]] = p
+
+    imported, skipped, errors = 0, 0, []
+    for r in rows:
+        try:
+            code = int(r.get("TR_GL_CODE") or 0) or None
+            cs_party = party_by_code.get(code) if code else None
+            date = r.get("TR_DATE") or ""
+            if hasattr(date, "isoformat"):
+                date = date.isoformat()
+            lot_no = str(r.get("LOT") or "").strip()
+            if not lot_no:
+                skipped += 1
+                continue
+            doc = {
+                "id": str(uuid.uuid4()),
+                "date": str(date),
+                "ref_no": str(r.get("TR_REF_NO") or "").strip(),
+                "lot_no": lot_no,
+                "cold_storage_id": (cs_party["id"] if cs_party else ""),
+                "cold_storage_name": (cs_party["name"] if cs_party else
+                                      (r.get("PARTY_NAME") or "").strip()),
+                "bags": int(r.get("SBAG") or 0),
+                "weight": float(r.get("WGT") or 0),
+                "item_id": None,
+                "item_name": "",
+                "notes": "Imported from FoxPro INWARDS",
+                "imported_from": "inwards",
+                "created_at": now_iso(),
+            }
+            await db.inward.insert_one(doc.copy())
+            imported += 1
+        except Exception as e:
+            errors.append({"lot": r.get("LOT"), "error": str(e)})
+            skipped += 1
+    return {"imported": imported, "skipped": skipped, "errors": errors[:20]}
+
+
+# ---------- DBF IMPORT: STOCK ITEMS (PROFIT.DBF) ----------
+@api.post("/import-dbf/items")
+async def import_dbf_items(payload: dict, current=Depends(get_current_user)):
+    """Import PROFIT.DBF as galla items."""
+    rows = payload.get("rows") or []
+    imported, skipped = 0, 0
+    for r in rows:
+        try:
+            name = (r.get("GL_NAME") or "").strip()
+            if not name:
+                skipped += 1
+                continue
+            existing = await db.items.find_one({"name": name})
+            doc = {
+                "name": name,
+                "unit": "Quintal",
+                "rate": 0.0,
+                "hsn": "",
+                "sale_acc_code": int(r.get("TR_GL_CD") or 0) or None,
+                "purchase_acc_code": int(r.get("TR_GL_CODE") or 0) or None,
+                "opening_qty": float(r.get("GL_Y_OP") or 0),
+            }
+            if existing:
+                await db.items.update_one({"id": existing["id"]}, {"$set": doc})
+            else:
+                doc["id"] = str(uuid.uuid4())
+                doc["created_at"] = now_iso()
+                await db.items.insert_one(doc)
+            imported += 1
+        except Exception:
+            skipped += 1
+    return {"imported": imported, "skipped": skipped}
+
+
+# ---------- DBF IMPORT: GST RETURNS (AAGSTRET.DBF) ----------
+@api.post("/import-dbf/gst")
+async def import_dbf_gst(payload: dict, current=Depends(get_current_user)):
+    rows = payload.get("rows") or []
+    if payload.get("replace"):
+        await db.gst_returns.delete_many({})
+    imported = 0
+    bulk = []
+    for r in rows:
+        try:
+            bulk.append({
+                "id": str(uuid.uuid4()),
+                "bill_date": str(r.get("BILLDATE") or "").strip(),
+                "particular": (r.get("PARTICULAR") or "").strip(),
+                "gstin": (r.get("GSTIN") or "").strip(),
+                "invoice_no": (r.get("INVOICE_NO") or "").strip(),
+                "taxable": float(r.get("TAXABLE") or 0),
+                "integrated": float(r.get("INTEGRATED") or 0),
+                "central": float(r.get("CENTRAL") or 0),
+                "state": float(r.get("STATE") or 0),
+                "inv_amt": float(r.get("INV_AMT") or 0),
+                "created_at": now_iso(),
+            })
+            imported += 1
+        except Exception:
+            pass
+    if bulk:
+        await db.gst_returns.insert_many(bulk)
+    return {"imported": imported}
+
+
+# ---------- DBF IMPORT: PURCHASE/SALE TRANSACTIONS ----------
+@api.post("/import-dbf/transactions")
+async def import_dbf_transactions(payload: dict, current=Depends(get_current_user)):
+    """Import TRANSPR / TRANSPUR / TRANSTEM rows as bills (purchase entries).
+    Maps the full FoxPro TRANSPR.DBF fields onto our bills collection.
+    """
+    rows = payload.get("rows") or []
+    bill_type = payload.get("bill_type") or "purchase"
+    party_by_code = {}
+    item_by_code = {}
+    async for p in db.parties.find({}, {"_id": 0}):
+        if p.get("code"):
+            party_by_code[p["code"]] = p
+    async for it in db.items.find({}, {"_id": 0}):
+        for k in ("sale_acc_code", "purchase_acc_code"):
+            c = it.get(k)
+            if c:
+                item_by_code[c] = it
+
+    imported, skipped, errors = 0, 0, []
+    for r in rows:
+        try:
+            party_code = int(r.get("TR_GL_CODE") or 0) or None
+            buyer_code = int(r.get("BUYER_CD") or 0) or None
+            agent_code = int(r.get("AGENT") or 0) or None
+            item_code = int(r.get("ITEM") or 0) or None
+            seller = party_by_code.get(party_code)
+            buyer = party_by_code.get(buyer_code) if buyer_code else None
+            agent = party_by_code.get(agent_code) if agent_code else None
+            item = item_by_code.get(item_code) if item_code else None
+
+            if not seller:
+                skipped += 1
+                continue
+
+            d_in = r.get("TR_DATE") or ""
+            if hasattr(d_in, "isoformat"):
+                d_in = d_in.isoformat()
+            d_due = r.get("DUEDATE") or ""
+            if hasattr(d_due, "isoformat"):
+                d_due = d_due.isoformat()
+            d_recv = r.get("R_DATE") or ""
+            if hasattr(d_recv, "isoformat"):
+                d_recv = d_recv.isoformat()
+
+            bag = float(r.get("BAG") or 0)
+            pack = float(r.get("PACK") or 0)
+            wgt = float(r.get("WGT") or 0)
+            rate = float(r.get("RATE") or 0)
+            amt = float(r.get("AMT") or 0)
+            line = {
+                "item_id": (item["id"] if item else ""),
+                "item_name": (item["name"] if item else (r.get("ITEM_NAME") or "").strip()),
+                "bag": bag, "pack": pack,
+                "bag_pack": (r.get("BPQ") or "").strip(),
+                "weight": wgt, "wb": wgt, "ghat": 0, "nwt": wgt,
+                "unit": "Quintal",
+                "rate": rate, "amount": amt,
+                "qty": bag,
+            }
+
+            subtotal = amt
+            hamali_amt = float(r.get("HAMALI") or 0)
+            cartage_amt = float(r.get("CARTAGE") or 0)
+            discount_amt = float(r.get("DISCOUNT") or 0)
+            rebate_amt = float(r.get("REBATE") or 0)
+            dalali_amt = float(r.get("DALALI") or 0)
+            bhada_amt = float(r.get("BHADA") or 0)
+            garamt = float(r.get("GARAMT") or 0)
+            loading = float(r.get("LOADING") or 0)
+            bdalali = float(r.get("BDALALI") or 0)
+            advance = float(r.get("ADVANCE") or 0)
+            less = float(r.get("LESS") or 0)
+            r_amount = float(r.get("R_AMOUNT") or 0)
+
+            additions = (hamali_amt + cartage_amt + bhada_amt + garamt +
+                         loading + bdalali + max(0, dalali_amt))
+            deductions = (discount_amt + rebate_amt + less + advance +
+                          max(0, -dalali_amt))
+            total = round(subtotal + additions - deductions, 2)
+
+            existing = await db.bills.find_one({"imported_ref": str(r.get("TR_REF_NO") or ""),
+                                                 "bill_type": bill_type})
+            bill_no = (existing["bill_no"] if existing
+                       else await _next_bill_no(bill_type))
+
+            doc = {
+                "id": (existing["id"] if existing else str(uuid.uuid4())),
+                "bill_type": bill_type,
+                "bill_no": bill_no,
+                "party_id": seller["id"], "party_name": seller["name"],
+                "buyer_id": (buyer["id"] if buyer else None),
+                "buyer_name": (buyer["name"] if buyer else ""),
+                "agent_id": (agent["id"] if agent else None),
+                "agent_name": (agent["name"] if agent else ""),
+                "date": str(d_in), "s_date": str(d_in),
+                "due_date": str(d_due),
+                "lot_no": str(r.get("LOTNO") or "").strip(),
+                "gp_no": "", "truck_no": (r.get("TNO") or "").strip(),
+                "driver_name": (r.get("DNAME") or "").strip(),
+                "bilty_no": (r.get("BUILTY") or "").strip(),
+                "garage": (r.get("GARAGE") or "").strip(),
+                "no_of_bag": (r.get("NOFBAG") or "").strip(),
+                "bag_pack_q": (r.get("BPQ") or "").strip(),
+                "payment_cond": (r.get("F_P") or "").strip(),
+                "items": [line],
+                "subtotal": subtotal,
+                "hamali_rt": float(r.get("HAMALIRT") or 0), "hamali_amt": hamali_amt,
+                "cartage_rt": float(r.get("CARTAGERT") or 0), "cartage_amt": cartage_amt,
+                "bhada_rt": float(r.get("BHADART") or 0), "bhada_amt": bhada_amt,
+                "mandirt": float(r.get("MANDIRT") or 0), "mandiamt": float(r.get("MANDIAMT") or 0),
+                "discount_rt": float(r.get("DISCOUNTRT") or 0), "discount_amt": discount_amt,
+                "rebate_rt": float(r.get("REBATERT") or 0), "rebate_amt": rebate_amt,
+                "dalali_rt": float(r.get("DALALIRT") or 0), "dalali_amt": dalali_amt,
+                "garrt": float(r.get("GRT") or 0), "garamt": garamt,
+                "loading": loading, "bdalali": bdalali,
+                "less": less, "advance": advance,
+                "commission_pct": 0, "commission_amt": 0,
+                "other_charges": float(r.get("OTHER") or 0),
+                "total": total,
+                "payment_received": r_amount,
+                "balance": round(total - r_amount, 2),
+                "notes": "Imported from FoxPro",
+                "remark1": (r.get("REMARK") or "").strip(),
+                "remark2": (r.get("REMARK1") or "").strip(),
+                "imported_ref": str(r.get("TR_REF_NO") or ""),
+                "imported_from": "transactions",
+                "created_at": (existing["created_at"] if existing else now_iso()),
+            }
+            if existing:
+                await db.bills.replace_one({"id": existing["id"]}, doc)
+            else:
+                await db.bills.insert_one(doc.copy())
+            imported += 1
+        except Exception as e:
+            errors.append({"ref": r.get("TR_REF_NO"), "error": str(e)})
+            skipped += 1
+    return {"imported": imported, "skipped": skipped, "errors": errors[:20]}
+
+
+# ---------- GST RETURNS LIST ----------
+@api.get("/gst-returns")
+async def list_gst_returns(current=Depends(get_current_user)):
+    rows = await db.gst_returns.find({}, {"_id": 0}).sort("bill_date", 1).to_list(5000)
+    return rows
+
+
 # ---------- ROOT ----------
 @api.get("/")
 async def root():
@@ -1020,6 +1377,7 @@ async def on_start():
     await db.accounts.create_index("id", unique=True)
     await db.journal.create_index("id", unique=True)
     await db.inward.create_index("id", unique=True)
+    await db.gst_returns.create_index("id", unique=True)
 
     # Seed admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@galla.com").lower()
@@ -1088,8 +1446,9 @@ async def on_start():
         await db.account_groups.insert_many(groups)
         logger.info("Seeded 18 default account groups (FoxPro GROUPTEM)")
 
-    # Seed default cash + bank account ledgers
-    if await db.accounts.count_documents({}) == 0:
+    # Seed default cash + bank account ledgers only if NO party with cash code 301 exists yet
+    has_cash_in_parties = await db.parties.find_one({"code": 301})
+    if not has_cash_in_parties and await db.accounts.count_documents({}) == 0:
         cash_group = await db.account_groups.find_one({"name": "CASH & BANK BALANCE"}, {"_id": 0})
         if cash_group:
             await db.accounts.insert_many([

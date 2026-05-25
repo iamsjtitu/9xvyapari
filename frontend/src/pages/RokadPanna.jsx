@@ -19,6 +19,8 @@ export default function RokadPanna() {
     mode: "Cash",
     cash_account_id: "",
     cash_account_name: "",
+    voucher_no: "",
+    chq_no: "",
   });
 
   const load = async () => {
@@ -34,8 +36,13 @@ export default function RokadPanna() {
   useEffect(() => {
     Promise.all([api.get("/parties"), api.get("/accounts")]).then(([p, a]) => {
       setParties(p.data);
-      // only cash/bank accounts
-      setAccounts(a.data.filter((x) => /cash|bank/i.test(x.group_name || "")));
+      // cash/bank accounts = parties under CASH & BANK BALANCE group + accounts collection legacy
+      const partyCash = p.data.filter((x) =>
+        /cash|bank/i.test(x.group_name || "")
+      );
+      const oldAcc = a.data.filter((x) => /cash|bank/i.test(x.group_name || ""))
+                           .map((x) => ({ ...x, _isAccount: true }));
+      setAccounts([...partyCash, ...oldAcc]);
     });
   }, []);
 
@@ -72,6 +79,8 @@ export default function RokadPanna() {
         mode: "Cash",
         cash_account_id: "",
         cash_account_name: "",
+        voucher_no: "",
+        chq_no: "",
       });
       load();
     } catch (err) {
@@ -105,7 +114,8 @@ export default function RokadPanna() {
       <table className="dense w-full">
         <thead>
           <tr>
-            <th style={{ width: 90 }}>Mode</th>
+            <th style={{ width: 60 }}>V.No.</th>
+            <th style={{ width: 90 }}>Cash A/C</th>
             <th>Party / Vivran</th>
             <th className="num" style={{ width: 130 }}>Amount</th>
             <th style={{ width: 36 }}></th>
@@ -114,20 +124,26 @@ export default function RokadPanna() {
         <tbody>
           {list.length === 0 ? (
             <tr>
-              <td colSpan={4} className="text-center text-muted2 py-8 text-sm">
+              <td colSpan={5} className="text-center text-muted2 py-8 text-sm">
                 Koi entry nahi.
               </td>
             </tr>
           ) : (
             list.map((e) => (
               <tr key={e.id} data-testid={`rokad-row-${e.id}`}>
+                <td className="font-mono-data text-xs text-terracotta">
+                  {e.voucher_no || "—"}
+                </td>
                 <td className="text-[11px] uppercase tracking-wider text-muted2">
-                  {e.mode || "Cash"}
+                  {e.cash_account_name || e.mode || "Cash"}
                 </td>
                 <td>
                   <div className="font-medium">{e.party_name || "—"}</div>
                   {e.description && (
                     <div className="text-xs text-muted2 mt-0.5">{e.description}</div>
+                  )}
+                  {e.chq_no && (
+                    <div className="text-xs text-muted2 mt-0.5 font-mono-data">Chq: {e.chq_no}</div>
                   )}
                 </td>
                 <td className="num" style={{ color }}>
@@ -324,27 +340,59 @@ export default function RokadPanna() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="lbl">Cash / Bank Account</label>
+                  <select
+                    className="input-dense"
+                    value={form.cash_account_id}
+                    onChange={async (e) => {
+                      const a = accounts.find((x) => x.id === e.target.value);
+                      let voucher_no = "";
+                      if (a && !a._isAccount) {
+                        try {
+                          const { data } = await api.get(`/cash-accounts/${a.id}/next-voucher`);
+                          voucher_no = data.next_voucher || "";
+                        } catch {}
+                      }
+                      setForm({
+                        ...form,
+                        cash_account_id: e.target.value,
+                        cash_account_name: a ? a.name : "",
+                        mode: a ? (/bank/i.test(a.group_name || "") ? "Bank" : "Cash") : form.mode,
+                        voucher_no,
+                      });
+                    }}
+                    data-testid="select-cash-account"
+                  >
+                    <option value="">— Default Cash —</option>
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.code ? `${a.code} · ` : ""}{a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="lbl">Voucher No.</label>
+                  <input
+                    className="input-dense num"
+                    value={form.voucher_no}
+                    onChange={(e) => setForm({ ...form, voucher_no: e.target.value })}
+                    placeholder="Auto from cash a/c"
+                    data-testid="input-voucher-no"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="lbl">Cash / Bank Account</label>
-                <select
+                <label className="lbl">Cheque No. (if applicable)</label>
+                <input
                   className="input-dense"
-                  value={form.cash_account_id}
-                  onChange={(e) => {
-                    const a = accounts.find((x) => x.id === e.target.value);
-                    setForm({
-                      ...form,
-                      cash_account_id: e.target.value,
-                      cash_account_name: a ? a.name : "",
-                      mode: a ? (/bank/i.test(a.group_name || "") ? "Bank" : "Cash") : form.mode,
-                    });
-                  }}
-                  data-testid="select-cash-account"
-                >
-                  <option value="">— Default Cash —</option>
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>{a.name} ({a.group_name})</option>
-                  ))}
-                </select>
+                  value={form.chq_no}
+                  onChange={(e) => setForm({ ...form, chq_no: e.target.value, mode: e.target.value ? "Cheque" : form.mode })}
+                  placeholder="Cheque number"
+                />
               </div>
 
               <div>
