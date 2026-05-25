@@ -1127,8 +1127,17 @@ async def import_dbf_cashbook(payload: dict, current=Depends(get_current_user)):
             description = " · ".join(desc_parts)[:300]
 
             chq_no = str(r.get("CHQ_NO") or "").strip()
+            voucher_no = str(r.get("TR_REF_NO") or "").strip()
+            # Idempotency: same (cash_account, voucher, type, date, amount) is same entry
+            dedup_key = {
+                "imported_from": "cashbook",
+                "cash_account_id": (cash_party["id"] if cash_party else None),
+                "voucher_no": voucher_no,
+                "type": entry_type,
+                "date": str(date),
+                "amount": round(amount, 2),
+            }
             doc = {
-                "id": str(uuid.uuid4()),
                 "date": str(date),
                 "type": entry_type,
                 "amount": round(amount, 2),
@@ -1140,12 +1149,17 @@ async def import_dbf_cashbook(payload: dict, current=Depends(get_current_user)):
                 "mode": ("Cheque" if chq_no else "Cash"),
                 "cash_account_id": (cash_party["id"] if cash_party else None),
                 "cash_account_name": (cash_party["name"] if cash_party else ""),
-                "voucher_no": str(r.get("TR_REF_NO") or "").strip(),
+                "voucher_no": voucher_no,
                 "chq_no": chq_no,
                 "imported_from": "cashbook",
-                "created_at": now_iso(),
             }
-            await db.rokad.insert_one(doc.copy())
+            existing = await db.rokad.find_one(dedup_key)
+            if existing:
+                await db.rokad.update_one({"id": existing["id"]}, {"$set": doc})
+            else:
+                doc["id"] = str(uuid.uuid4())
+                doc["created_at"] = now_iso()
+                await db.rokad.insert_one(doc)
             imported += 1
         except Exception as e:
             errors.append({"ref": r.get("TR_REF_NO"), "error": str(e)})
@@ -1176,7 +1190,6 @@ async def import_dbf_inward_dbf(payload: dict, current=Depends(get_current_user)
                 skipped += 1
                 continue
             doc = {
-                "id": str(uuid.uuid4()),
                 "date": str(date),
                 "ref_no": str(r.get("TR_REF_NO") or "").strip(),
                 "lot_no": lot_no,
@@ -1189,9 +1202,22 @@ async def import_dbf_inward_dbf(payload: dict, current=Depends(get_current_user)
                 "item_name": "",
                 "notes": "Imported from FoxPro INWARDS",
                 "imported_from": "inwards",
-                "created_at": now_iso(),
             }
-            await db.inward.insert_one(doc.copy())
+            # Idempotency on (lot_no, date, cold_storage_id, ref_no)
+            dedup_key = {
+                "imported_from": "inwards",
+                "lot_no": lot_no,
+                "date": str(date),
+                "cold_storage_id": doc["cold_storage_id"],
+                "ref_no": doc["ref_no"],
+            }
+            existing = await db.inward.find_one(dedup_key)
+            if existing:
+                await db.inward.update_one({"id": existing["id"]}, {"$set": doc})
+            else:
+                doc["id"] = str(uuid.uuid4())
+                doc["created_at"] = now_iso()
+                await db.inward.insert_one(doc)
             imported += 1
         except Exception as e:
             errors.append({"lot": r.get("LOT"), "error": str(e)})
@@ -1411,6 +1437,185 @@ async def list_gst_returns(current=Depends(get_current_user)):
     return rows
 
 
+# ---------- AN.DBF (Journal / Transaction history) ----------
+@api.post("/import-dbf/journal")
+async def import_dbf_journal(payload: dict, current=Depends(get_current_user)):
+    """Import AN.DBF (journal/transaction history) rows.
+    Each row is one side of a double-entry transaction. We store them in
+    `dos_journal` collection so the user retains every line; pairing into
+    balanced journal entries is done lazily for display.
+    """
+    rows = payload.get("rows") or []
+    if not rows:
+        raise HTTPException(400, "Koi rows nahi hain")
+
+    # Pre-fetch parties to attach names
+    party_by_code = {}
+    async for p in db.parties.find({}, {"_id": 0}):
+        if p.get("code"):
+            party_by_code[p["code"]] = p
+
+    imported, skipped, errors = 0, 0, []
+    for idx, r in enumerate(rows):
+        try:
+            code = int(r.get("TR_GL_CODE") or 0) or None
+            d = r.get("TR_DATE")
+            if hasattr(d, "isoformat"):
+                d = d.isoformat()
+            ref = str(r.get("TR_REF_NO") or "").strip()
+            dr_amt = float(r.get("TR_AMNT_DB") or 0)
+            cr_amt = float(r.get("TR_AMNT_CD") or 0)
+            crdb = (r.get("TR_CRDB") or "").strip().upper()
+            descr = " ".join(filter(None, [
+                (r.get("TR_DESCR") or "").strip(),
+                (r.get("TR_DESCR1") or "").strip(),
+            ]))
+            extra = " ".join(filter(None, [
+                (r.get("TR_DESCR2") or "").strip(),
+                (r.get("TR_DESCR3") or "").strip(),
+            ]))
+            party = party_by_code.get(code) if code else None
+            sgn = (r.get("SGN") or "").strip().upper()
+            doc = {
+                "date": str(d or ""),
+                "ref_no": ref,
+                "code": code,
+                "party_id": (party["id"] if party else None),
+                "account_name": (party["name"] if party else (r.get("GL_NAME") or "")),
+                "narration": descr,
+                "extra": extra,
+                "sgn": sgn,
+                "crdb": crdb,
+                "debit": dr_amt if crdb == "D" else 0.0,
+                "credit": cr_amt if crdb == "C" else 0.0,
+                "chq_no": (r.get("CHQ_NO") or "").strip(),
+                "weight": float(r.get("WGT") or 0),
+                "rate": float(r.get("RATE") or 0),
+                "imported_from": "AN.DBF",
+                "row_index": idx,
+            }
+            # Upsert by (row_index, imported_from) — each AN.DBF row is unique
+            key = {"row_index": idx, "imported_from": "AN.DBF"}
+            existing = await db.dos_journal.find_one(key)
+            if existing:
+                await db.dos_journal.update_one({"id": existing["id"]}, {"$set": doc})
+            else:
+                doc["id"] = str(uuid.uuid4())
+                doc["created_at"] = now_iso()
+                await db.dos_journal.insert_one(doc)
+            imported += 1
+        except Exception as e:
+            errors.append({"ref": r.get("TR_REF_NO"), "error": str(e)})
+            skipped += 1
+    return {"imported": imported, "skipped": skipped, "errors": errors[:20]}
+
+
+# ---------- DOS JOURNAL VIEW ----------
+@api.get("/dos-journal")
+async def list_dos_journal(date_from: Optional[str] = None, date_to: Optional[str] = None,
+                            current=Depends(get_current_user)):
+    q = {}
+    if date_from or date_to:
+        q["date"] = {}
+        if date_from:
+            q["date"]["$gte"] = date_from
+        if date_to:
+            q["date"]["$lte"] = date_to
+    rows = await db.dos_journal.find(q, {"_id": 0}).sort([("date", 1), ("ref_no", 1)]).to_list(5000)
+    return rows
+
+
+# ---------- COMPLETE DOS DATA MIGRATION (one-click) ----------
+@api.post("/migrate-dos-data")
+async def migrate_dos_data(payload: dict = None, current=Depends(get_current_user)):
+    """One-click migration of all DBF data from the configured DOS folder.
+    Reads every supported DBF from `/tmp/galla_audit/FOXPRO2/WS2026/`
+    and runs the matching import logic in-process.
+    """
+    import os as _os
+    try:
+        from dbfread import DBF
+    except ImportError:
+        raise HTTPException(500, "dbfread not installed")
+
+    folder = (payload or {}).get("folder") or "/tmp/galla_audit/FOXPRO2/WS2026"
+    if not _os.path.isdir(folder):
+        raise HTTPException(400, f"DOS folder not found: {folder}")
+
+    # Map of DBF filename -> (importer endpoint function, extra payload)
+    ORDER = [
+        ("LEDGR.DBF",   "ledger",       {}),
+        ("PROFIT.DBF",  "items",        {}),
+        ("CASHBOOK.DBF","cashbook",     {}),
+        ("CASHTEM.DBF", "cashbook",     {}),
+        ("INWARDP.DBF", "inward",       {}),
+        ("INWARDS.DBF", "inward",       {}),
+        ("AAGSTRET.DBF","gst",          {"replace": True}),
+        ("TRANSTEM - Copy.DBF", "transactions", {"bill_type": "purchase"}),
+        ("AN.DBF",      "journal",      {}),
+    ]
+
+    def _read_dbf(path):
+        t = DBF(path, lowernames=False, ignore_missing_memofile=True,
+                char_decode_errors="ignore")
+        out = []
+        for r in t:
+            row = {}
+            for k, v in r.items():
+                if hasattr(v, "isoformat"):
+                    row[k] = v.isoformat()
+                elif isinstance(v, (bytes, bytearray)):
+                    row[k] = v.decode("latin-1", errors="ignore")
+                else:
+                    row[k] = v
+            out.append(row)
+        return out
+
+    # Importer dispatch — re-uses logic from individual endpoints
+    DISPATCH = {
+        "ledger":       import_dbf_ledger,
+        "items":        import_dbf_items,
+        "cashbook":     import_dbf_cashbook,
+        "inward":       import_dbf_inward_dbf,
+        "gst":          import_dbf_gst,
+        "transactions": import_dbf_transactions,
+        "journal":      import_dbf_journal,
+    }
+
+    report = {"steps": [], "total_imported": 0, "total_skipped": 0, "folder": folder}
+    for fname, kind, extra in ORDER:
+        path = _os.path.join(folder, fname)
+        if not _os.path.exists(path):
+            report["steps"].append({"file": fname, "kind": kind, "status": "missing"})
+            continue
+        try:
+            rows = _read_dbf(path)
+            if not rows:
+                report["steps"].append({"file": fname, "kind": kind, "status": "empty",
+                                        "count": 0})
+                continue
+            body = {"rows": rows, **extra}
+            fn = DISPATCH.get(kind)
+            if not fn:
+                report["steps"].append({"file": fname, "kind": kind, "status": "unsupported"})
+                continue
+            result = await fn(body, current)
+            report["steps"].append({
+                "file": fname, "kind": kind, "status": "ok",
+                "count": len(rows),
+                "imported": result.get("imported", 0),
+                "skipped": result.get("skipped", 0),
+            })
+            report["total_imported"] += result.get("imported", 0)
+            report["total_skipped"] += result.get("skipped", 0)
+        except Exception as e:
+            report["steps"].append({
+                "file": fname, "kind": kind, "status": "error",
+                "error": str(e)[:300],
+            })
+    return report
+
+
 # ---------- ROOT ----------
 @api.get("/")
 async def root():
@@ -1448,6 +1653,7 @@ async def on_start():
     await db.journal.create_index("id", unique=True)
     await db.inward.create_index("id", unique=True)
     await db.gst_returns.create_index("id", unique=True)
+    await db.dos_journal.create_index("id", unique=True)
 
     # Seed admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@galla.com").lower()

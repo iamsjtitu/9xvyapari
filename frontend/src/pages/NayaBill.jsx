@@ -258,6 +258,35 @@ export default function NayaBill() {
       description: "Add line item" },
   ], [open, filter]);
 
+  // Inline create-item handler
+  const createItem = async (name, idx) => {
+    const cleaned = String(name || "").trim();
+    if (!cleaned) return;
+    try {
+      const { data } = await api.post("/items", { name: cleaned });
+      setItems((prev) => [...prev, data].sort((a, b) =>
+        (a.name || "").localeCompare(b.name || "")
+      ));
+      updateLine(idx, {
+        item_id: data.id, item_name: data.name,
+        unit: data.unit, rate: data.rate,
+      });
+      toast.success(`Item "${data.name}" add ho gaya`);
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
+    }
+  };
+
+  // Items adapted to autocomplete shape (unit/rate shown as hint)
+  const itemOptions = useMemo(
+    () => items.map((it) => ({
+      ...it,
+      code: it.unit ? it.unit.slice(0, 4) : "",
+      place: it.rate ? `@ ₹${it.rate}` : "",
+    })),
+    [items]
+  );
+
   // Inline create-party handler — POSTs to /parties, adds to local options,
   // and returns the new party (consumer's onPick is called separately).
   const createParty = async (name, fieldKey) => {
@@ -586,17 +615,23 @@ export default function NayaBill() {
                   {form.lines.map((l, idx) => (
                     <tr key={idx}>
                       <td>
-                        <select className="input-dense" value={l.item_id}
-                          onChange={(e) => {
-                            const it = items.find((x) => x.id === e.target.value);
-                            updateLine(idx, {
-                              item_id: e.target.value, item_name: it?.name || "",
-                              unit: it?.unit || l.unit, rate: it?.rate || l.rate,
-                            });
-                          }} data-testid={`line-item-${idx}`}>
-                          <option value="">— Item —</option>
-                          {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
-                        </select>
+                        <PartyAutocomplete
+                          value={l.item_name}
+                          selectedId={l.item_id}
+                          options={itemOptions}
+                          onPick={(it) => updateLine(idx, {
+                            item_id: it.id, item_name: it.name,
+                            unit: it.unit || l.unit, rate: it.rate || l.rate,
+                          })}
+                          onChangeText={(t) => updateLine(idx, {
+                            item_name: t,
+                            item_id: l.item_name === t ? l.item_id : "",
+                          })}
+                          onCreate={(name) => createItem(name, idx)}
+                          placeholder="Item search..."
+                          testId={`line-item-${idx}`}
+                          createLabel="as new item"
+                        />
                       </td>
                       <td><input className="input-dense" value={l.bag_pack}
                         onChange={(e) => updateLine(idx, { bag_pack: e.target.value })} /></td>

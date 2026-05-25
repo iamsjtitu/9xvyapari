@@ -30,6 +30,7 @@ export default function PartyAutocomplete({
   required = false,
   disabled = false,
   allowFreeText = true,
+  createLabel = "as new party",
 }) {
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(0);
@@ -212,7 +213,7 @@ export default function PartyAutocomplete({
             >
               <Plus size={12} weight="bold" />
               <span>
-                {creating ? "Adding..." : <>Add <span className="font-mono-data text-ink">"{trimmed}"</span> as new party</>}
+                {creating ? "Adding..." : <>Add <span className="font-mono-data text-ink">"{trimmed}"</span> {createLabel}</>}
               </span>
               <span className="ml-auto text-[10px] text-muted2 font-mono-data">Enter</span>
             </button>

@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import api, { formatApiErrorDetail } from "@/lib/api";
-import { FileArrowUp, Database, CheckCircle, Warning } from "@phosphor-icons/react";
+import { FileArrowUp, Database, CheckCircle, Warning, Lightning } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
 // Map of FoxPro table -> {label, importEndpoint, extraPayload?}
@@ -48,9 +48,37 @@ function tableKey(name) {
 export default function ImportDBF() {
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [migrating, setMigrating] = useState(false);
+  const [migrationResult, setMigrationResult] = useState(null);
   const [preview, setPreview] = useState(null);
   const [result, setResult] = useState(null);
   const fileRef = useRef(null);
+
+  const migrateAll = async () => {
+    if (!window.confirm(
+      "Pura DOS data migrate karein?\n\n" +
+      "Yeh /tmp/galla_audit/FOXPRO2/WS2026/ se sabhi DBF files ek baar me import karega:\n" +
+      "• Master Ledger (LEDGR)\n" +
+      "• Stock Items (PROFIT)\n" +
+      "• Cash Book (CASHBOOK + CASHTEM)\n" +
+      "• Cold Storage Inward (INWARDP + INWARDS)\n" +
+      "• GST Returns (AAGSTRET)\n" +
+      "• Bills (TRANSTEM)\n" +
+      "• Journal / Transaction History (AN.DBF)\n\n" +
+      "Yeh idempotent hai — dobara chalane par duplicates nahi banenge."
+    )) return;
+    setMigrating(true);
+    setMigrationResult(null);
+    try {
+      const { data } = await api.post("/migrate-dos-data", {});
+      setMigrationResult(data);
+      toast.success(`Migration complete: ${data.total_imported} records imported`);
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
+    } finally {
+      setMigrating(false);
+    }
+  };
 
   const onPick = async (e) => {
     const f = e.target.files?.[0];
@@ -108,6 +136,70 @@ export default function ImportDBF() {
           Apke purane FoxPro <span className="font-mono-data">.DBF</span> files ko upload kar ke directly app me import karein.
           Pehle preview milega, phir confirm karke import hoga.
         </div>
+      </div>
+
+      <div className="card-flat p-6 border-l-4 border-jama bg-gradient-to-r from-jama-bg/60 to-transparent">
+        <div className="flex items-center gap-3 mb-3">
+          <Lightning size={22} color="#1B5E20" weight="bold" />
+          <div className="font-heading font-semibold text-lg">Complete DOS Data Migration</div>
+        </div>
+        <div className="text-sm text-muted2 mb-3">
+          Ek button click se <span className="font-mono-data text-ink">/tmp/galla_audit/FOXPRO2/WS2026/</span> ke
+          sabhi DBF files (Master Ledger, Items, Cash Book, Inward, GST, Bills, Journal AN.DBF) directly import ho jayenge.
+          Yeh <strong>idempotent</strong> hai — dobara chalane par duplicates nahi banenge.
+        </div>
+        <button
+          className="btn-primary"
+          onClick={migrateAll}
+          disabled={migrating}
+          data-testid="btn-migrate-all"
+        >
+          <Lightning size={16} weight="bold" />
+          {migrating ? "Migrating... please wait" : "Migrate Complete DOS Data"}
+        </button>
+
+        {migrationResult && (
+          <div className="mt-4 border-t border-khaki pt-3">
+            <div className="text-sm mb-2">
+              <span className="text-jama font-medium">{migrationResult.total_imported} records imported</span>
+              {migrationResult.total_skipped > 0 && (
+                <span className="text-muted2"> · {migrationResult.total_skipped} skipped</span>
+              )}
+              <span className="text-muted2 font-mono-data ml-2 text-xs">
+                from {migrationResult.folder}
+              </span>
+            </div>
+            <table className="dense w-full text-xs">
+              <thead>
+                <tr>
+                  <th>File</th>
+                  <th>Kind</th>
+                  <th>Status</th>
+                  <th className="num">Rows</th>
+                  <th className="num">Imported</th>
+                  <th className="num">Skipped</th>
+                </tr>
+              </thead>
+              <tbody>
+                {migrationResult.steps.map((s, i) => (
+                  <tr key={i} data-testid={`migrate-step-${i}`}>
+                    <td className="font-mono-data text-terracotta">{s.file}</td>
+                    <td className="text-muted2">{s.kind}</td>
+                    <td>
+                      <span style={{
+                        color: s.status === "ok" ? "#1B5E20" :
+                               s.status === "missing" ? "#595959" : "#B71C1C"
+                      }}>{s.status}</span>
+                    </td>
+                    <td className="num font-mono-data">{s.count ?? "—"}</td>
+                    <td className="num font-mono-data text-jama">{s.imported ?? "—"}</td>
+                    <td className="num font-mono-data text-muted2">{s.skipped ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="card-flat p-6">
