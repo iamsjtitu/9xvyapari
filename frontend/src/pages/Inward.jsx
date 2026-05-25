@@ -3,6 +3,7 @@ import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, Trash, X, Truck } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 const EMPTY = {
   date: todayISO(),
@@ -92,6 +93,16 @@ export default function Inward() {
     await api.delete(`/inward/${id}`);
     toast.success("Deleted"); load();
   };
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    { key: "a", action: () => { setForm({ ...EMPTY, date: date || todayISO() }); setEditingId(null); setOpen(true); },
+      description: "Add new inward" },
+    { ctrl: true, key: "s", action: (e) => open && save(e),
+      allowInInputs: true, description: "Save inward" },
+    { key: "Escape", action: () => setOpen(false), allowInInputs: true,
+      description: "Close modal" },
+  ], [open, date]);
 
   return (
     <div className="space-y-5" data-testid="page-inward">

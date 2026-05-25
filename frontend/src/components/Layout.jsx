@@ -2,10 +2,12 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import ShortcutHelp from "@/components/ShortcutHelp";
 import {
   House, Notebook, UsersThree, Package, Receipt, ChartBar, SignOut, Storefront,
   TreeStructure, IdentificationCard, BookOpenText, CloudArrowUp, Calendar, Power,
-  Truck, Scales, Database,
+  Truck, Scales, Database, Keyboard,
 } from "@phosphor-icons/react";
 
 const sections = [
@@ -46,6 +48,7 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [settings, setSettings] = useState(null);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
     api.get("/settings").then((r) => setSettings(r.data)).catch(() => {});
@@ -55,6 +58,26 @@ export default function Layout() {
     await logout();
     navigate("/login", { replace: true });
   };
+
+  // Flatten nav for shortcut binding
+  const navShortcuts = sections.flatMap((sec) =>
+    sec.items.map((n) => ({
+      alt: true, key: n.key.toLowerCase(),
+      description: `${sec.title}: ${n.label}`,
+      action: () => navigate(n.to),
+    }))
+  );
+
+  // Global shortcuts
+  useKeyboardShortcuts([
+    ...navShortcuts,
+    { key: "?", action: () => setHelpOpen((v) => !v),
+      allowInInputs: true, description: "Show keyboard help" },
+    { key: "Escape", action: () => setHelpOpen(false),
+      allowInInputs: true },
+    { ctrl: true, key: "/", action: () => setHelpOpen((v) => !v),
+      allowInInputs: true, description: "Show keyboard help" },
+  ], [navigate]);
 
   return (
     <div className="h-screen flex paper-bg" data-testid="app-shell">
@@ -149,8 +172,24 @@ export default function Layout() {
 
       <main className="flex-1 overflow-auto">
         <div className="px-6 py-5 max-w-[1500px] mx-auto animate-fade-in">
-          <Outlet context={{ settings }} />
+          <Outlet context={{ settings, openShortcutHelp: () => setHelpOpen(true) }} />
         </div>
+
+        {/* Floating "?" help button */}
+        <button
+          className="fixed bottom-4 right-4 print:hidden h-10 w-10 rounded-full bg-terracotta text-white grid place-items-center shadow-lg hover:bg-terracotta-hover transition-colors z-40"
+          onClick={() => setHelpOpen(true)}
+          title="Keyboard Shortcuts (press ? )"
+          data-testid="btn-shortcut-help"
+        >
+          <Keyboard size={18} weight="bold" />
+        </button>
+
+        <ShortcutHelp
+          open={helpOpen}
+          onClose={() => setHelpOpen(false)}
+          navShortcuts={navShortcuts}
+        />
       </main>
     </div>
   );

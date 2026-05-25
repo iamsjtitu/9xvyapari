@@ -4,6 +4,7 @@ import api, { inr, formatApiErrorDetail } from "@/lib/api";
 import { Plus, PencilSimple, Trash, X, MagnifyingGlass } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 const EMPTY = {
   code: "",
@@ -120,6 +121,15 @@ export default function PartyKhata() {
     const matchG = !filterGroup || p.group_id === filterGroup;
     return matchQ && matchG;
   });
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    { key: "a", action: startNew, description: "Add new ledger" },
+    { key: "/", action: () => document.querySelector('[data-testid="input-search-party"]')?.focus(),
+      description: "Focus search" },
+    { key: "Escape", action: () => setEditing(null), allowInInputs: true,
+      description: "Close dialog" },
+  ], []);
 
   const totalUdhaar = parties.reduce((s, p) => s + Math.max(0, p.balance || 0), 0);
   const totalOwed = parties.reduce((s, p) => s + Math.max(0, -(p.balance || 0)), 0);

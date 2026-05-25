@@ -3,6 +3,7 @@ import api, { inr, formatApiErrorDetail } from "@/lib/api";
 import { Plus, PencilSimple, Trash, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 const EMPTY = { name: "", unit: "Quintal", rate: 0, hsn: "" };
 
@@ -35,6 +36,14 @@ export default function GallaMaster() {
     toast.success("Item delete kiya gaya");
     load();
   };
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    { key: "a", action: () => { setEditing({ id: null }); setForm(EMPTY); },
+      description: "Add new galla item" },
+    { key: "Escape", action: () => setEditing(null), allowInInputs: true,
+      description: "Close modal" },
+  ], []);
 
   return (
     <div className="space-y-5" data-testid="page-items">

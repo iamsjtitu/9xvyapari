@@ -3,6 +3,7 @@ import api, { inr, formatApiErrorDetail } from "@/lib/api";
 import { Plus, PencilSimple, Trash, X, MagnifyingGlass } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 const EMPTY = { name: "", group_id: "", opening_balance: 0, phone: "", address: "", notes: "" };
 
@@ -46,6 +47,14 @@ export default function Accounts() {
     a.name.toLowerCase().includes(q.toLowerCase()) ||
     (a.group_name || "").toLowerCase().includes(q.toLowerCase())
   );
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    { key: "a", action: () => { setEditing({ id: null }); setForm(EMPTY); },
+      description: "Add new account" },
+    { key: "Escape", action: () => setEditing(null), allowInInputs: true,
+      description: "Close modal" },
+  ], []);
 
   return (
     <div className="space-y-5" data-testid="page-accounts">

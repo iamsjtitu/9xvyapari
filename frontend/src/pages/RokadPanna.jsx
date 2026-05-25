@@ -3,6 +3,7 @@ import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, Trash, ArrowDown, ArrowUp, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 export default function RokadPanna() {
   const [dateFrom, setDateFrom] = useState(todayISO());
@@ -57,6 +58,21 @@ export default function RokadPanna() {
       setAccounts([...partyCash, ...oldAcc]);
     });
   }, []);
+
+  // Page-level keyboard shortcuts
+  useKeyboardShortcuts([
+    { key: "a", action: () => { setForm((f) => ({ ...f, date: dateTo })); setShowAdd(true); },
+      description: "Add new entry" },
+    { key: "r", action: () => { setForm((f) => ({ ...f, type: "jama", date: dateTo })); setShowAdd(true); },
+      description: "Receipt (Jama) entry" },
+    { key: "p", action: () => { setForm((f) => ({ ...f, type: "kharch", date: dateTo })); setShowAdd(true); },
+      description: "Payment (Kharch) entry" },
+    { key: "t", action: () => { setDateFrom(todayISO()); setDateTo(todayISO()); },
+      description: "Set to Today" },
+    { key: "Escape", action: () => setShowAdd(false), allowInInputs: true,
+      description: "Close dialog" },
+  ], [dateTo]);
+
 
   // Bank-filtered entries for display (visible range)
   const visibleEntries = useMemo(() =>

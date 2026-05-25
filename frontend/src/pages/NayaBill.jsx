@@ -4,6 +4,7 @@ import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, Trash, Receipt, X, MagnifyingGlass } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 const blankLine = () => ({
   item_id: "", item_name: "",
@@ -211,6 +212,19 @@ export default function NayaBill() {
   );
 
   const isPurchase = form.bill_type === "purchase";
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    { key: "a", action: () => {
+        setForm(blank(filter === "purchase" ? "purchase" : "sale")); setOpen(true);
+      }, description: "Add new bill" },
+    { ctrl: true, key: "s", action: () => open && save(),
+      allowInInputs: true, description: "Save bill" },
+    { key: "Escape", action: () => setOpen(false), allowInInputs: true,
+      description: "Close bill modal" },
+    { key: "+", action: () => open && addLine(),
+      description: "Add line item" },
+  ], [open, filter]);
 
   // Filter party options based on group nature
   const sellerOptions = parties.filter((p) =>

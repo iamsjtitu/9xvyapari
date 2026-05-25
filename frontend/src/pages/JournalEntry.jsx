@@ -3,6 +3,7 @@ import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, Trash, BookOpenText, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 const blank = () => ({
   date: todayISO(),
@@ -75,6 +76,16 @@ export default function JournalEntry() {
     await api.delete(`/journal/${id}`);
     toast.success("Deleted"); load();
   };
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    { key: "a", action: () => { setForm(blank()); setOpen(true); },
+      description: "Add new journal" },
+    { ctrl: true, key: "s", action: () => open && save(),
+      allowInInputs: true, description: "Save journal" },
+    { key: "Escape", action: () => setOpen(false), allowInInputs: true,
+      description: "Close modal" },
+  ], [open]);
 
   return (
     <div className="space-y-5" data-testid="page-journal">

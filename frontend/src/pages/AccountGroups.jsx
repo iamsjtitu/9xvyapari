@@ -57,6 +57,14 @@ export default function AccountGroups() {
     list: groups.filter((g) => g.nature === n.v),
   }));
 
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    { key: "a", action: () => { setEditing({ id: null }); setForm(EMPTY); },
+      description: "Add new group" },
+    { key: "Escape", action: () => setEditing(null), allowInInputs: true,
+      description: "Close modal" },
+  ], []);
+
   return (
     <div className="space-y-5" data-testid="page-account-groups">
       <div className="flex flex-wrap items-end justify-between gap-3">
