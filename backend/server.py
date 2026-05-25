@@ -878,6 +878,112 @@ async def next_code_in_group(gid: str, current=Depends(get_current_user)):
     return {"next_code": nxt, "fcode": f, "lcode": l_code}
 
 
+# ---------- DBF IMPORT (from original FoxPro software) ----------
+@api.post("/import-dbf/ledger")
+async def import_dbf_ledger(payload: dict, current=Depends(get_current_user)):
+    """Import LEDGR.DBF rows into parties.
+    Expects: {rows: [{TR_GL_CODE, GL_NAME, GL_NAME1, GL_PLACE, ADDRESS_1, ADDRESS_2,
+                      F_G_L_NO, PHONE, MPSTNO, CSTNO, GL_Y_OP, QTY, TR_GL_CD1, RATE}, ...]}
+    Group is auto-detected from numeric code falling in account_group fcode-lcode range.
+    Returns: {imported, skipped, errors}
+    """
+    rows = payload.get("rows") or []
+    if not rows:
+        raise HTTPException(400, "Koi rows nahi hain")
+
+    groups = await db.account_groups.find({}, {"_id": 0}).to_list(500)
+
+    def group_for_code(code):
+        for g in groups:
+            f, lc = g.get("fcode"), g.get("lcode")
+            if f and lc and f <= code <= lc:
+                return g
+        return None
+
+    imported, skipped, errors = 0, 0, []
+    for r in rows:
+        try:
+            code = int(r.get("TR_GL_CODE") or 0)
+            name = (r.get("GL_NAME") or "").strip()
+            gl_type = (r.get("GL_TYPE") or "A").strip().upper()
+            if not name or gl_type == "M" or code <= 0:
+                skipped += 1
+                continue
+            g = group_for_code(code)
+            existing = await db.parties.find_one({"code": code}, {"_id": 0})
+            doc = {
+                "name": name,
+                "alt_name": (r.get("GL_NAME1") or "").strip(),
+                "place": (r.get("GL_PLACE") or "").strip(),
+                "address": (r.get("ADDRESS_1") or "").strip(),
+                "address2": (r.get("ADDRESS_2") or "").strip(),
+                "gstin": (r.get("F_G_L_NO") or "").strip(),
+                "phone": (r.get("PHONE") or "").strip(),
+                "mpstno": (r.get("MPSTNO") or "").strip(),
+                "cstno": (r.get("CSTNO") or "").strip(),
+                "pan": "",
+                "type": "both",
+                "opening_balance": float(r.get("GL_Y_OP") or 0),
+                "opening_qty": float(r.get("QTY") or 0),
+                "rate": float(r.get("RATE") or 0),
+                "code": code,
+                "group_id": g["id"] if g else None,
+                "group_name": g["name"] if g else "",
+            }
+            if existing:
+                await db.parties.update_one({"id": existing["id"]}, {"$set": doc})
+            else:
+                doc["id"] = str(uuid.uuid4())
+                doc["created_at"] = now_iso()
+                await db.parties.insert_one(doc)
+            imported += 1
+        except Exception as e:
+            errors.append({"code": r.get("TR_GL_CODE"), "error": str(e)})
+            skipped += 1
+    return {"imported": imported, "skipped": skipped, "errors": errors[:20]}
+
+
+@api.post("/import-dbf/upload")
+async def import_dbf_upload(payload: dict, current=Depends(get_current_user)):
+    """Parse uploaded .DBF base64 file. Returns list of row dicts.
+    payload: {file_b64: str, table: str}
+    table = 'LEDGR' | 'GROUPTEM' | 'CASHBOOK' etc. (FoxPro DBF table name)
+    """
+    file_b64 = payload.get("file_b64") or ""
+    table = payload.get("table") or "TABLE"
+    import base64
+    import tempfile
+    try:
+        from dbfread import DBF
+    except ImportError:
+        raise HTTPException(500, "dbfread library not installed")
+
+    try:
+        binary = base64.b64decode(file_b64)
+    except Exception as e:
+        raise HTTPException(400, f"Invalid base64: {e}")
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".DBF") as tmp:
+        tmp.write(binary)
+        tmp_path = tmp.name
+    try:
+        dbf = DBF(tmp_path, ignore_missing_memofile=True, char_decode_errors="ignore")
+        rows = []
+        for r in dbf:
+            row = {}
+            for k, v in r.items():
+                if hasattr(v, "isoformat"):
+                    v = v.isoformat()
+                row[k] = v
+            rows.append(row)
+        return {"table": table, "count": len(rows),
+                "fields": [(f.name, f.type, f.length) for f in dbf.fields],
+                "rows": rows}
+    finally:
+        import os as _os
+        _os.unlink(tmp_path)
+
+
 # ---------- ROOT ----------
 @api.get("/")
 async def root():

@@ -5,7 +5,7 @@ import api from "@/lib/api";
 import {
   House, Notebook, UsersThree, Package, Receipt, ChartBar, SignOut, Storefront,
   TreeStructure, IdentificationCard, BookOpenText, CloudArrowUp, Calendar, Power,
-  Truck, Scales,
+  Truck, Scales, Database,
 } from "@phosphor-icons/react";
 
 const sections = [
@@ -34,6 +34,7 @@ const sections = [
   {
     title: "Maintenance",
     items: [
+      { to: "/import-dbf", label: "Import (DBF)", key: "K", icon: Database, tid: "nav-import" },
       { to: "/backup", label: "Backup / Restore", key: "H", icon: CloudArrowUp, tid: "nav-backup" },
       { to: "/settings", label: "Settings / Date", key: "J", icon: Calendar, tid: "nav-settings" },
     ],
