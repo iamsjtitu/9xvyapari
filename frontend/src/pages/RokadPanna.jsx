@@ -158,18 +158,17 @@ export default function RokadPanna() {
       <table className="dense w-full">
         <thead>
           <tr>
-            <th style={{ width: 90 }}>Date</th>
-            <th style={{ width: 60 }}>V.No.</th>
-            <th style={{ width: 90 }}>Cash A/C</th>
+            <th style={{ width: 80 }}>Date</th>
+            <th style={{ width: 50 }}>V.No.</th>
             <th>Party / Vivran</th>
-            <th className="num" style={{ width: 130 }}>Amount</th>
-            <th style={{ width: 36 }}></th>
+            <th className="num" style={{ width: 110 }}>Amount</th>
+            <th style={{ width: 36 }} className="print:hidden"></th>
           </tr>
         </thead>
         <tbody>
           {list.length === 0 ? (
             <tr>
-              <td colSpan={6} className="text-center text-muted2 py-8 text-sm">
+              <td colSpan={5} className="text-center text-muted2 py-8 text-sm">
                 Koi entry nahi.
               </td>
             </tr>
@@ -180,22 +179,21 @@ export default function RokadPanna() {
                 <td className="font-mono-data text-xs text-terracotta">
                   {e.voucher_no || "—"}
                 </td>
-                <td className="text-[11px] uppercase tracking-wider text-muted2">
-                  {e.cash_account_name || e.mode || "Cash"}
-                </td>
                 <td>
                   <div className="font-medium">{e.party_name || "—"}</div>
-                  {e.description && (
-                    <div className="text-xs text-muted2 mt-0.5">{e.description}</div>
+                  {(e.description || e.cash_account_name) && (
+                    <div className="text-[10px] text-muted2 mt-0.5">
+                      {e.cash_account_name ? `[${e.cash_account_name}] ` : ""}{e.description || ""}
+                    </div>
                   )}
                   {e.chq_no && (
-                    <div className="text-xs text-muted2 mt-0.5 font-mono-data">Chq: {e.chq_no}</div>
+                    <div className="text-[10px] text-muted2 mt-0.5 font-mono-data">Chq: {e.chq_no}</div>
                   )}
                 </td>
                 <td className="num" style={{ color }}>
                   ₹ {inr(e.amount)}
                 </td>
-                <td>
+                <td className="print:hidden">
                   <button
                     className="btn-ghost p-1.5"
                     onClick={() => del(e.id)}

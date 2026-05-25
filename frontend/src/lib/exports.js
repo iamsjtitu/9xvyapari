@@ -8,7 +8,6 @@ export function inrPlain(n) {
 
 /* ---- Excel Export ---- */
 export function exportToExcel(filename, sheets) {
-  // sheets: [{name, columns: [{key, label, width?, num?}], rows: [...]}]
   const wb = XLSX.utils.book_new();
   for (const sh of sheets) {
     const data = [
@@ -25,14 +24,37 @@ export function exportToExcel(filename, sheets) {
   XLSX.writeFile(wb, filename.replace(/\.xlsx$/i, "") + ".xlsx");
 }
 
-/* ---- Print / PDF ---- */
+/* ---- Print / PDF — auto landscape detection for cash book / wide reports ---- */
+function injectPageRule(orientation) {
+  // Remove any previous one
+  document.getElementById("__print_page_rule__")?.remove();
+  const style = document.createElement("style");
+  style.id = "__print_page_rule__";
+  style.media = "print";
+  style.innerHTML = `@page { size: A4 ${orientation}; margin: 8mm; }`;
+  document.head.appendChild(style);
+}
+
+function detectOrientation() {
+  // landscape for pages with wide tables
+  const path = window.location.pathname;
+  if (path.includes("/rokad") || path.includes("/gst-returns") ||
+      path.includes("/trial-balance") || path.includes("/reports") ||
+      path.includes("/bills") || path.includes("/parties") ||
+      path.includes("/inward") || path.includes("/journal")) {
+    return "landscape";
+  }
+  return "portrait";
+}
+
 export function triggerPrint() {
-  window.print();
+  injectPageRule(detectOrientation());
+  // give browser time to apply the new stylesheet
+  setTimeout(() => window.print(), 30);
 }
 
 export function exportPDF() {
-  // Browser "Save as PDF" via print dialog (cleanest, no library needed)
-  window.print();
+  triggerPrint();
 }
 
 /* ---- FoxPro-style header builder for print ---- */

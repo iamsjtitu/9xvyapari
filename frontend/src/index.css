@@ -206,77 +206,112 @@ label.lbl {
 }
 
 @media print {
-  /* Reset background */
+  /* ---- Page setup ---- */
+  @page { size: A4; margin: 10mm 8mm; }
+  html, body { margin: 0 !important; padding: 0 !important; }
   body, html, .paper-bg, #root { background: white !important; }
+
+  /* Force colors to print as designed */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 
   /* Hide UI chrome */
   aside, .print\:hidden { display: none !important; }
-  main { overflow: visible !important; }
-  main > div { padding: 0 !important; max-width: 100% !important; }
+  main { overflow: visible !important; width: 100% !important; }
+  main > div { padding: 0 !important; max-width: 100% !important; margin: 0 !important; }
 
   /* Body monospace for FoxPro look */
   body {
     font-family: "IBM Plex Mono", "Courier New", monospace !important;
-    font-size: 10pt !important;
+    font-size: 9pt !important;
     color: #000 !important;
+    line-height: 1.25 !important;
   }
   h1, h2, h3, .font-heading {
     font-family: "IBM Plex Mono", "Courier New", monospace !important;
     font-weight: 700 !important;
   }
 
-  /* Tables — FoxPro-style dense monochrome */
-  table.dense, table.dense thead th, table.dense tbody td, table.dense tfoot td {
-    border-color: #000 !important;
-    color: #000 !important;
-    background: white !important;
+  /* Print FoxPro header */
+  .foxpro-print-header {
+    margin-bottom: 6px !important;
+  }
+
+  /* Tables — FoxPro dense monochrome, tight fit */
+  table.dense {
+    width: 100% !important;
+    table-layout: auto !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto;
   }
   table.dense thead th {
     background: white !important;
     border-bottom: 1px solid #000 !important;
+    border-top: 1px solid #000 !important;
     color: #000 !important;
     font-family: "IBM Plex Mono", monospace !important;
     font-weight: 700 !important;
-    font-size: 9pt !important;
+    font-size: 7.5pt !important;
     text-transform: uppercase;
-    padding: 3px 6px !important;
+    padding: 2px 4px !important;
+    text-align: left;
+    word-wrap: break-word;
   }
   table.dense tbody td {
-    padding: 2px 6px !important;
-    font-size: 9.5pt !important;
+    padding: 1.5px 4px !important;
+    font-size: 8pt !important;
     border-bottom: 1px dotted #888 !important;
+    color: #000 !important;
+    word-wrap: break-word;
+    max-width: 0;          /* allow flexible width */
+    overflow-wrap: break-word;
+    background: white !important;
+  }
+  table.dense tfoot td {
+    border-top: 1px solid #000 !important;
+    border-bottom: 2px solid #000 !important;
+    font-weight: 700 !important;
+    background: white !important;
+    padding: 2px 4px !important;
+    font-size: 8.5pt !important;
   }
   table.dense tbody tr:nth-child(even),
   table.dense tbody tr:hover { background: white !important; }
-  table.dense tfoot td {
-    border-top: 1px solid #000 !important;
-    font-weight: 700 !important;
-    background: white !important;
-  }
 
-  /* Cards become flat with thin border for print */
+  /* Right-align numbers */
+  table.dense td.num, table.dense th.num { text-align: right !important; }
+
+  /* Cards flat */
   .card-flat {
     background: white !important;
     border: 1px solid #000 !important;
     box-shadow: none !important;
+    margin-bottom: 4px !important;
+    padding: 4px 6px !important;
+    border-radius: 0 !important;
   }
 
-  /* Section title becomes bold black */
-  .section-title { color: #000 !important; font-weight: 700 !important; }
+  /* Tighten spacing */
+  .space-y-5 > * + * { margin-top: 4px !important; }
+  .p-5, .p-6 { padding: 4px 6px !important; }
+  .px-5, .px-6 { padding-left: 6px !important; padding-right: 6px !important; }
+  .py-3 { padding-top: 4px !important; padding-bottom: 4px !important; }
 
-  /* Amount colors -> black */
-  .amount-jama, .amount-kharch { color: #000 !important; }
+  /* Section title bold black */
+  .section-title { color: #000 !important; font-weight: 700 !important; font-size: 7.5pt !important; }
 
-  /* Inputs / selects / buttons hidden in print except inside print panels */
-  input, select, button { display: none !important; }
+  /* Amount colors -> keep red/green for visibility */
+  .amount-jama { color: #0a4d10 !important; }
+  .amount-kharch { color: #8b0000 !important; }
+
+  /* Inputs / buttons hidden */
+  input, select, button, label.lbl { display: none !important; }
 
   /* Allow hidden display for our print-only header */
   .foxpro-print-header.hidden.print\:block,
   .print-only { display: block !important; }
 
-  /* Page setup */
-  @page { margin: 12mm 10mm; size: A4; }
-  @page :first { margin-top: 10mm; }
+  /* Hide modal overlays in print */
+  .fixed { display: none !important; }
 
   /* Page break helpers */
   .page-break { page-break-after: always; }
@@ -285,18 +320,41 @@ label.lbl {
   thead { display: table-header-group; }
   tfoot { display: table-footer-group; }
 
-  /* Cash book — FORCE Jama LEFT + Kharch RIGHT side-by-side in print
-     (DOS cash book layout: Receipt | Payment columns) */
+  /* ---- CASH BOOK 2-column DOS layout ---- */
   .cash-book-grid {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 8px !important;
+    gap: 6px !important;
   }
-  body:has(.cash-book-grid) { /* may not apply universally */ }
+  /* Force tight table for cash book on print */
+  .cash-book-grid table.dense thead th,
+  .cash-book-grid table.dense tbody td {
+    font-size: 7pt !important;
+    padding: 1px 3px !important;
+  }
+
+  /* Bank summary card — flex layout for print */
+  [data-testid="bank-summary"] {
+    padding: 4px 8px !important;
+  }
+  [data-testid="bank-summary"] .font-mono-data {
+    font-size: 9pt !important;
+  }
+
+  /* Wide reports landscape via JS-driven body class */
+  body.print-landscape, body.print-landscape * {
+    /* placeholder — actual @page set below */
+  }
 }
 
-/* Cash book pages print landscape for wider Jama|Kharch layout */
+/* Landscape page size applied via body class */
 @media print {
-  @page cashbook { size: A4 landscape; margin: 10mm; }
-  .cash-book-page { page: cashbook; }
+  body.print-landscape {
+    /* fallback */
+  }
+}
+
+/* Use a separate sheet that targets landscape pages */
+@media print and (orientation: landscape) {
+  /* Will apply if user manually picks landscape in print dialog */
 }
