@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 
 export default function RokadPanna() {
-  const [date, setDate] = useState(todayISO());
+  const [dateFrom, setDateFrom] = useState(todayISO());
+  const [dateTo, setDateTo] = useState(todayISO());
   const [entries, setEntries] = useState([]);
   const [parties, setParties] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -25,14 +26,14 @@ export default function RokadPanna() {
   });
 
   const load = async () => {
-    const { data } = await api.get(`/rokad?date_from=${date}&date_to=${date}`);
+    const { data } = await api.get(`/rokad?date_from=${dateFrom}&date_to=${dateTo}`);
     setEntries(data);
   };
 
   useEffect(() => {
     load();
     // eslint-disable-next-line
-  }, [date]);
+  }, [dateFrom, dateTo]);
 
   useEffect(() => {
     Promise.all([api.get("/parties"), api.get("/accounts")]).then(([p, a]) => {
@@ -71,7 +72,7 @@ export default function RokadPanna() {
       toast.success("Entry add ki gayi");
       setShowAdd(false);
       setForm({
-        date,
+        date: dateTo,
         type: "jama",
         amount: "",
         party_id: "",
@@ -115,6 +116,7 @@ export default function RokadPanna() {
       <table className="dense w-full">
         <thead>
           <tr>
+            <th style={{ width: 90 }}>Date</th>
             <th style={{ width: 60 }}>V.No.</th>
             <th style={{ width: 90 }}>Cash A/C</th>
             <th>Party / Vivran</th>
@@ -125,13 +127,14 @@ export default function RokadPanna() {
         <tbody>
           {list.length === 0 ? (
             <tr>
-              <td colSpan={5} className="text-center text-muted2 py-8 text-sm">
+              <td colSpan={6} className="text-center text-muted2 py-8 text-sm">
                 Koi entry nahi.
               </td>
             </tr>
           ) : (
             list.map((e) => (
               <tr key={e.id} data-testid={`rokad-row-${e.id}`}>
+                <td className="font-mono-data text-xs">{(e.date || "").slice(0, 10)}</td>
                 <td className="font-mono-data text-xs text-terracotta">
                   {e.voucher_no || "—"}
                 </td>
@@ -177,7 +180,7 @@ export default function RokadPanna() {
           </h1>
         </div>
         <div className="flex items-end gap-3">
-          <ExportBar filename={`cash-book-${date}`} sheets={[
+          <ExportBar filename={`cash-book-${dateFrom}-to-${dateTo}`} sheets={[
             {
               name: "Receipts (Jama)",
               columns: [
@@ -206,19 +209,36 @@ export default function RokadPanna() {
             },
           ]} />
           <div>
-            <label className="lbl">Date</label>
+            <label className="lbl">From</label>
             <input
               type="date"
               className="input-dense"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              data-testid="input-date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              data-testid="input-date-from"
+            />
+          </div>
+          <div>
+            <label className="lbl">To</label>
+            <input
+              type="date"
+              className="input-dense"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              data-testid="input-date-to"
             />
           </div>
           <button
+            className="btn-outline"
+            onClick={() => { setDateFrom(todayISO()); setDateTo(todayISO()); }}
+            title="Aaj ki entries"
+          >
+            Today
+          </button>
+          <button
             className="btn-primary"
             onClick={() => {
-              setForm((f) => ({ ...f, date }));
+              setForm((f) => ({ ...f, date: dateTo }));
               setShowAdd(true);
             }}
             data-testid="btn-add-entry"
@@ -229,7 +249,7 @@ export default function RokadPanna() {
       </div>
 
       <FoxProPrintHeader title="CASH BOOK / ROKAD PANNA"
-        subtitle={`Date: ${date} · Jama: ${inr(totals.jama)} · Kharch: ${inr(totals.kharch)} · Baki: ${inr(totals.baki)}`} />
+        subtitle={`${dateFrom === dateTo ? `Date: ${dateFrom}` : `From: ${dateFrom} · To: ${dateTo}`} · Jama: ${inr(totals.jama)} · Kharch: ${inr(totals.kharch)} · Baki: ${inr(totals.baki)}`} />
 
       {/* Summary bar */}
       <div className="card-flat px-5 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -258,7 +278,7 @@ export default function RokadPanna() {
           </div>
         </div>
         <div className="text-xs text-muted2 font-mono-data">
-          Date: {date} · Entries: {entries.length}
+          Date: {dateFrom === dateTo ? dateFrom : `${dateFrom} → ${dateTo}`} · Entries: {entries.length}
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import api, { inr, todayISO } from "@/lib/api";
 import { Calendar, ArrowDown, ArrowUp, Receipt } from "@phosphor-icons/react";
+import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 
 export default function Reports() {
   const [from, setFrom] = useState(todayISO().slice(0, 8) + "01");
