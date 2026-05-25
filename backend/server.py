@@ -378,6 +378,11 @@ async def _compute_party_balance(party_id: str, opening: float) -> float:
             bal -= r["amount"]  # party paid us
         else:
             bal += r["amount"]  # we paid party
+    # Imported DOS journal entries (AN.DBF)
+    dosj = await db.dos_journal.find({"party_id": party_id}, {"_id": 0}).to_list(5000)
+    for j in dosj:
+        bal += float(j.get("debit") or 0)
+        bal -= float(j.get("credit") or 0)
     return round(bal, 2)
 
 
@@ -560,8 +565,12 @@ async def party_ledger(pid: str, current=Depends(get_current_user)):
         raise HTTPException(404, "Party not found")
     bills = await db.bills.find({"party_id": pid}, {"_id": 0}).sort("date", 1).to_list(5000)
     rokads = await db.rokad.find({"party_id": pid}, {"_id": 0}).sort("date", 1).to_list(5000)
+    # Imported DOS journal entries (AN.DBF) for this party
+    dos_journal = await db.dos_journal.find(
+        {"party_id": pid}, {"_id": 0}
+    ).sort([("date", 1), ("ref_no", 1)]).to_list(5000)
     party["balance"] = await _compute_party_balance(pid, party.get("opening_balance", 0.0))
-    return {"party": party, "bills": bills, "rokad": rokads}
+    return {"party": party, "bills": bills, "rokad": rokads, "dos_journal": dos_journal}
 
 
 # ---------- ACCOUNT GROUPS ----------
