@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import api, { inr } from "@/lib/api";
 import { ArrowLeft, Receipt, Notebook } from "@phosphor-icons/react";
+import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 
 export default function PartyLedger() {
   const { id } = useParams();
@@ -43,7 +44,23 @@ export default function PartyLedger() {
 
   return (
     <div className="space-y-5" data-testid="page-party-ledger">
-      <Link to="/parties" className="btn-ghost"><ArrowLeft size={14} /> Wapas</Link>
+      <div className="flex items-center justify-between">
+        <Link to="/parties" className="btn-ghost"><ArrowLeft size={14} /> Wapas</Link>
+        <ExportBar filename={`ledger-${party.name.replace(/[^a-z0-9]/gi, "_")}`} sheets={[{
+          name: `Ledger of ${party.name}`,
+          columns: [
+            { key: "date", label: "Date", width: 12 },
+            { key: "label", label: "Narration", width: 40 },
+            { key: "debit", label: "Debit", width: 14, num: true },
+            { key: "credit", label: "Credit", width: 14, num: true },
+            { key: "balance", label: "Balance", width: 14, num: true },
+          ],
+          rows: enriched,
+        }]} />
+      </div>
+
+      <FoxProPrintHeader title={`PARTY LEDGER: ${party.name.toUpperCase()}`}
+        subtitle={`Code: ${party.code || "—"} · ${party.place || ""} · Current Balance: ₹${inr(Math.abs(party.balance))} ${party.balance > 0 ? "DR" : party.balance < 0 ? "CR" : ""}`} />
 
       <div className="card-flat p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">

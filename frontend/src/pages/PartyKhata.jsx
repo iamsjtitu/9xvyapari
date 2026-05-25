@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api, { inr, formatApiErrorDetail } from "@/lib/api";
 import { Plus, PencilSimple, Trash, X, MagnifyingGlass } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 
 const EMPTY = {
   code: "",
@@ -135,10 +136,29 @@ export default function PartyKhata() {
             Sales Party, Purchase Party, Cold Storage, Cash/Bank — sabhi yahan se manage hote hain.
           </div>
         </div>
-        <button className="btn-primary" onClick={startNew} data-testid="btn-add-party">
-          <Plus size={16} weight="bold" /> Naya Khata
-        </button>
+        <div className="flex items-end gap-2">
+          <ExportBar filename="ledger-master" sheets={[{
+            name: "Ledger Master",
+            columns: [
+              { key: "code", label: "Code", width: 8, num: true },
+              { key: "name", label: "Name", width: 32 },
+              { key: "group_name", label: "Group", width: 24 },
+              { key: "place", label: "Place", width: 16 },
+              { key: "phone", label: "Phone", width: 14 },
+              { key: "gstin", label: "GSTIN", width: 18 },
+              { key: "opening_balance", label: "Opening Bal", width: 14, num: true },
+              { key: "balance", label: "Current Bal", width: 14, num: true },
+            ],
+            rows: filtered,
+          }]} />
+          <button className="btn-primary" onClick={startNew} data-testid="btn-add-party">
+            <Plus size={16} weight="bold" /> Naya Khata
+          </button>
+        </div>
       </div>
+
+      <FoxProPrintHeader title="MASTER LEDGER / KHATA BAHI"
+        subtitle={`Total ${filtered.length} ledgers · ${groups.length} groups`} />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="card-flat p-4">

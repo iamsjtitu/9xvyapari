@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, Trash, X, Truck } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 
 const EMPTY = {
   date: todayISO(),
@@ -105,6 +106,19 @@ export default function Inward() {
           </div>
         </div>
         <div className="flex items-end gap-3">
+          <ExportBar filename="inward-register" sheets={[{
+            name: "Inward Register",
+            columns: [
+              { key: "date", label: "Date", width: 12 },
+              { key: "ref_no", label: "Ref", width: 10 },
+              { key: "lot_no", label: "Lot No", width: 12 },
+              { key: "cold_storage_name", label: "Cold Storage", width: 30 },
+              { key: "item_name", label: "Item", width: 18 },
+              { key: "bags", label: "Bags", width: 8, num: true },
+              { key: "weight", label: "Weight (Qtl)", width: 14, num: true },
+            ],
+            rows: rows,
+          }]} />
           <div>
             <label className="lbl">Date (filter)</label>
             <input type="date" className="input-dense" value={date}
@@ -117,6 +131,9 @@ export default function Inward() {
           </button>
         </div>
       </div>
+
+      <FoxProPrintHeader title="INWARD REGISTER (COLD STORAGE)"
+        subtitle={`Total ${rows.length} entries · ${totals.bags} bags · ${inr(totals.wgt)} Qtl`} />
 
       {/* Totals */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">

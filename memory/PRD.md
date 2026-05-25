@@ -43,6 +43,15 @@ User clarifications:
 - ✅ Full data-testid coverage on interactive elements
 - ✅ 100% backend + frontend test pass (20-test pytest suite)
 
+## v1.4 (2026-02-23) — Print + PDF + Excel Export Everywhere
+- ✅ **3-button `ExportBar`** (Print / PDF / Excel) added to all major pages
+- ✅ **FoxPro AA.TXT-style print** — monospaced (IBM Plex Mono), `GALLA BAHI | DATE | TIME` header, centered title with `----` underline, dense monochrome tables, dotted row separators, group totals with double underline. Matches the original software output exactly.
+- ✅ **PDF export** — uses browser print-to-PDF (cleanest, no extra library needed; user picks "Save as PDF" in print destination)
+- ✅ **Excel export** — uses `xlsx` library, multi-sheet support (e.g. Cash Book has Receipts + Payments sheets, Reports has Daily Summary + Bills Summary)
+- ✅ **Reusable `FoxProPrintHeader`** component with firm name, phone, date/time, title, subtitle
+- ✅ Global print CSS hides sidebar, action buttons, search bars; force monospace + B/W rendering
+- ✅ Added to: Trial Balance, GST Returns, Master Ledger (Party Khata), Cash Register (Rokad), Bills list, Bill View, Inward Register, Reports, Galla Master, Journal Entry, Party Ledger, Account Groups, Accounts (12 pages)
+
 ## v1.3 (2026-02-23) — Full Data Migration from FoxPro
 - ✅ **5 new DBF import endpoints**: /import-dbf/cashbook (→ rokad), /inward (→ inward), /items (→ items), /gst (→ gst_returns), /transactions (→ bills with full TRANSPR mapping)
 - ✅ **Per-cash-account voucher numbering** — `GET /api/cash-accounts/{pid}/next-voucher` returns next max voucher_no + 1 for that cash account. Rokad model now has voucher_no + chq_no fields. Frontend auto-suggests voucher when cash a/c selected.

@@ -68,10 +68,26 @@ export default function AccountGroups() {
             Naye account uske group ke range me auto-number paayega.
           </div>
         </div>
-        <button className="btn-primary" onClick={() => { setEditing({ id: null }); setForm(EMPTY); }} data-testid="btn-add-group">
-          <Plus size={16} weight="bold" /> Naya Group
-        </button>
+        <div className="flex items-end gap-2">
+          <ExportBar filename="account-groups" sheets={[{
+            name: "Account Groups",
+            columns: [
+              { key: "fcode", label: "FCODE", width: 8, num: true },
+              { key: "lcode", label: "LCODE", width: 8, num: true },
+              { key: "name", label: "Group Name", width: 32 },
+              { key: "nature", label: "Nature", width: 12 },
+              { key: "ecode", label: "ECODE", width: 8, num: true },
+            ],
+            rows: groups,
+          }]} />
+          <button className="btn-primary" onClick={() => { setEditing({ id: null }); setForm(EMPTY); }} data-testid="btn-add-group">
+            <Plus size={16} weight="bold" /> Naya Group
+          </button>
+        </div>
       </div>
+
+      <FoxProPrintHeader title="ACCOUNT GROUPS (GROUPTEM)"
+        subtitle={`Total ${groups.length} groups`} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {grouped.map((sec) => (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api, { inr } from "@/lib/api";
-import { Scales, Printer } from "@phosphor-icons/react";
+import { Scales } from "@phosphor-icons/react";
+import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 
 const NATURE_COLORS = {
   asset: "#1B5E20", liability: "#8B2520",
@@ -16,7 +17,31 @@ export default function TrialBalance() {
 
   if (!data) return <div className="text-muted2 font-heading">Loading Trial Balance...</div>;
 
-  const print = () => window.print();
+  const excelSheets = [
+    {
+      name: "Trial Balance",
+      columns: [
+        { key: "group", label: "Group", width: 28 },
+        { key: "code", label: "Code", width: 8, num: true },
+        { key: "name", label: "Name", width: 35 },
+        { key: "debit", label: "Debit", width: 16, num: true },
+        { key: "credit", label: "Credit", width: 16, num: true },
+      ],
+      rows: data.sections.flatMap((sec) => [
+        ...sec.rows.map((r) => ({
+          group: sec.group_name, code: r.code || "",
+          name: r.name, debit: r.balance > 0 ? r.balance : 0,
+          credit: r.balance < 0 ? Math.abs(r.balance) : 0,
+        })),
+        { group: `${sec.group_name} TOTAL`, code: "", name: "",
+          debit: sec.dr_total, credit: sec.cr_total },
+        { group: "", code: "", name: "", debit: "", credit: "" },
+      ]).concat([
+        { group: "GRAND TOTAL", code: "", name: "",
+          debit: data.grand_dr, credit: data.grand_cr },
+      ]),
+    },
+  ];
 
   return (
     <div className="space-y-5" data-testid="page-trial-balance">
@@ -31,13 +56,14 @@ export default function TrialBalance() {
             Group-wise Debit / Credit balance summary (FoxPro AA.TXT style).
           </div>
         </div>
-        <button className="btn-primary" onClick={print} data-testid="btn-print-tb">
-          <Printer size={16} weight="bold" /> Print
-        </button>
+        <ExportBar filename="trial-balance" sheets={excelSheets} />
       </div>
 
+      <FoxProPrintHeader title="TRIAL BALANCE"
+        subtitle={`AS ON ${new Date().toLocaleDateString("en-IN")}`} />
+
       <div className="card-flat p-6 bg-white" id="tb-printable">
-        <div className="border-b-2 border-terracotta pb-3 mb-4 text-center">
+        <div className="border-b-2 border-terracotta pb-3 mb-4 text-center print:hidden">
           <div className="font-heading font-bold text-xl">TRIAL BALANCE</div>
           <div className="text-xs text-muted2 mt-1 font-mono-data">
             As of {new Date().toLocaleDateString("en-IN")}

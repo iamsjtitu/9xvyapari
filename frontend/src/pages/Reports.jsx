@@ -53,7 +53,31 @@ export default function Reports() {
           <div className="section-title">Reports · रिपोर्ट / खाता बही</div>
           <h1 className="font-heading font-semibold text-3xl tracking-tight">Hisab Summary</h1>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-end">
+          <ExportBar filename={`reports-${from}-to-${to}`} sheets={[
+            {
+              name: "Daily Summary",
+              columns: [
+                { key: "date", label: "Date", width: 12 },
+                { key: "jama", label: "Jama (Receipt)", width: 16, num: true },
+                { key: "kharch", label: "Kharch (Payment)", width: 16, num: true },
+                { value: (d) => d.jama - d.kharch, label: "Net", width: 14, num: true },
+              ],
+              rows: dailyRows,
+            },
+            {
+              name: "Bills Summary",
+              columns: [
+                { key: "bill_no", label: "Bill No", width: 10 },
+                { key: "date", label: "Date", width: 12 },
+                { key: "bill_type", label: "Type", width: 10 },
+                { key: "party_name", label: "Party", width: 30 },
+                { key: "total", label: "Total", width: 14, num: true },
+                { key: "commission_amt", label: "Arhat", width: 12, num: true },
+              ],
+              rows: bills,
+            },
+          ]} />
           <div>
             <label className="lbl">From</label>
             <input type="date" className="input-dense" value={from} onChange={(e) => setFrom(e.target.value)} data-testid="input-from" />
@@ -64,6 +88,9 @@ export default function Reports() {
           </div>
         </div>
       </div>
+
+      <FoxProPrintHeader title="DAILY SUMMARY REPORT"
+        subtitle={`From ${from} to ${to} · Jama ${inr(rokadTotals.jama)} · Kharch ${inr(rokadTotals.kharch)} · Sales ${inr(billTotals.sale)} · Purchase ${inr(billTotals.purchase)}`} />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

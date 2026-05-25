@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, Trash, Receipt, X, MagnifyingGlass } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 
 const blankLine = () => ({
   item_id: "", item_name: "",
@@ -230,12 +231,35 @@ export default function NayaBill() {
             {filter === "purchase" ? "Purchase Entry" : filter === "sale" ? "Sale / Bill Entry" : "All Bills"}
           </h1>
         </div>
-        <button className="btn-primary" onClick={() => {
-          setForm(blank(filter === "purchase" ? "purchase" : "sale")); setOpen(true);
-        }} data-testid="btn-new-bill">
-          <Plus size={16} weight="bold" /> Naya {filter === "purchase" ? "Purchase" : "Bill"} <span className="kbd ml-1">A</span>
-        </button>
+        <div className="flex items-end gap-2">
+          <ExportBar filename={`bills-${filter}`} sheets={[{
+            name: filter === "purchase" ? "Purchase Register" : filter === "sale" ? "Sale Register" : "Bills",
+            columns: [
+              { key: "bill_no", label: "Bill No.", width: 10 },
+              { key: "date", label: "Date", width: 12 },
+              { key: "lot_no", label: "Lot", width: 10 },
+              { key: "bill_type", label: "Type", width: 10 },
+              { key: "party_name", label: "Party", width: 30 },
+              { key: "truck_no", label: "Truck", width: 14 },
+              { value: (b) => (b.items || []).reduce((s, it) => s + (it.bag || 0), 0), label: "Bags", width: 10, num: true },
+              { value: (b) => (b.items || []).reduce((s, it) => s + (it.wb || it.weight || 0), 0), label: "Weight (Qtl)", width: 12, num: true },
+              { key: "total", label: "Total", width: 14, num: true },
+              { key: "payment_received", label: "Received", width: 14, num: true },
+              { key: "balance", label: "Baki", width: 14, num: true },
+            ],
+            rows: filtered,
+          }]} />
+          <button className="btn-primary" onClick={() => {
+            setForm(blank(filter === "purchase" ? "purchase" : "sale")); setOpen(true);
+          }} data-testid="btn-new-bill">
+            <Plus size={16} weight="bold" /> Naya {filter === "purchase" ? "Purchase" : "Bill"} <span className="kbd ml-1">A</span>
+          </button>
+        </div>
       </div>
+
+      <FoxProPrintHeader
+        title={filter === "purchase" ? "PURCHASE REGISTER" : filter === "sale" ? "SALES REGISTER" : "ALL BILLS"}
+        subtitle={`Total ${filtered.length} bills`} />
 
       <div className="card-flat px-4 py-3 flex flex-wrap items-center gap-3">
         <div className="flex gap-1 bg-parchment p-1 rounded-sm">

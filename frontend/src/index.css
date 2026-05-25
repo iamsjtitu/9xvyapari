@@ -198,3 +198,90 @@ label.lbl {
 
 .amount-jama { color: #1B5E20; font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
 .amount-kharch { color: #B71C1C; font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+
+/* ============ FoxPro-style PRINT ============ */
+.foxpro-rule {
+  border-top: 1px dashed #000;
+  margin: 4px 0;
+}
+
+@media print {
+  /* Reset background */
+  body, html, .paper-bg, #root { background: white !important; }
+
+  /* Hide UI chrome */
+  aside, .print\:hidden { display: none !important; }
+  main { overflow: visible !important; }
+  main > div { padding: 0 !important; max-width: 100% !important; }
+
+  /* Body monospace for FoxPro look */
+  body {
+    font-family: "IBM Plex Mono", "Courier New", monospace !important;
+    font-size: 10pt !important;
+    color: #000 !important;
+  }
+  h1, h2, h3, .font-heading {
+    font-family: "IBM Plex Mono", "Courier New", monospace !important;
+    font-weight: 700 !important;
+  }
+
+  /* Tables — FoxPro-style dense monochrome */
+  table.dense, table.dense thead th, table.dense tbody td, table.dense tfoot td {
+    border-color: #000 !important;
+    color: #000 !important;
+    background: white !important;
+  }
+  table.dense thead th {
+    background: white !important;
+    border-bottom: 1px solid #000 !important;
+    color: #000 !important;
+    font-family: "IBM Plex Mono", monospace !important;
+    font-weight: 700 !important;
+    font-size: 9pt !important;
+    text-transform: uppercase;
+    padding: 3px 6px !important;
+  }
+  table.dense tbody td {
+    padding: 2px 6px !important;
+    font-size: 9.5pt !important;
+    border-bottom: 1px dotted #888 !important;
+  }
+  table.dense tbody tr:nth-child(even),
+  table.dense tbody tr:hover { background: white !important; }
+  table.dense tfoot td {
+    border-top: 1px solid #000 !important;
+    font-weight: 700 !important;
+    background: white !important;
+  }
+
+  /* Cards become flat with thin border for print */
+  .card-flat {
+    background: white !important;
+    border: 1px solid #000 !important;
+    box-shadow: none !important;
+  }
+
+  /* Section title becomes bold black */
+  .section-title { color: #000 !important; font-weight: 700 !important; }
+
+  /* Amount colors -> black */
+  .amount-jama, .amount-kharch { color: #000 !important; }
+
+  /* Inputs / selects / buttons hidden in print except inside print panels */
+  input, select, button { display: none !important; }
+
+  /* Allow hidden display for our print-only header */
+  .foxpro-print-header.hidden.print\:block,
+  .print-only { display: block !important; }
+
+  /* Page setup */
+  @page { margin: 12mm 10mm; size: A4; }
+  @page :first { margin-top: 10mm; }
+
+  /* Page break helpers */
+  .page-break { page-break-after: always; }
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; page-break-after: auto; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+}

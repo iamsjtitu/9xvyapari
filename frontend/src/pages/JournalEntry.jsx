@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, Trash, BookOpenText, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 
 const blank = () => ({
   date: todayISO(),
@@ -83,10 +84,27 @@ export default function JournalEntry() {
           <h1 className="font-heading font-semibold text-3xl tracking-tight">Journal Voucher</h1>
           <div className="text-muted2 text-sm mt-1">Double-entry: Debit = Credit. Bina cash ke adjustments / transfers.</div>
         </div>
-        <button className="btn-primary" onClick={() => { setForm(blank()); setOpen(true); }} data-testid="btn-new-journal">
-          <Plus size={16} weight="bold" /> Nayi Journal <span className="kbd ml-1">D</span>
-        </button>
+        <div className="flex items-end gap-2">
+          <ExportBar filename="journal-entries" sheets={[{
+            name: "Journal Register",
+            columns: [
+              { key: "voucher_no", label: "V.No.", width: 10 },
+              { key: "date", label: "Date", width: 12 },
+              { key: "narration", label: "Narration", width: 40 },
+              { key: "ref", label: "Ref", width: 16 },
+              { value: (j) => (j.lines || []).map((l) => `${l.debit > 0 ? "Dr." : "Cr."} ${l.account_name} ₹${l.debit || l.credit}`).join(" | "), label: "Lines", width: 60 },
+              { key: "total", label: "Total", width: 14, num: true },
+            ],
+            rows: entries,
+          }]} />
+          <button className="btn-primary" onClick={() => { setForm(blank()); setOpen(true); }} data-testid="btn-new-journal">
+            <Plus size={16} weight="bold" /> Nayi Journal <span className="kbd ml-1">D</span>
+          </button>
+        </div>
       </div>
+
+      <FoxProPrintHeader title="JOURNAL VOUCHER REGISTER"
+        subtitle={`Total ${entries.length} vouchers`} />
 
       <div className="card-flat overflow-hidden">
         <table className="dense w-full" data-testid="table-journal">

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, Trash, ArrowDown, ArrowUp, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 
 export default function RokadPanna() {
   const [date, setDate] = useState(todayISO());
@@ -176,6 +177,34 @@ export default function RokadPanna() {
           </h1>
         </div>
         <div className="flex items-end gap-3">
+          <ExportBar filename={`cash-book-${date}`} sheets={[
+            {
+              name: "Receipts (Jama)",
+              columns: [
+                { key: "date", label: "Date", width: 12 },
+                { key: "voucher_no", label: "V.No.", width: 8 },
+                { key: "cash_account_name", label: "Cash A/C", width: 22 },
+                { key: "party_name", label: "Party", width: 28 },
+                { key: "description", label: "Narration", width: 35 },
+                { key: "chq_no", label: "Chq No", width: 10 },
+                { key: "amount", label: "Amount", width: 14, num: true },
+              ],
+              rows: jamaList,
+            },
+            {
+              name: "Payments (Kharch)",
+              columns: [
+                { key: "date", label: "Date", width: 12 },
+                { key: "voucher_no", label: "V.No.", width: 8 },
+                { key: "cash_account_name", label: "Cash A/C", width: 22 },
+                { key: "party_name", label: "Party", width: 28 },
+                { key: "description", label: "Narration", width: 35 },
+                { key: "chq_no", label: "Chq No", width: 10 },
+                { key: "amount", label: "Amount", width: 14, num: true },
+              ],
+              rows: kharchList,
+            },
+          ]} />
           <div>
             <label className="lbl">Date</label>
             <input
@@ -198,6 +227,9 @@ export default function RokadPanna() {
           </button>
         </div>
       </div>
+
+      <FoxProPrintHeader title="CASH BOOK / ROKAD PANNA"
+        subtitle={`Date: ${date} · Jama: ${inr(totals.jama)} · Kharch: ${inr(totals.kharch)} · Baki: ${inr(totals.baki)}`} />
 
       {/* Summary bar */}
       <div className="card-flat px-5 py-3 flex flex-wrap items-center justify-between gap-3">

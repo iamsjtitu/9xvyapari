@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import api, { inr } from "@/lib/api";
-import { ArrowLeft, Printer, Storefront } from "@phosphor-icons/react";
+import { ArrowLeft, Storefront } from "@phosphor-icons/react";
+import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 
 export default function BillView() {
   const { id } = useParams();
@@ -17,10 +18,24 @@ export default function BillView() {
     <div className="space-y-4" data-testid="page-bill-view">
       <div className="flex items-center justify-between print:hidden">
         <Link to="/bills" className="btn-ghost"><ArrowLeft size={14} /> Wapas</Link>
-        <button className="btn-primary" onClick={() => window.print()} data-testid="btn-print">
-          <Printer size={16} weight="bold" /> Print / PDF
-        </button>
+        <ExportBar filename={`bill-${bill.bill_no}`} sheets={[{
+          name: `Bill ${bill.bill_no}`,
+          columns: [
+            { key: "item_name", label: "Item", width: 28 },
+            { key: "bag_pack", label: "Pack", width: 12 },
+            { key: "qty", label: "Bags", width: 8, num: true },
+            { key: "weight", label: "Weight", width: 10, num: true },
+            { key: "wb", label: "W.B.", width: 10, num: true },
+            { key: "rate", label: "Rate", width: 12, num: true },
+            { key: "amount", label: "Amount", width: 14, num: true },
+          ],
+          rows: bill.items || [],
+        }]} />
       </div>
+
+      <FoxProPrintHeader
+        title={bill.bill_type === "sale" ? "SALE INVOICE" : "PURCHASE BILL"}
+        subtitle={`Bill No: ${bill.bill_no} · Date: ${bill.date} · Party: ${bill.party_name}`} />
 
       <div className="card-flat p-8 bg-white max-w-3xl mx-auto print:shadow-none print:border-0" id="printable-bill">
         {/* Header */}

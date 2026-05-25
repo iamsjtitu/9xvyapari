@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import api, { inr } from "@/lib/api";
-import { Receipt, MagnifyingGlass, Printer } from "@phosphor-icons/react";
+import { Receipt, MagnifyingGlass } from "@phosphor-icons/react";
+import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 
 export default function GSTReturns() {
   const [rows, setRows] = useState([]);
@@ -41,10 +42,25 @@ export default function GSTReturns() {
             FoxPro AAGSTRET.DBF se imported B2B sale invoices with CGST/SGST/IGST.
           </div>
         </div>
-        <button className="btn-primary" onClick={() => window.print()}>
-          <Printer size={16} weight="bold" /> Print
-        </button>
+        <ExportBar filename="gst-returns" sheets={[{
+          name: "GST Returns",
+          columns: [
+            { key: "bill_date", label: "Bill Date", width: 12 },
+            { key: "particular", label: "Party", width: 30 },
+            { key: "gstin", label: "GSTIN", width: 18 },
+            { key: "invoice_no", label: "Invoice No.", width: 14 },
+            { key: "taxable", label: "Taxable", width: 14, num: true },
+            { key: "central", label: "CGST", width: 12, num: true },
+            { key: "state", label: "SGST", width: 12, num: true },
+            { key: "integrated", label: "IGST", width: 12, num: true },
+            { key: "inv_amt", label: "Invoice Amt", width: 14, num: true },
+          ],
+          rows: filtered,
+        }]} />
       </div>
+
+      <FoxProPrintHeader title="GST RETURNS REGISTER"
+        subtitle={`Total ${filtered.length} invoices`} />
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 print:hidden">
         <Stat label="Total Invoices" value={filtered.length} />

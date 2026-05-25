@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api, { inr, formatApiErrorDetail } from "@/lib/api";
 import { Plus, PencilSimple, Trash, X, MagnifyingGlass } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 
 const EMPTY = { name: "", group_id: "", opening_balance: 0, phone: "", address: "", notes: "" };
 
@@ -54,10 +55,27 @@ export default function Accounts() {
           <h1 className="font-heading font-semibold text-3xl tracking-tight">Accounts (Khate)</h1>
           <div className="text-muted2 text-sm mt-1">Cash, Bank, Expense, Income, Capital accounts. (Party accounts are in Party Khata.)</div>
         </div>
-        <button className="btn-primary" onClick={() => { setEditing({ id: null }); setForm(EMPTY); }} data-testid="btn-add-account">
-          <Plus size={16} weight="bold" /> Naya Account <span className="kbd ml-1">B</span>
-        </button>
+        <div className="flex items-end gap-2">
+          <ExportBar filename="accounts" sheets={[{
+            name: "Accounts",
+            columns: [
+              { key: "code", label: "Code", width: 8, num: true },
+              { key: "name", label: "Name", width: 32 },
+              { key: "group_name", label: "Group", width: 24 },
+              { key: "phone", label: "Phone", width: 14 },
+              { key: "opening_balance", label: "Opening", width: 14, num: true },
+              { key: "balance", label: "Balance", width: 14, num: true },
+            ],
+            rows: accounts,
+          }]} />
+          <button className="btn-primary" onClick={() => { setEditing({ id: null }); setForm(EMPTY); }} data-testid="btn-add-account">
+            <Plus size={16} weight="bold" /> Naya Account <span className="kbd ml-1">B</span>
+          </button>
+        </div>
       </div>
+
+      <FoxProPrintHeader title="ACCOUNTS REGISTER"
+        subtitle={`Total ${accounts.length} accounts`} />
 
       <div className="card-flat overflow-hidden">
         <div className="px-4 py-3 border-b border-khaki flex flex-wrap items-center gap-3">

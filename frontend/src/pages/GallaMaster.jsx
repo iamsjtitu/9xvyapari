@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api, { inr, formatApiErrorDetail } from "@/lib/api";
 import { Plus, PencilSimple, Trash, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 
 const EMPTY = { name: "", unit: "Quintal", rate: 0, hsn: "" };
 
@@ -42,14 +43,32 @@ export default function GallaMaster() {
           <div className="section-title">Galla Master · गल्ला सूची</div>
           <h1 className="font-heading font-semibold text-3xl tracking-tight">Items & Rates</h1>
         </div>
-        <button
-          className="btn-primary"
-          onClick={() => { setEditing({ id: null }); setForm(EMPTY); }}
-          data-testid="btn-add-item"
-        >
-          <Plus size={16} weight="bold" /> Naya Galla
-        </button>
+        <div className="flex items-end gap-2">
+          <ExportBar filename="galla-items" sheets={[{
+            name: "Galla Items",
+            columns: [
+              { key: "name", label: "Name", width: 28 },
+              { key: "unit", label: "Unit", width: 10 },
+              { key: "hsn", label: "HSN", width: 10 },
+              { key: "rate", label: "Rate", width: 14, num: true },
+              { key: "purchase_acc_code", label: "Pur A/C", width: 10, num: true },
+              { key: "sale_acc_code", label: "Sale A/C", width: 10, num: true },
+              { key: "opening_qty", label: "Opening Qty", width: 14, num: true },
+            ],
+            rows: items,
+          }]} />
+          <button
+            className="btn-primary"
+            onClick={() => { setEditing({ id: null }); setForm(EMPTY); }}
+            data-testid="btn-add-item"
+          >
+            <Plus size={16} weight="bold" /> Naya Galla
+          </button>
+        </div>
       </div>
+
+      <FoxProPrintHeader title="GALLA MASTER (STOCK ITEMS)"
+        subtitle={`Total ${items.length} items`} />
 
       <div className="card-flat overflow-hidden">
         <table className="dense w-full" data-testid="table-items">
