@@ -76,7 +76,7 @@ export default function Layout() {
                 {settings?.firm_name || "Galla Bahi"}
               </div>
               <div className="text-[10px] uppercase tracking-widest text-white/50">
-                Hisab Kitab v1.1
+                Hisab Kitab v1.3
               </div>
             </div>
           </div>

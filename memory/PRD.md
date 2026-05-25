@@ -43,6 +43,22 @@ User clarifications:
 - ✅ Full data-testid coverage on interactive elements
 - ✅ 100% backend + frontend test pass (20-test pytest suite)
 
+## v1.3 (2026-02-23) — Full Data Migration from FoxPro
+- ✅ **5 new DBF import endpoints**: /import-dbf/cashbook (→ rokad), /inward (→ inward), /items (→ items), /gst (→ gst_returns), /transactions (→ bills with full TRANSPR mapping)
+- ✅ **Per-cash-account voucher numbering** — `GET /api/cash-accounts/{pid}/next-voucher` returns next max voucher_no + 1 for that cash account. Rokad model now has voucher_no + chq_no fields. Frontend auto-suggests voucher when cash a/c selected.
+- ✅ **GST Returns page** (/gst-returns) with GSTR-1 style table + totals (Taxable, CGST, SGST, IGST, Invoice Amt).
+- ✅ **Real production data migrated** from user's FoxPro WS2026/:
+  - 527 parties (LEDGR.DBF)
+  - 15 items (PROFIT.DBF: DHAN, CHAWAL, KHANDA, BARDANA etc.)
+  - 42 inward entries (INWARDS+INWARDP — CHOUPAL/SALASAR/BAHUBALI/AQUA COLD)
+  - 16 rokad entries (CASHBOOK+CASHTEM with V.117/134/135/136 per SBI cash account)
+  - 4 purchase bills (TRANSTEM) with full Hamali/Discount/Dalali charges
+  - 50 GST returns (AAGSTRET — PRAKASH INDUSTRIES, REAL ISPAT, BALAJI LOHA etc.)
+- ✅ Trial Balance reflects real numbers: SALES PARTY Dr ₹55.35 Cr, PURCHASE PARTY Cr ₹59.13 Cr, COLD STORAGE Dr ₹3.40 Cr, CASH & BANK BALANCE Dr ₹1.30 Cr / Cr ₹2.86 Cr
+- ✅ Auto-seed of CASH IN HAND in legacy accounts collection skipped when party with code 301 exists
+- ✅ ImportDBF page supports 13 FoxPro tables with auto-routing to correct endpoint
+- ✅ 100% pass: 51/51 backend pytest + full frontend e2e on iteration_4
+
 ## v1.2 (2026-02-23) — Deep FoxPro Audit + Replication
 User shared original FoxPro 2.6 DOS-based "Galla Hisab" software (ZIP with `.DBF`, `.FXP`, `.PRG` files). Did full audit of the 544-row LEDGR.DBF, GROUPTEM.DBF, TRANSPR.DBF (purchase entry with 40+ fields), CASHBOOK.DBF, PARAMET.DBF, INWARDS.DBF, AAGSTRET.DBF.
 
