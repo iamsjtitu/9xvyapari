@@ -97,8 +97,20 @@ class PartyIn(BaseModel):
     name: str
     phone: Optional[str] = ""
     address: Optional[str] = ""
+    address2: Optional[str] = ""
+    place: Optional[str] = ""           # GL_PLACE
     type: Literal["customer", "supplier", "both"] = "both"
-    opening_balance: float = 0.0  # +ve = party owes us (udhaar), -ve = we owe party
+    opening_balance: float = 0.0
+    opening_qty: float = 0.0
+    rate: float = 0.0
+    gstin: Optional[str] = ""           # F_G_L_NO
+    pan: Optional[str] = ""
+    cstno: Optional[str] = ""
+    mpstno: Optional[str] = ""
+    code: Optional[int] = None          # numeric ledger code (auto-assigned)
+    group_id: Optional[str] = None      # which AccountGroup it belongs to
+    group_name: Optional[str] = ""
+    alt_name: Optional[str] = ""        # GL_NAME1
 
 class PartyOut(PartyIn):
     id: str
@@ -106,9 +118,12 @@ class PartyOut(PartyIn):
 
 class ItemIn(BaseModel):
     name: str
-    unit: str = "Quintal"  # Quintal, Kg, Bag
+    unit: str = "Quintal"
     rate: float = 0.0
     hsn: Optional[str] = ""
+    sale_acc_code: Optional[int] = None      # link to SALES A/C ledger code
+    purchase_acc_code: Optional[int] = None  # link to PURCHASE A/C ledger code
+    opening_qty: float = 0.0
 
 class ItemOut(ItemIn):
     id: str
@@ -117,31 +132,70 @@ class ItemOut(ItemIn):
 class BillItem(BaseModel):
     item_id: str
     item_name: str
-    qty: float = 0.0          # number of bags / units
-    bag_pack: Optional[str] = ""  # e.g. "50 Kg", "Tin", "Bori"
-    weight: float = 0.0       # declared / package weight (quintals)
-    wb: float = 0.0           # weight bridge (kanta) weight (quintals)
+    bag: float = 0.0            # number of bags
+    pack: float = 0.0           # weight per bag (Kg)
+    bag_pack: Optional[str] = ""
+    weight: float = 0.0         # declared weight (Quintal)
+    wb: float = 0.0             # weight bridge (Kanta) (Quintal)
+    ghat: float = 0.0           # weight loss
+    nwt: float = 0.0            # net weight
     unit: str = "Quintal"
     rate: float = 0.0
     amount: float = 0.0
+    qty: float = 0.0            # backward compat
 
 class BillIn(BaseModel):
     bill_type: Literal["sale", "purchase"]
     party_id: str
     party_name: str
-    date: str  # ISO date - E.Date (entry date)
-    s_date: Optional[str] = ""        # supply date / bill date
-    gp_no: Optional[str] = ""         # gate-pass / GP No.
-    truck_no: Optional[str] = ""      # vehicle / truck number
-    payment_cond: Optional[str] = ""  # payment condition (eg. "30 days credit")
+    date: str                                # E.Date (entry date)
+    s_date: Optional[str] = ""               # supply / bill date
+    due_date: Optional[str] = ""             # payment due date
+    lot_no: Optional[str] = ""               # LOTNO
+    gp_no: Optional[str] = ""                # gate-pass no
+    truck_no: Optional[str] = ""             # TNO
+    driver_name: Optional[str] = ""          # DNAME
+    bilty_no: Optional[str] = ""             # BUILTY
+    garage: Optional[str] = ""               # GARAGE
+    no_of_bag: Optional[str] = ""            # NOFBAG (display text)
+    bag_pack_q: Optional[str] = ""           # BPQ
+    payment_cond: Optional[str] = ""         # PAYCOND
+    agent_id: Optional[str] = None
+    agent_name: Optional[str] = ""
+    buyer_id: Optional[str] = None           # for purchase: final buyer (the customer)
+    buyer_name: Optional[str] = ""
     items: List[BillItem]
     subtotal: float
+    # itemised charges
+    advance: float = 0.0
+    less: float = 0.0
+    hamali_rt: float = 0.0
+    hamali_amt: float = 0.0
+    cartage_rt: float = 0.0
+    cartage_amt: float = 0.0
+    discount_rt: float = 0.0
+    discount_amt: float = 0.0
+    rebate_rt: float = 0.0
+    rebate_amt: float = 0.0
+    dalali_rt: float = 0.0
+    dalali_amt: float = 0.0
+    bhada_rt: float = 0.0
+    bhada_amt: float = 0.0
+    loading: float = 0.0
+    bdalali: float = 0.0
+    garrt: float = 0.0
+    garamt: float = 0.0
+    mandirt: float = 0.0
+    mandiamt: float = 0.0
+    # original commission
     commission_pct: float = 0.0
     commission_amt: float = 0.0
     other_charges: float = 0.0
     total: float
     payment_received: float = 0.0
     notes: Optional[str] = ""
+    remark1: Optional[str] = ""
+    remark2: Optional[str] = ""
 
 class BillOut(BillIn):
     id: str
@@ -171,6 +225,28 @@ class RokadOut(RokadIn):
 class AccountGroupIn(BaseModel):
     name: str
     nature: Literal["asset", "liability", "income", "expense"] = "asset"
+    fcode: Optional[int] = None    # first code (FCODE)
+    lcode: Optional[int] = None    # last code  (LCODE)
+    ecode: Optional[int] = None    # next-available code (ECODE)
+
+class InwardIn(BaseModel):
+    date: str                      # TR_DATE
+    ref_no: Optional[str] = ""     # TR_REF_NO
+    lot_no: str                    # LOT
+    cold_storage_id: str           # TR_GL_CODE - linked party (cold storage)
+    cold_storage_name: str         # PARTY_NAME
+    bags: int = 0                  # SBAG
+    weight: float = 0.0            # WGT (Quintal)
+    item_id: Optional[str] = None
+    item_name: Optional[str] = ""
+    notes: Optional[str] = ""
+
+class StockItemIn(BaseModel):
+    name: str
+    sale_acc_code: Optional[int] = None
+    purchase_acc_code: Optional[int] = None
+    opening_qty: float = 0.0
+    closing_qty: float = 0.0
 
 class AccountIn(BaseModel):
     name: str
@@ -666,6 +742,142 @@ async def restore(payload: dict, current=Depends(get_current_user)):
 # Add cash_account_id to rokad – update field if not set by client (handled in model fallback)
 
 
+# ---------- INWARD REGISTER (Cold Storage) ----------
+@api.get("/inward")
+async def list_inward(date_from: Optional[str] = None, date_to: Optional[str] = None,
+                      cold_storage_id: Optional[str] = None,
+                      current=Depends(get_current_user)):
+    q = {}
+    if date_from or date_to:
+        q["date"] = {}
+        if date_from:
+            q["date"]["$gte"] = date_from
+        if date_to:
+            q["date"]["$lte"] = date_to
+    if cold_storage_id:
+        q["cold_storage_id"] = cold_storage_id
+    rows = await db.inward.find(q, {"_id": 0}).sort("date", -1).to_list(5000)
+    return rows
+
+@api.post("/inward")
+async def create_inward(body: InwardIn, current=Depends(get_current_user)):
+    doc = body.model_dump()
+    doc["id"] = str(uuid.uuid4())
+    doc["created_at"] = now_iso()
+    await db.inward.insert_one(doc.copy())
+    doc.pop("_id", None)
+    return doc
+
+@api.put("/inward/{iid}")
+async def update_inward(iid: str, body: InwardIn, current=Depends(get_current_user)):
+    res = await db.inward.update_one({"id": iid}, {"$set": body.model_dump()})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Inward not found")
+    return await db.inward.find_one({"id": iid}, {"_id": 0})
+
+@api.delete("/inward/{iid}")
+async def delete_inward(iid: str, current=Depends(get_current_user)):
+    await db.inward.delete_one({"id": iid})
+    return {"ok": True}
+
+
+# ---------- TRIAL BALANCE ----------
+@api.get("/reports/trial-balance")
+async def trial_balance(current=Depends(get_current_user)):
+    """Trial Balance grouped by Account Group, with Dr / Cr columns.
+    Combines parties (sales/purchase parties) + accounts (cash/bank etc.)."""
+    groups = await db.account_groups.find({}, {"_id": 0}).to_list(500)
+    groups_by_id = {g["id"]: g for g in groups}
+
+    # Build all ledgers (parties + accounts) with computed balance
+    ledgers = []
+
+    # Parties (treat all as ledgers under their group)
+    for p in await db.parties.find({}, {"_id": 0}).to_list(5000):
+        bal = await _compute_party_balance(p["id"], p.get("opening_balance", 0.0))
+        gid = p.get("group_id")
+        g = groups_by_id.get(gid) if gid else None
+        ledgers.append({
+            "code": p.get("code") or 0,
+            "name": p.get("name", ""),
+            "group_id": gid,
+            "group_name": (g["name"] if g else (p.get("group_name") or "SALES PARTY")),
+            "nature": (g["nature"] if g else "asset"),
+            "balance": bal,
+            "kind": "party",
+        })
+
+    # Accounts (cash, bank, expense, income etc.)
+    for a in await db.accounts.find({}, {"_id": 0}).to_list(5000):
+        bal = await _compute_account_balance(a["id"], a.get("opening_balance", 0.0))
+        g = groups_by_id.get(a.get("group_id"))
+        ledgers.append({
+            "code": a.get("code") or 0,
+            "name": a.get("name", ""),
+            "group_id": a.get("group_id"),
+            "group_name": (g["name"] if g else ""),
+            "nature": (g["nature"] if g else "asset"),
+            "balance": bal,
+            "kind": "account",
+        })
+
+    # group rows together
+    sections = []
+    for g in sorted(groups, key=lambda x: x.get("fcode") or 0):
+        rows = [row for row in ledgers if row["group_id"] == g["id"]]
+        rows.sort(key=lambda x: x["code"])
+        dr_total = sum(row["balance"] for row in rows if row["balance"] > 0)
+        cr_total = sum(-row["balance"] for row in rows if row["balance"] < 0)
+        sections.append({
+            "group_id": g["id"],
+            "group_name": g["name"],
+            "nature": g["nature"],
+            "fcode": g.get("fcode"),
+            "lcode": g.get("lcode"),
+            "rows": rows,
+            "dr_total": round(dr_total, 2),
+            "cr_total": round(cr_total, 2),
+        })
+
+    # rows without group
+    orphan = [row for row in ledgers if not row["group_id"]]
+    if orphan:
+        sections.append({
+            "group_id": None, "group_name": "UNCATEGORIZED", "nature": "asset",
+            "fcode": 0, "lcode": 0, "rows": orphan,
+            "dr_total": round(sum(row["balance"] for row in orphan if row["balance"] > 0), 2),
+            "cr_total": round(sum(-row["balance"] for row in orphan if row["balance"] < 0), 2),
+        })
+
+    grand_dr = sum(s["dr_total"] for s in sections)
+    grand_cr = sum(s["cr_total"] for s in sections)
+    return {"sections": sections, "grand_dr": round(grand_dr, 2), "grand_cr": round(grand_cr, 2)}
+
+
+# ---------- NEXT FREE CODE in a group ----------
+@api.get("/account-groups/{gid}/next-code")
+async def next_code_in_group(gid: str, current=Depends(get_current_user)):
+    g = await db.account_groups.find_one({"id": gid}, {"_id": 0})
+    if not g:
+        raise HTTPException(404, "Group not found")
+    f = g.get("fcode") or 1
+    l_code = g.get("lcode") or 9999
+    # find max used code in this group across parties + accounts
+    used = []
+    async for p in db.parties.find({"group_id": gid}, {"_id": 0, "code": 1}):
+        if p.get("code"):
+            used.append(p["code"])
+    async for a in db.accounts.find({"group_id": gid}, {"_id": 0, "code": 1}):
+        if a.get("code"):
+            used.append(a["code"])
+    nxt = max(used) + 1 if used else f
+    if nxt < f:
+        nxt = f
+    if nxt > l_code:
+        return {"next_code": None, "error": "Group code range exhausted"}
+    return {"next_code": nxt, "fcode": f, "lcode": l_code}
+
+
 # ---------- ROOT ----------
 @api.get("/")
 async def root():
@@ -701,6 +913,7 @@ async def on_start():
     await db.account_groups.create_index("id", unique=True)
     await db.accounts.create_index("id", unique=True)
     await db.journal.create_index("id", unique=True)
+    await db.inward.create_index("id", unique=True)
 
     # Seed admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@galla.com").lower()
@@ -739,52 +952,51 @@ async def on_start():
         await db.items.insert_many(samples)
         logger.info("Seeded sample galla items")
 
-    # Seed default Account Groups (Tally-style)
+    # Seed default Account Groups – matching original FoxPro GROUPTEM.DBF
     if await db.account_groups.count_documents({}) == 0:
+        # nature derived from code range:
+        # 1-1999 = Asset/Liability mix (Indian Tally style: codes 1-50 Capital is liability)
         groups = [
-            {"name": "Cash-in-Hand", "nature": "asset"},
-            {"name": "Bank Accounts", "nature": "asset"},
-            {"name": "Sundry Debtors", "nature": "asset"},
-            {"name": "Sundry Creditors", "nature": "liability"},
-            {"name": "Capital Account", "nature": "liability"},
-            {"name": "Loans (Liability)", "nature": "liability"},
-            {"name": "Direct Expenses", "nature": "expense"},
-            {"name": "Indirect Expenses", "nature": "expense"},
-            {"name": "Direct Incomes", "nature": "income"},
-            {"name": "Indirect Incomes", "nature": "income"},
-            {"name": "Sales Account", "nature": "income"},
-            {"name": "Purchase Account", "nature": "expense"},
-            {"name": "Commission (Arhat)", "nature": "income"},
+            {"name": "CAPITAL A/C",         "nature": "liability", "fcode": 1,    "lcode": 50,   "ecode": 3},
+            {"name": "LOANS (LIABILITY)",   "nature": "liability", "fcode": 51,   "lcode": 100,  "ecode": 52},
+            {"name": "OTHER DEPOSITS",      "nature": "asset",     "fcode": 101,  "lcode": 200,  "ecode": 107},
+            {"name": "FIXED ASSETS",        "nature": "asset",     "fcode": 201,  "lcode": 250,  "ecode": 202},
+            {"name": "CURRENT ASSETS",      "nature": "asset",     "fcode": 251,  "lcode": 299,  "ecode": 252},
+            {"name": "CASH & BANK BALANCE", "nature": "asset",     "fcode": 300,  "lcode": 349,  "ecode": 308},
+            {"name": "SALES PARTY",         "nature": "asset",     "fcode": 350,  "lcode": 1199, "ecode": 599},
+            {"name": "PURCHASE PARTY",      "nature": "liability", "fcode": 1200, "lcode": 2199, "ecode": 1405},
+            {"name": "COLD STORAGE",        "nature": "asset",     "fcode": 2200, "lcode": 2400, "ecode": 2238},
+            {"name": "LOANS & ADVANCES",    "nature": "asset",     "fcode": 2500, "lcode": 2899, "ecode": 2501},
+            {"name": "SALES A/C",           "nature": "income",    "fcode": 3001, "lcode": 3034, "ecode": 3028},
+            {"name": "INDIRECT INCOMES",    "nature": "income",    "fcode": 3035, "lcode": 3049, "ecode": 3037},
+            {"name": "PURCHASE A/C",        "nature": "expense",   "fcode": 3050, "lcode": 3099, "ecode": 3052},
+            {"name": "INDIRECT EXP.",       "nature": "expense",   "fcode": 3100, "lcode": 3149, "ecode": 3104},
+            {"name": "OTHER EXP",           "nature": "expense",   "fcode": 3150, "lcode": 3199, "ecode": 3154},
+            {"name": "SALARY A/C",          "nature": "expense",   "fcode": 3200, "lcode": 3249, "ecode": 3212},
+            {"name": "DIRECT EXPENSES",     "nature": "expense",   "fcode": 3250, "lcode": 3299, "ecode": 3253},
+            {"name": "STAFF ADVANCE",       "nature": "asset",     "fcode": 3300, "lcode": 3400, "ecode": 3302},
         ]
         for g in groups:
             g["id"] = str(uuid.uuid4())
             g["created_at"] = now_iso()
         await db.account_groups.insert_many(groups)
-        logger.info("Seeded default account groups")
+        logger.info("Seeded 18 default account groups (FoxPro GROUPTEM)")
 
-    # Seed default cash account
+    # Seed default cash + bank account ledgers
     if await db.accounts.count_documents({}) == 0:
-        cash_group = await db.account_groups.find_one({"name": "Cash-in-Hand"}, {"_id": 0})
-        bank_group = await db.account_groups.find_one({"name": "Bank Accounts"}, {"_id": 0})
+        cash_group = await db.account_groups.find_one({"name": "CASH & BANK BALANCE"}, {"_id": 0})
         if cash_group:
-            await db.accounts.insert_one({
-                "id": str(uuid.uuid4()),
-                "name": "Cash",
-                "group_id": cash_group["id"],
-                "opening_balance": 0.0,
-                "phone": "", "address": "", "notes": "Default cash account",
-                "created_at": now_iso(),
-            })
-        if bank_group:
-            await db.accounts.insert_one({
-                "id": str(uuid.uuid4()),
-                "name": "Bank A/C",
-                "group_id": bank_group["id"],
-                "opening_balance": 0.0,
-                "phone": "", "address": "", "notes": "",
-                "created_at": now_iso(),
-            })
-        logger.info("Seeded default accounts")
+            await db.accounts.insert_many([
+                {"id": str(uuid.uuid4()), "name": "CASH IN HAND", "code": 301,
+                 "group_id": cash_group["id"], "opening_balance": 0.0,
+                 "phone": "", "address": "", "notes": "Default cash account",
+                 "created_at": now_iso()},
+                {"id": str(uuid.uuid4()), "name": "BANK A/C", "code": 302,
+                 "group_id": cash_group["id"], "opening_balance": 0.0,
+                 "phone": "", "address": "", "notes": "",
+                 "created_at": now_iso()},
+            ])
+        logger.info("Seeded default cash/bank accounts")
 
 
 @app.on_event("shutdown")

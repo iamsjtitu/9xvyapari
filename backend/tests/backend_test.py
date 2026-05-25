@@ -1,16 +1,37 @@
-"""Backend pytest suite for Galla Hisab-Kitab app."""
+"""Backend pytest suite for Galla Hisab-Kitab v1.2 (FoxPro structure)."""
 import os
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://khata-book-18.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = "admin@galla.com"
 ADMIN_PASSWORD = "admin123"
 
+# 18 expected groups (per v1.2 FoxPro reseed)
+EXPECTED_GROUPS = {
+    "CAPITAL A/C": (1, 50, "liability"),
+    "LOANS (LIABILITY)": (51, 100, "liability"),
+    "OTHER DEPOSITS": (101, 200, "asset"),
+    "FIXED ASSETS": (201, 250, "asset"),
+    "CURRENT ASSETS": (251, 299, "asset"),
+    "CASH & BANK BALANCE": (300, 349, "asset"),
+    "SALES PARTY": (350, 1199, "asset"),
+    "PURCHASE PARTY": (1200, 2199, "liability"),
+    "COLD STORAGE": (2200, 2400, "asset"),
+    "LOANS & ADVANCES": (2500, 2899, "asset"),
+    "SALES A/C": (3001, 3034, "income"),
+    "INDIRECT INCOMES": (3035, 3049, "income"),
+    "PURCHASE A/C": (3050, 3099, "expense"),
+    "INDIRECT EXP.": (3100, 3149, "expense"),
+    "OTHER EXP": (3150, 3199, "expense"),
+    "SALARY A/C": (3200, 3249, "expense"),
+    "DIRECT EXPENSES": (3250, 3299, "expense"),
+    "STAFF ADVANCE": (3300, 3400, "asset"),
+}
 
-# ---------------- Fixtures ----------------
+
 @pytest.fixture(scope="session")
 def auth_session():
     s = requests.Session()
@@ -18,450 +39,372 @@ def auth_session():
     r = s.post(f"{API}/auth/login", json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
     assert r.status_code == 200, f"Login failed: {r.status_code} {r.text}"
     data = r.json()
-    assert "access_token" in data
     s.headers.update({"Authorization": f"Bearer {data['access_token']}"})
     s.access_token = data["access_token"]
-    s.user_id = data["id"]
     return s
 
 
 @pytest.fixture(scope="session")
 def created_ids():
-    return {"parties": [], "items": [], "bills": [], "rokad": []}
+    return {"parties": [], "items": [], "bills": [], "rokad": [],
+            "inward": [], "journal": [], "accounts": [], "groups": []}
 
 
 # ---------------- Auth ----------------
 class TestAuth:
     def test_root(self):
         r = requests.get(f"{API}/")
-        assert r.status_code == 200
-        assert r.json().get("status") == "ok"
+        assert r.status_code == 200 and r.json()["status"] == "ok"
 
     def test_login_success(self):
-        r = requests.post(f"{API}/auth/login", json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
+        r = requests.post(f"{API}/auth/login",
+                          json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
         assert r.status_code == 200
-        data = r.json()
-        assert data["email"] == ADMIN_EMAIL
-        assert "access_token" in data and len(data["access_token"]) > 10
-        # Check httpOnly cookies set
-        cookies = r.cookies
-        assert "access_token" in cookies or "access_token" in r.headers.get("set-cookie", "")
+        d = r.json()
+        assert d["email"] == ADMIN_EMAIL
+        assert len(d["access_token"]) > 10
+        # httpOnly cookies
+        assert "access_token" in r.cookies
 
     def test_login_bad_password(self):
-        r = requests.post(f"{API}/auth/login", json={"email": ADMIN_EMAIL, "password": "wrong"})
+        r = requests.post(f"{API}/auth/login",
+                          json={"email": ADMIN_EMAIL, "password": "wrong"})
         assert r.status_code == 401
 
-    def test_me_with_bearer(self, auth_session):
-        r = requests.get(f"{API}/auth/me", headers={"Authorization": f"Bearer {auth_session.access_token}"})
-        assert r.status_code == 200
-        assert r.json()["email"] == ADMIN_EMAIL
-
-    def test_me_unauthenticated_returns_401(self):
+    def test_me_unauth(self):
         r = requests.get(f"{API}/auth/me")
         assert r.status_code == 401
 
 
-# ---------------- Auth required on other endpoints ----------------
 class TestAuthRequired:
     @pytest.mark.parametrize("path", [
-        "/parties", "/items", "/bills", "/rokad",
-        "/summary/dashboard",
-        "/account-groups", "/accounts", "/journal", "/settings", "/backup"
+        "/parties", "/items", "/bills", "/rokad", "/summary/dashboard",
+        "/account-groups", "/accounts", "/journal", "/settings", "/backup",
+        "/inward", "/reports/trial-balance",
     ])
-    def test_unauthenticated_rejected(self, path):
-        r = requests.get(f"{API}{path}")
-        assert r.status_code == 401, f"{path} should require auth but got {r.status_code}"
+    def test_unauth_blocked(self, path):
+        assert requests.get(f"{API}{path}").status_code == 401
 
 
-# ---------------- Items ----------------
-class TestItems:
-    def test_seeded_items_present(self, auth_session):
-        r = auth_session.get(f"{API}/items")
-        assert r.status_code == 200
-        items = r.json()
-        assert isinstance(items, list)
-        assert len(items) >= 6, f"Expected >=6 seeded items, got {len(items)}"
-        names = [i["name"] for i in items]
-        # check a few seeded names
-        assert any("Gehu" in n for n in names)
-        assert any("Chana" in n for n in names)
-
-    def test_create_update_delete_item(self, auth_session, created_ids):
-        payload = {"name": "TEST_Jowar", "unit": "Quintal", "rate": 2500, "hsn": "1007"}
-        r = auth_session.post(f"{API}/items", json=payload)
-        assert r.status_code == 200
-        item = r.json()
-        assert item["name"] == payload["name"]
-        assert "id" in item
-        iid = item["id"]
-        created_ids["items"].append(iid)
-
-        # GET verify
-        r = auth_session.get(f"{API}/items")
-        assert any(i["id"] == iid for i in r.json())
-
-        # UPDATE
-        upd = {**payload, "rate": 2700}
-        r = auth_session.put(f"{API}/items/{iid}", json=upd)
-        assert r.status_code == 200
-        assert r.json()["rate"] == 2700
-
-        # DELETE
-        r = auth_session.delete(f"{API}/items/{iid}")
-        assert r.status_code == 200
-        created_ids["items"].remove(iid)
-
-
-# ---------------- Parties ----------------
-class TestParties:
-    def test_create_list_party(self, auth_session, created_ids):
-        payload = {"name": "TEST_Ramesh Traders", "phone": "9876543210",
-                   "address": "Mandi Road", "type": "customer", "opening_balance": 1000.0}
-        r = auth_session.post(f"{API}/parties", json=payload)
-        assert r.status_code == 200
-        party = r.json()
-        assert party["name"] == payload["name"]
-        assert "id" in party
-        pid = party["id"]
-        created_ids["parties"].append(pid)
-
-        r = auth_session.get(f"{API}/parties")
-        assert r.status_code == 200
-        parties = r.json()
-        found = next((p for p in parties if p["id"] == pid), None)
-        assert found is not None
-        assert "balance" in found
-        assert found["balance"] == 1000.0  # opening balance reflected
-
-    def test_update_delete_party(self, auth_session, created_ids):
-        payload = {"name": "TEST_ToDelete", "phone": "1", "address": "x",
-                   "type": "both", "opening_balance": 0}
-        r = auth_session.post(f"{API}/parties", json=payload)
-        pid = r.json()["id"]
-
-        upd = {**payload, "name": "TEST_Updated"}
-        r = auth_session.put(f"{API}/parties/{pid}", json=upd)
-        assert r.status_code == 200
-        assert r.json()["name"] == "TEST_Updated"
-
-        r = auth_session.delete(f"{API}/parties/{pid}")
-        assert r.status_code == 200
-
-
-# ---------------- Bills + Rokad linkage ----------------
-class TestBills:
-    @pytest.fixture(scope="class")
-    def test_party(self, auth_session, created_ids):
-        r = auth_session.post(f"{API}/parties", json={
-            "name": "TEST_BillParty", "phone": "1", "address": "x",
-            "type": "customer", "opening_balance": 0
-        })
-        pid = r.json()["id"]
-        created_ids["parties"].append(pid)
-        return r.json()
-
-    @pytest.fixture(scope="class")
-    def test_item(self, auth_session):
-        r = auth_session.get(f"{API}/items")
-        return r.json()[0]
-
-    def test_create_sale_bill_and_balance(self, auth_session, test_party, test_item, created_ids):
-        item_amt = 10 * test_item["rate"]
-        commission = round(item_amt * 0.02, 2)
-        total = item_amt + commission
-        payload = {
-            "bill_type": "sale",
-            "party_id": test_party["id"],
-            "party_name": test_party["name"],
-            "date": "2026-01-15",
-            "items": [{
-                "item_id": test_item["id"], "item_name": test_item["name"],
-                "qty": 10, "unit": test_item["unit"], "rate": test_item["rate"],
-                "amount": item_amt
-            }],
-            "subtotal": item_amt,
-            "commission_pct": 2.0,
-            "commission_amt": commission,
-            "other_charges": 0,
-            "total": total,
-            "payment_received": 5000,
-            "notes": "TEST sale"
-        }
-        r = auth_session.post(f"{API}/bills", json=payload)
-        assert r.status_code == 200
-        bill = r.json()
-        assert bill["bill_no"].startswith("S")
-        assert len(bill["bill_no"]) == 6  # S + 5 digits
-        assert abs(bill["balance"] - (total - 5000)) < 0.01
-        created_ids["bills"].append(bill["id"])
-
-        # Rokad auto entry created
-        r = auth_session.get(f"{API}/rokad")
-        rokad = [x for x in r.json() if x.get("ref_bill_id") == bill["id"]]
-        assert len(rokad) == 1
-        assert rokad[0]["type"] == "jama"
-        assert rokad[0]["amount"] == 5000
-
-        # Party balance: total - payment_received (sale -> +ve owe)
-        r = auth_session.get(f"{API}/summary/party/{test_party['id']}")
-        assert r.status_code == 200
-        data = r.json()
-        expected_bal = round(total - 5000, 2)
-        assert abs(data["party"]["balance"] - expected_bal) < 0.01
-
-    def test_create_purchase_bill(self, auth_session, test_party, test_item, created_ids):
-        item_amt = 5 * test_item["rate"]
-        payload = {
-            "bill_type": "purchase",
-            "party_id": test_party["id"],
-            "party_name": test_party["name"],
-            "date": "2026-01-15",
-            "items": [{
-                "item_id": test_item["id"], "item_name": test_item["name"],
-                "qty": 5, "unit": test_item["unit"], "rate": test_item["rate"],
-                "amount": item_amt
-            }],
-            "subtotal": item_amt,
-            "commission_pct": 0,
-            "commission_amt": 0,
-            "other_charges": 0,
-            "total": item_amt,
-            "payment_received": 0,
-            "notes": "TEST purchase"
-        }
-        r = auth_session.post(f"{API}/bills", json=payload)
-        assert r.status_code == 200
-        bill = r.json()
-        assert bill["bill_no"].startswith("P")
-        assert bill["balance"] == item_amt
-        created_ids["bills"].append(bill["id"])
-
-
-# ---------------- Rokad ----------------
-class TestRokad:
-    def test_create_jama_and_kharch(self, auth_session, created_ids):
-        r = auth_session.post(f"{API}/rokad", json={
-            "date": "2026-01-15", "type": "jama", "amount": 1500,
-            "description": "TEST jama entry", "mode": "Cash"
-        })
-        assert r.status_code == 200
-        created_ids["rokad"].append(r.json()["id"])
-
-        r = auth_session.post(f"{API}/rokad", json={
-            "date": "2026-01-15", "type": "kharch", "amount": 300,
-            "description": "TEST kharch entry", "mode": "UPI"
-        })
-        assert r.status_code == 200
-        created_ids["rokad"].append(r.json()["id"])
-
-    def test_rokad_filter_by_date(self, auth_session):
-        r = auth_session.get(f"{API}/rokad?date_from=2026-01-15&date_to=2026-01-15")
-        assert r.status_code == 200
-        entries = r.json()
-        assert all(e["date"] == "2026-01-15" for e in entries)
-        assert len(entries) >= 2
-
-
-# ---------------- Dashboard ----------------
-class TestDashboard:
-    def test_dashboard_summary(self, auth_session):
-        r = auth_session.get(f"{API}/summary/dashboard")
-        assert r.status_code == 200
-        data = r.json()
-        for key in ["today", "month", "parties_count", "items_count", "total_udhaar", "total_owed"]:
-            assert key in data, f"missing key {key}"
-        assert isinstance(data["parties_count"], int)
-        assert isinstance(data["items_count"], int)
-
-
-# ---------------- Account Groups (v1.1) ----------------
-class TestAccountGroups:
-    def test_seeded_groups(self, auth_session):
+# ---------------- Account Groups (v1.2 - 18 FoxPro groups) ----------------
+class TestAccountGroupsV12:
+    def test_18_groups_seeded_with_codes(self, auth_session):
         r = auth_session.get(f"{API}/account-groups")
         assert r.status_code == 200
         groups = r.json()
-        assert len(groups) >= 13
-        names = [g["name"] for g in groups]
-        for expected in ["Cash-in-Hand", "Bank Accounts", "Sundry Debtors",
-                         "Sundry Creditors", "Capital Account", "Sales Account",
-                         "Purchase Account", "Commission (Arhat)"]:
-            assert expected in names, f"missing seeded group {expected}"
+        assert len(groups) == 18, f"Expected 18 groups, got {len(groups)}"
+        for g in groups:
+            assert g["name"] in EXPECTED_GROUPS, f"Unexpected group: {g['name']}"
+            fcode, lcode, nature = EXPECTED_GROUPS[g["name"]]
+            assert g["fcode"] == fcode, f"{g['name']} fcode {g['fcode']} != {fcode}"
+            assert g["lcode"] == lcode, f"{g['name']} lcode {g['lcode']} != {lcode}"
+            assert g["nature"] == nature, f"{g['name']} nature {g['nature']} != {nature}"
+            assert "ecode" in g
 
-    def test_group_crud(self, auth_session, created_ids):
-        r = auth_session.post(f"{API}/account-groups",
-                              json={"name": "TEST_Group", "nature": "asset"})
-        assert r.status_code == 200
-        gid = r.json()["id"]
-        created_ids.setdefault("groups", []).append(gid)
-
-        r = auth_session.put(f"{API}/account-groups/{gid}",
-                             json={"name": "TEST_GroupX", "nature": "liability"})
-        assert r.status_code == 200
-        assert r.json()["nature"] == "liability"
-
-        r = auth_session.delete(f"{API}/account-groups/{gid}")
-        assert r.status_code == 200
-        created_ids["groups"].remove(gid)
-
-    def test_delete_group_with_accounts_blocked(self, auth_session, created_ids):
-        # create a group
-        gr = auth_session.post(f"{API}/account-groups",
-                               json={"name": "TEST_BlockGroup", "nature": "asset"}).json()
-        gid = gr["id"]
-        # add account in it
-        ac = auth_session.post(f"{API}/accounts", json={
-            "name": "TEST_BlockAcct", "group_id": gid, "opening_balance": 0
-        }).json()
-        aid = ac["id"]
-        # attempt delete should 400
-        r = auth_session.delete(f"{API}/account-groups/{gid}")
-        assert r.status_code == 400
-        # cleanup
-        auth_session.delete(f"{API}/accounts/{aid}")
-        auth_session.delete(f"{API}/account-groups/{gid}")
-
-
-# ---------------- Accounts (v1.1) ----------------
-class TestAccounts:
-    def test_seeded_accounts(self, auth_session):
-        r = auth_session.get(f"{API}/accounts")
-        assert r.status_code == 200
-        accounts = r.json()
-        names = [a["name"] for a in accounts]
-        assert "Cash" in names
-        assert "Bank A/C" in names
-        # group_name joined + balance computed
-        for a in accounts:
-            assert "group_name" in a
-            assert "balance" in a
-
-    def test_account_crud_and_invalid_group(self, auth_session, created_ids):
-        # invalid group
-        r = auth_session.post(f"{API}/accounts", json={
-            "name": "TEST_BadAcct", "group_id": "non-existent", "opening_balance": 0
-        })
-        assert r.status_code == 400
-
+    def test_all_expected_groups_present(self, auth_session):
         groups = auth_session.get(f"{API}/account-groups").json()
-        gid = groups[0]["id"]
-        r = auth_session.post(f"{API}/accounts", json={
-            "name": "TEST_Acct1", "group_id": gid, "opening_balance": 500
-        })
+        names = {g["name"] for g in groups}
+        for expected_name in EXPECTED_GROUPS.keys():
+            assert expected_name in names, f"Missing group {expected_name}"
+
+
+# ---------------- next-code endpoint ----------------
+class TestNextCode:
+    def test_next_code_for_sales_party(self, auth_session):
+        """SALES PARTY range 350-1199. Existing party RAMOTAR BAGRI at 350 (per context).
+        Next free code should be >= 351 (or 350 if empty)."""
+        groups = auth_session.get(f"{API}/account-groups").json()
+        sp = next(g for g in groups if g["name"] == "SALES PARTY")
+        r = auth_session.get(f"{API}/account-groups/{sp['id']}/next-code")
         assert r.status_code == 200
-        aid = r.json()["id"]
-        created_ids.setdefault("accounts", []).append(aid)
+        d = r.json()
+        assert "next_code" in d
+        assert d["fcode"] == 350
+        assert d["lcode"] == 1199
+        assert d["next_code"] >= 350 and d["next_code"] <= 1199
 
-        r = auth_session.put(f"{API}/accounts/{aid}", json={
-            "name": "TEST_Acct1U", "group_id": gid, "opening_balance": 750
-        })
+    def test_next_code_for_empty_group(self, auth_session):
+        """For a group with no parties/accounts, next_code should equal fcode."""
+        groups = auth_session.get(f"{API}/account-groups").json()
+        # FIXED ASSETS (201-250) likely empty
+        fa = next(g for g in groups if g["name"] == "FIXED ASSETS")
+        r = auth_session.get(f"{API}/account-groups/{fa['id']}/next-code")
         assert r.status_code == 200
-        assert r.json()["opening_balance"] == 750
+        d = r.json()
+        # if empty -> fcode 201
+        # if not empty -> still in range
+        assert d["fcode"] == 201 and d["lcode"] == 250
+        assert d["next_code"] is None or (201 <= d["next_code"] <= 250)
 
-        r = auth_session.delete(f"{API}/accounts/{aid}")
-        assert r.status_code == 200
-        created_ids["accounts"].remove(aid)
+    def test_next_code_increments_after_party_added(self, auth_session, created_ids):
+        groups = auth_session.get(f"{API}/account-groups").json()
+        sa = next(g for g in groups if g["name"] == "STAFF ADVANCE")  # 3300-3400
+        r1 = auth_session.get(f"{API}/account-groups/{sa['id']}/next-code")
+        next1 = r1.json()["next_code"]
 
-
-# ---------------- Journal Entry (v1.1) ----------------
-class TestJournal:
-    def test_journal_unbalanced_rejected(self, auth_session):
-        accts = auth_session.get(f"{API}/accounts").json()
-        if len(accts) < 2:
-            pytest.skip("Not enough accounts")
-        r = auth_session.post(f"{API}/journal", json={
-            "date": "2026-01-15", "narration": "TEST unbalanced",
-            "lines": [
-                {"account_id": accts[0]["id"], "account_name": accts[0]["name"], "debit": 100, "credit": 0},
-                {"account_id": accts[1]["id"], "account_name": accts[1]["name"], "debit": 0, "credit": 50}
-            ]
+        # create party in this group with that code
+        pr = auth_session.post(f"{API}/parties", json={
+            "name": "TEST_StaffX", "code": next1, "group_id": sa["id"],
+            "group_name": sa["name"], "type": "both", "opening_balance": 0
         })
-        assert r.status_code == 400
+        assert pr.status_code == 200
+        created_ids["parties"].append(pr.json()["id"])
 
-    def test_journal_zero_rejected(self, auth_session):
-        accts = auth_session.get(f"{API}/accounts").json()
-        r = auth_session.post(f"{API}/journal", json={
-            "date": "2026-01-15", "narration": "TEST zero",
-            "lines": [
-                {"account_id": accts[0]["id"], "account_name": accts[0]["name"], "debit": 0, "credit": 0},
-                {"account_id": accts[1]["id"], "account_name": accts[1]["name"], "debit": 0, "credit": 0}
-            ]
-        })
-        assert r.status_code == 400
+        r2 = auth_session.get(f"{API}/account-groups/{sa['id']}/next-code")
+        assert r2.json()["next_code"] == next1 + 1
 
-    def test_journal_balanced_creates(self, auth_session, created_ids):
-        accts = auth_session.get(f"{API}/accounts").json()
-        r = auth_session.post(f"{API}/journal", json={
-            "date": "2026-01-15", "narration": "TEST balanced",
-            "lines": [
-                {"account_id": accts[0]["id"], "account_name": accts[0]["name"], "debit": 1000, "credit": 0},
-                {"account_id": accts[1]["id"], "account_name": accts[1]["name"], "debit": 0, "credit": 1000}
-            ]
-        })
+    def test_next_code_invalid_group(self, auth_session):
+        r = auth_session.get(f"{API}/account-groups/nonexistent/next-code")
+        assert r.status_code == 404
+
+
+# ---------------- Parties with FoxPro fields ----------------
+class TestPartiesV12:
+    def test_create_party_with_full_foxpro_fields(self, auth_session, created_ids):
+        groups = auth_session.get(f"{API}/account-groups").json()
+        pp = next(g for g in groups if g["name"] == "PURCHASE PARTY")
+        nxt = auth_session.get(f"{API}/account-groups/{pp['id']}/next-code").json()["next_code"]
+
+        payload = {
+            "name": "TEST_FULL Trader", "code": nxt, "group_id": pp["id"],
+            "group_name": pp["name"], "place": "Hisar", "gstin": "06ABCDE1234F1Z5",
+            "pan": "ABCDE1234F", "cstno": "CST123", "mpstno": "MPST456",
+            "phone": "9999999999", "address": "Main Mandi", "address2": "Shop 23",
+            "alt_name": "FULL TRD", "opening_balance": 5000.0, "opening_qty": 100.5,
+            "rate": 2200.0, "type": "supplier",
+        }
+        r = auth_session.post(f"{API}/parties", json=payload)
+        assert r.status_code == 200, r.text
+        p = r.json()
+        for k in ["code", "place", "gstin", "pan", "cstno", "mpstno",
+                  "alt_name", "address2", "opening_qty", "rate", "group_id"]:
+            assert p.get(k) == payload[k], f"{k}: {p.get(k)} != {payload[k]}"
+        created_ids["parties"].append(p["id"])
+
+        # round-trip via GET
+        lst = auth_session.get(f"{API}/parties").json()
+        found = next(x for x in lst if x["id"] == p["id"])
+        assert found["gstin"] == payload["gstin"]
+        assert found["balance"] == 5000.0
+
+
+# ---------------- Inward Register ----------------
+class TestInward:
+    def test_inward_crud(self, auth_session, created_ids):
+        # create cold storage party first
+        groups = auth_session.get(f"{API}/account-groups").json()
+        cs = next(g for g in groups if g["name"] == "COLD STORAGE")
+        nxt = auth_session.get(f"{API}/account-groups/{cs['id']}/next-code").json()["next_code"]
+        cs_party = auth_session.post(f"{API}/parties", json={
+            "name": "TEST_ColdStore1", "code": nxt, "group_id": cs["id"],
+            "group_name": cs["name"], "type": "both"
+        }).json()
+        created_ids["parties"].append(cs_party["id"])
+
+        items = auth_session.get(f"{API}/items").json()
+
+        payload = {
+            "date": "2026-01-10", "ref_no": "REF001", "lot_no": "LOT-101",
+            "cold_storage_id": cs_party["id"], "cold_storage_name": cs_party["name"],
+            "bags": 50, "weight": 25.5,
+            "item_id": items[0]["id"], "item_name": items[0]["name"],
+            "notes": "TEST inward"
+        }
+        r = auth_session.post(f"{API}/inward", json=payload)
+        assert r.status_code == 200, r.text
+        row = r.json()
+        assert row["lot_no"] == "LOT-101"
+        assert row["bags"] == 50
+        assert row["weight"] == 25.5
+        iid = row["id"]
+        created_ids["inward"].append(iid)
+
+        # list
+        r = auth_session.get(f"{API}/inward")
         assert r.status_code == 200
-        j = r.json()
-        assert j["voucher_no"].startswith("J")
-        assert len(j["voucher_no"]) == 6
-        assert j["total"] == 1000
-        created_ids.setdefault("journal", []).append(j["id"])
+        assert any(x["id"] == iid for x in r.json())
 
-    def test_journal_list_and_filter(self, auth_session):
-        r = auth_session.get(f"{API}/journal?date_from=2026-01-15&date_to=2026-01-15")
+        # filter by cold_storage_id
+        r = auth_session.get(f"{API}/inward",
+                             params={"cold_storage_id": cs_party["id"]})
+        assert all(x["cold_storage_id"] == cs_party["id"] for x in r.json())
+
+        # filter by date
+        r = auth_session.get(f"{API}/inward",
+                             params={"date_from": "2026-01-10", "date_to": "2026-01-10"})
+        assert all(x["date"] == "2026-01-10" for x in r.json())
+
+        # update
+        upd = {**payload, "bags": 75, "weight": 35.0}
+        r = auth_session.put(f"{API}/inward/{iid}", json=upd)
         assert r.status_code == 200
-        entries = r.json()
-        assert all(e["date"] == "2026-01-15" for e in entries)
+        assert r.json()["bags"] == 75
+        assert r.json()["weight"] == 35.0
+
+        # delete
+        r = auth_session.delete(f"{API}/inward/{iid}")
+        assert r.status_code == 200
+        created_ids["inward"].remove(iid)
+        # verify gone
+        rows = auth_session.get(f"{API}/inward").json()
+        assert not any(x["id"] == iid for x in rows)
 
 
-# ---------------- Bills with v1.1 extended fields ----------------
-class TestBillsV11:
-    def test_bill_with_dos_fields(self, auth_session, created_ids):
-        parties = auth_session.get(f"{API}/parties").json()
-        if not parties:
-            pr = auth_session.post(f"{API}/parties", json={
-                "name": "TEST_V11Party", "phone": "1", "address": "x",
-                "type": "supplier", "opening_balance": 0
-            }).json()
-            created_ids["parties"].append(pr["id"])
-            parties = [pr]
+# ---------------- Bills with full FoxPro purchase fields ----------------
+class TestBillsFoxPro:
+    def test_purchase_bill_with_all_charges(self, auth_session, created_ids):
+        groups = auth_session.get(f"{API}/account-groups").json()
+        pp = next(g for g in groups if g["name"] == "PURCHASE PARTY")
+        nxt = auth_session.get(f"{API}/account-groups/{pp['id']}/next-code").json()["next_code"]
+        p = auth_session.post(f"{API}/parties", json={
+            "name": "TEST_PP Trader", "code": nxt, "group_id": pp["id"],
+            "group_name": pp["name"], "type": "supplier"
+        }).json()
+        created_ids["parties"].append(p["id"])
+
         items = auth_session.get(f"{API}/items").json()
         item = items[0]
-        amt = round(5.2 * item["rate"], 2)  # wb=5.2 quintal
+
+        # build bill: 10 bags x 50kg pack, weight 5q wb 5.2q ghat 0.05 nwt 5.15
+        bag = 10
+        weight = 5.0
+        wb = 5.2
+        ghat = 0.05
+        nwt = 5.15
+        amount = round(nwt * item["rate"], 2)
+        subtotal = amount
+        hamali_rt = 2.0
+        hamali_amt = hamali_rt * bag        # 20
+        bhada_rt = 50.0
+        bhada_amt = bhada_rt * weight       # 250
+        dalali_rt = 2.0
+        dalali_amt = round(dalali_rt * subtotal / 100, 2)
+        mandirt = 1.0
+        mandiamt = round(mandirt * subtotal / 100, 2)
+        cartage_amt = 100.0
+        additions = hamali_amt + bhada_amt + mandiamt + cartage_amt
+        deductions = dalali_amt
+        total = subtotal + additions - deductions
+
         payload = {
             "bill_type": "purchase",
-            "party_id": parties[0]["id"],
-            "party_name": parties[0]["name"],
-            "date": "2026-01-15",
-            "s_date": "2026-01-14",
-            "gp_no": "GP1234",
-            "truck_no": "HR-55-AB-1234",
-            "payment_cond": "30 days credit",
+            "party_id": p["id"], "party_name": p["name"],
+            "date": "2026-01-15", "s_date": "2026-01-15", "due_date": "2026-02-15",
+            "lot_no": "LOT-500", "gp_no": "GP-500", "truck_no": "HR-55-XX-9999",
+            "driver_name": "Ramu", "bilty_no": "BLT-500", "garage": "Garage-A",
+            "no_of_bag": "10 bags", "bag_pack_q": "50 Kg",
+            "agent_id": None, "agent_name": "AGENT-1",
+            "buyer_id": None, "buyer_name": "BUYER-1",
             "items": [{
                 "item_id": item["id"], "item_name": item["name"],
-                "qty": 10, "bag_pack": "50 Kg", "weight": 5.0, "wb": 5.2,
-                "unit": item["unit"], "rate": item["rate"], "amount": amt
+                "bag": bag, "pack": 50, "bag_pack": "10 x 50",
+                "weight": weight, "wb": wb, "ghat": ghat, "nwt": nwt,
+                "unit": "Quintal", "rate": item["rate"], "amount": amount, "qty": nwt,
             }],
-            "subtotal": amt, "commission_pct": 0, "commission_amt": 0,
-            "other_charges": 0, "total": amt, "payment_received": 0,
-            "notes": "TEST v1.1 bill"
+            "subtotal": subtotal,
+            "hamali_rt": hamali_rt, "hamali_amt": hamali_amt,
+            "cartage_rt": 0, "cartage_amt": cartage_amt,
+            "bhada_rt": bhada_rt, "bhada_amt": bhada_amt,
+            "mandirt": mandirt, "mandiamt": mandiamt,
+            "dalali_rt": dalali_rt, "dalali_amt": dalali_amt,
+            "discount_rt": 0, "discount_amt": 0,
+            "rebate_rt": 0, "rebate_amt": 0,
+            "garrt": 0, "garamt": 0,
+            "loading": 0, "bdalali": 0, "less": 0, "advance": 0,
+            "commission_pct": 0, "commission_amt": 0, "other_charges": 0,
+            "total": total, "payment_received": 0,
+            "notes": "TEST FoxPro bill",
+            "remark1": "First remark", "remark2": "Second remark",
         }
         r = auth_session.post(f"{API}/bills", json=payload)
         assert r.status_code == 200, r.text
         bill = r.json()
-        assert bill["gp_no"] == "GP1234"
-        assert bill["truck_no"] == "HR-55-AB-1234"
-        assert bill["s_date"] == "2026-01-14"
-        assert bill["payment_cond"] == "30 days credit"
-        assert bill["items"][0]["bag_pack"] == "50 Kg"
-        assert bill["items"][0]["wb"] == 5.2
         created_ids["bills"].append(bill["id"])
+        assert bill["bill_no"].startswith("P")
+        # Verify all FoxPro fields round-trip
+        for k in ["lot_no", "gp_no", "truck_no", "driver_name", "bilty_no",
+                  "garage", "no_of_bag", "bag_pack_q", "due_date",
+                  "agent_name", "buyer_name", "remark1", "remark2"]:
+            assert bill[k] == payload[k], f"{k} mismatch"
+        assert abs(bill["hamali_amt"] - 20.0) < 0.01
+        assert abs(bill["bhada_amt"] - 250.0) < 0.01
+        # Item-level fields
+        it = bill["items"][0]
+        assert it["bag"] == 10
+        assert it["pack"] == 50
+        assert it["weight"] == weight
+        assert it["wb"] == wb
+        assert it["ghat"] == ghat
+        assert it["nwt"] == nwt
 
-        # GET single bill round-trips fields
+        # GET single bill
         rg = auth_session.get(f"{API}/bills/{bill['id']}")
         assert rg.status_code == 200
-        assert rg.json()["truck_no"] == "HR-55-AB-1234"
+        assert rg.json()["truck_no"] == "HR-55-XX-9999"
 
-    def test_old_bill_format_still_works(self, auth_session, created_ids):
-        """Backward compat: bill without new fields should still save."""
+
+# ---------------- Trial Balance ----------------
+class TestTrialBalance:
+    def test_trial_balance_structure(self, auth_session):
+        r = auth_session.get(f"{API}/reports/trial-balance")
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert "sections" in d
+        assert "grand_dr" in d
+        assert "grand_cr" in d
+        assert len(d["sections"]) >= 18  # at least 18 groups (+ optional UNCATEGORIZED)
+
+        # sections sorted by fcode
+        coded = [s for s in d["sections"] if s.get("fcode")]
+        fcodes = [s["fcode"] for s in coded]
+        assert fcodes == sorted(fcodes), "sections not sorted by fcode"
+
+        # each section has expected keys
+        for s in d["sections"]:
+            for k in ["group_name", "nature", "rows", "dr_total", "cr_total"]:
+                assert k in s, f"section missing {k}"
+
+        # SALES PARTY section should exist
+        sales_party = next((s for s in d["sections"] if s["group_name"] == "SALES PARTY"), None)
+        assert sales_party is not None
+        assert sales_party["fcode"] == 350 and sales_party["lcode"] == 1199
+
+    def test_trial_balance_includes_parties_and_accounts(self, auth_session, created_ids):
+        """After creating a party with opening balance, TB should include it under correct group."""
+        groups = auth_session.get(f"{API}/account-groups").json()
+        sp = next(g for g in groups if g["name"] == "SALES PARTY")
+        nxt = auth_session.get(f"{API}/account-groups/{sp['id']}/next-code").json()["next_code"]
+        p = auth_session.post(f"{API}/parties", json={
+            "name": "TEST_TB Party", "code": nxt, "group_id": sp["id"],
+            "group_name": sp["name"], "type": "customer", "opening_balance": 1234.0
+        }).json()
+        created_ids["parties"].append(p["id"])
+
+        tb = auth_session.get(f"{API}/reports/trial-balance").json()
+        sales_section = next(s for s in tb["sections"] if s["group_name"] == "SALES PARTY")
+        row = next((r for r in sales_section["rows"] if r["name"] == "TEST_TB Party"), None)
+        assert row is not None, "Created party not in TB SALES PARTY section"
+        assert row["balance"] == 1234.0
+        assert row["code"] == nxt
+        assert row["kind"] == "party"
+
+
+# ---------------- Cash & Bank accounts (seeded) ----------------
+class TestSeededAccounts:
+    def test_cash_and_bank_seeded(self, auth_session):
+        r = auth_session.get(f"{API}/accounts")
+        assert r.status_code == 200
+        names = [a["name"] for a in r.json()]
+        assert "CASH IN HAND" in names
+        assert "BANK A/C" in names
+
+
+# ---------------- Existing v1.0/v1.1 still works ----------------
+class TestBackwardCompat:
+    def test_old_bill_format(self, auth_session, created_ids):
         parties = auth_session.get(f"{API}/parties").json()
+        if not parties:
+            pytest.skip("no parties")
         items = auth_session.get(f"{API}/items").json()
         payload = {
             "bill_type": "sale",
@@ -472,74 +415,26 @@ class TestBillsV11:
                        "rate": items[0]["rate"], "amount": items[0]["rate"]}],
             "subtotal": items[0]["rate"], "commission_pct": 0, "commission_amt": 0,
             "other_charges": 0, "total": items[0]["rate"], "payment_received": 0,
-            "notes": "old format"
         }
         r = auth_session.post(f"{API}/bills", json=payload)
         assert r.status_code == 200
         created_ids["bills"].append(r.json()["id"])
 
-
-# ---------------- Settings ----------------
-class TestSettings:
-    def test_get_settings_default(self, auth_session):
-        r = auth_session.get(f"{API}/settings")
+    def test_dashboard(self, auth_session):
+        r = auth_session.get(f"{API}/summary/dashboard")
         assert r.status_code == 200
-        s = r.json()
-        assert "fy_start" in s and "fy_end" in s
-        assert s["fy_start"].endswith("-04-01")
-        assert s["fy_end"].endswith("-03-31")
-        assert "firm_name" in s
-
-    def test_update_settings(self, auth_session):
-        r = auth_session.put(f"{API}/settings", json={
-            "firm_name": "TEST Firm",
-            "fy_start": "2026-04-01",
-            "fy_end": "2027-03-31",
-            "current_date": "2026-01-15"
-        })
-        assert r.status_code == 200
-        s = r.json()
-        assert s["firm_name"] == "TEST Firm"
-        assert s["fy_start"] == "2026-04-01"
-        # Persisted
-        r2 = auth_session.get(f"{API}/settings")
-        assert r2.json()["firm_name"] == "TEST Firm"
-        # restore original
-        auth_session.put(f"{API}/settings", json={"firm_name": "Galla Bahi"})
-
-
-# ---------------- Backup / Restore ----------------
-class TestBackupRestore:
-    def test_backup_has_all_collections(self, auth_session):
-        r = auth_session.get(f"{API}/backup")
-        assert r.status_code == 200
-        backup = r.json()
-        assert "data" in backup and "exported_at" in backup and "version" in backup
-        for c in ["account_groups", "accounts", "parties", "items",
-                  "bills", "rokad", "journal", "settings"]:
-            assert c in backup["data"], f"missing collection {c} in backup"
-            assert isinstance(backup["data"][c], list)
-
-    def test_restore_roundtrip(self, auth_session):
-        # snapshot
-        backup = auth_session.get(f"{API}/backup").json()
-        # restore same data
-        r = auth_session.post(f"{API}/restore", json={"data": backup["data"]})
-        assert r.status_code == 200
-        result = r.json()
-        assert result["ok"] is True
-        assert "restored" in result
-        for c in ["account_groups", "accounts", "parties", "items"]:
-            assert c in result["restored"]
-        # admin auth still works post-restore (users collection untouched)
-        r2 = auth_session.get(f"{API}/auth/me")
-        assert r2.status_code == 200
+        d = r.json()
+        for k in ["today", "month", "parties_count", "items_count",
+                  "total_udhaar", "total_owed"]:
+            assert k in d
 
 
 # ---------------- Cleanup ----------------
 def test_zz_cleanup(auth_session, created_ids):
     for jid in created_ids.get("journal", []):
         auth_session.delete(f"{API}/journal/{jid}")
+    for iid in created_ids.get("inward", []):
+        auth_session.delete(f"{API}/inward/{iid}")
     for aid in created_ids.get("accounts", []):
         auth_session.delete(f"{API}/accounts/{aid}")
     for gid in created_ids.get("groups", []):

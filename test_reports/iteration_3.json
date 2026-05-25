@@ -1,0 +1,51 @@
+{
+  "summary": "v1.2 (FoxPro deep restructure) end-to-end verified. Backend: 31/31 pytest tests pass (~6s) covering all v1.2 features: 18 seeded account groups with correct fcode/lcode/nature (CAPITAL A/C 1-50, SALES PARTY 350-1199, COLD STORAGE 2200-2400, etc.), /account-groups/{gid}/next-code endpoint (returns next free code in group range, increments after party added, returns 404 for invalid group), Party creation with full FoxPro fields (code, group_id, group_name, place, gstin, pan, cstno, mpstno, alt_name, address2, opening_balance, opening_qty, rate), Inward register CRUD with date+cold_storage_id filters, Purchase bill with full FoxPro fields (lot_no, due_date, gp_no, truck_no, driver_name, bilty_no, garage, no_of_bag, bag_pack_q, agent_name, buyer_name, remark1/2; charges hamali_rt+amt, bhada_rt+amt, dalali_rt+amt, mandi rt+amt, cartage_amt, discount, rebate; item bag/pack/weight/wb/ghat/nwt all round-trip correctly), Trial Balance /api/reports/trial-balance returns >=18 sections sorted by fcode each with rows+dr_total+cr_total + grand totals, RAMOTAR BAGRI correctly appears under SALES PARTY 350-1199. Seeded accounts CASH IN HAND (301) + BANK A/C (302) verified. Backward compat: old bill format still saves. Frontend: login OK, /account-groups shows 18 groups split into 4 nature columns (Asset 8, Liability 3, Income 2, Expense 5) with CODE RANGE column, /parties opens 'Naya Khata / Ledger' modal with Group dropdown + Code + Name + Type + Alt Name (GL_NAME1) + Place (GL_PLACE) + Phone + Address1 + Address2 + GSTIN (F_G_L_NO) + PAN + CST NO + MP STATE TAX + Opening Balance + Opening Qty + Default Rate. /inward page renders with Date/Ref/Lot No/Cold Storage/Item/Bags/Weight columns + 'Nayi Inward' button. /trial-balance renders all 18 groups grouped sections with Code/Narration/Debit (₹)/Credit (₹) columns + Group Total rows + RAMOTAR BAGRI visible at code 350 under SALES PARTY. /bills?type=purchase opens 'Purchase Entry (कच्चा खरीद)' modal with ALL FoxPro fields: E.Date, S.Date, Lot No, GP No, Due Date, Payment Cond, Seller/Buyer/Agent dropdowns, Truck No, Driver, Bilty, Garage, No. of Bags; item table Item Name | Bag Pack | Bag | Pack | Weight | W.B. | Ghat | Net Wt | Rate | Amount; Additions panel (Hamali x bags, Cartage x bags, Bhada x Qtl, Mandi Tax %, Dalali/Arhat %, Garage x bags, Loading, Brokerage Dalali, Other Charges); Deductions panel (Discount, Rebate, Less, Advance Paid); Remark 1, Remark 2; live Subtotal + Additions - Deductions = Total Amount summary.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/bills POST", "issue": "_next_bill_no still uses count_documents (not race-safe, carry-over)"},
+      {"endpoint": "/api/account-groups/{gid}/next-code", "issue": "If max(used)+1 falls in an outsider's range (e.g. wrong codes saved manually), the function does not validate that nxt is still <= lcode in the < f branch; minor edge case"},
+      {"endpoint": "/api/parties POST", "issue": "No uniqueness check on (group_id, code) - duplicates can be inserted via API (UI does call next-code so practically OK, but API allows it)"},
+      {"endpoint": "/api/inward POST", "issue": "cold_storage_id not validated against parties collection (orphan id can be saved)"},
+      {"endpoint": "/api/reports/trial-balance", "issue": "_compute_party_balance + _compute_account_balance called per row in O(N) loop - acceptable for kaccha arhat scale"},
+      {"endpoint": "/api/auth/login", "issue": "Still no brute-force lockout (carry-over)"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PartyKhata group dropdown", "issues": ["React hydration warning in console: '<span> cannot be a child of <option>' caused by Emergent dev instrumentation injecting <span data-ve-dynamic> inside <option> for {g.name}+{g.fcode}-{g.lcode}. Dev-only warning, functionally OK. Same root cause as v1.1 iteration_2 report."]},
+      {"screen": "All modals", "issues": ["Still uses native <select> and <input type=date> instead of shadcn Select/Calendar (intentional - dense desktop FoxPro look)"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Optional: validate cold_storage_id (FK) and uniqueness of (group_id, code) on Party/Account create",
+    "Optional: make bill_no & next-code race-safe via atomic findOneAndUpdate counter",
+    "Optional: add brute-force lockout on /api/auth/login (5 fails per 15 min)",
+    "Optional: address the dev-only React hydration warning on <option> children (Emergent x-source instrumentation)"
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 1005 lines - exceeds 700-line threshold. Recommend splitting into routers/ subpackage (auth.py, parties.py, items.py, bills.py, rokad.py, accounts.py, journal.py, inward.py, reports.py, backup.py, settings.py).",
+    "Trial Balance scans entire bills + rokad + journal collections per ledger row -> O(L * (B+R+J)). For >1000 ledgers this will get slow; consider precomputing balances or a single aggregation pipeline.",
+    "next_code_in_group only checks max(used)+1 - if codes are deleted out of order, gaps are not reused. Probably matches FoxPro ECODE behavior so acceptable.",
+    "PartyIn / BillIn / BillItem models have grown large with many optional/default fields. Consider grouping (e.g. PartyAddress, BillCharges sub-models) for clarity.",
+    "All POST handlers consistently use {'_id': 0} projection. /api/parties create_party returns doc with .pop('_id', None) after copy - safe pattern.",
+    "Inward endpoints follow established CRUD pattern - good consistency.",
+    "Trial Balance correctly handles orphan rows (no group_id) into UNCATEGORIZED section."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (rewritten for v1.2: 31 tests covering 18 groups, next-code, FoxPro party fields, Inward CRUD, FoxPro purchase bill with all charges, Trial Balance structure+content, seeded CASH IN HAND/BANK A/C, backward compat)"
+  ],
+  "success_rate": {"backend": "100% (31/31)", "frontend": "100% on all v1.2 flows tested"},
+  "test_credentials": "admin@galla.com / admin123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Tests created TEST_ prefixed parties (FULL Trader in PURCHASE PARTY, PP Trader, ColdStore1 in COLD STORAGE, StaffX in STAFF ADVANCE, TB Party in SALES PARTY) and bills (1 purchase with full FoxPro fields, 1 old-format sale) and 1 inward entry. All cleaned via test_zz_cleanup teardown. RAMOTAR BAGRI (code 350) party that existed pre-test was preserved.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "v1.2 fully verified end-to-end. Backend test suite at /app/backend/tests/backend_test.py (31 tests, ~6s runtime, all passing) covers the 18 FoxPro account groups with code ranges, next-code endpoint, party FoxPro fields, Inward CRUD, full FoxPro purchase bill with all charges (hamali_rt/amt, bhada_rt/amt, dalali_rt/amt, mandi rt/amt, cartage_amt, discount, rebate, etc.) and bag/pack/weight/wb/ghat/nwt items, Trial Balance grouped report, seeded CASH IN HAND/BANK A/C accounts. Frontend pages tested via Playwright: /account-groups (18 groups, 4 nature columns, CODE RANGE), /parties (Naya Khata modal with all FoxPro fields), /inward, /trial-balance (renders grouped sections with Dr/Cr columns and RAMOTAR BAGRI at code 350), /bills?type=purchase (Purchase Entry modal with all FoxPro fields incl. Additions/Deductions panels and item table with Bag/Pack/Weight/W.B./Ghat/Net Wt columns). Note: REACT_APP_BACKEND_URL must be exported when running pytest (it is in frontend/.env but not exported to backend test shell): use `REACT_APP_BACKEND_URL=https://khata-book-18.preview.emergentagent.com python -m pytest backend/tests/backend_test.py`. Backend BASE_URL no longer has a fallback default per system rule.",
+  "rca of the issue": "No bugs found in v1.2. One transient pytest collection error was caused by REACT_APP_BACKEND_URL not being in shell env (only in frontend/.env). Resolved by exporting it on the command line; production frontend reads it from .env so unaffected."
+}

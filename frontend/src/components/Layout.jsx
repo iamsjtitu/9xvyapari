@@ -5,6 +5,7 @@ import api from "@/lib/api";
 import {
   House, Notebook, UsersThree, Package, Receipt, ChartBar, SignOut, Storefront,
   TreeStructure, IdentificationCard, BookOpenText, CloudArrowUp, Calendar, Power,
+  Truck, Scales,
 } from "@phosphor-icons/react";
 
 const sections = [
@@ -16,7 +17,9 @@ const sections = [
       { to: "/journal", label: "Journal Entry", key: "D", icon: BookOpenText, tid: "nav-journal" },
       { to: "/bills?type=purchase", label: "Purchase Entry", key: "E", icon: Package, tid: "nav-purchase" },
       { to: "/bills?type=sale", label: "Sale / Bill Entry", key: "F", icon: Receipt, tid: "nav-sale" },
+      { to: "/inward", label: "Inward Register", key: "N", icon: Truck, tid: "nav-inward" },
       { to: "/reports", label: "Reports", key: "G", icon: ChartBar, tid: "nav-reports" },
+      { to: "/trial-balance", label: "Trial Balance", key: "T", icon: Scales, tid: "nav-tb" },
     ],
   },
   {

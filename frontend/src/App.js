@@ -16,6 +16,8 @@ import Accounts from "@/pages/Accounts";
 import JournalEntry from "@/pages/JournalEntry";
 import Backup from "@/pages/Backup";
 import Settings from "@/pages/Settings";
+import Inward from "@/pages/Inward";
+import TrialBalance from "@/pages/TrialBalance";
 import "@/App.css";
 
 function Protected({ children }) {
@@ -64,6 +66,8 @@ function App() {
             <Route path="reports" element={<Reports />} />
             <Route path="account-groups" element={<AccountGroups />} />
             <Route path="accounts" element={<Accounts />} />
+            <Route path="inward" element={<Inward />} />
+            <Route path="trial-balance" element={<TrialBalance />} />
             <Route path="backup" element={<Backup />} />
             <Route path="settings" element={<Settings />} />
           </Route>
