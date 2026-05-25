@@ -284,4 +284,19 @@ label.lbl {
   tr { page-break-inside: avoid; page-break-after: auto; }
   thead { display: table-header-group; }
   tfoot { display: table-footer-group; }
+
+  /* Cash book — FORCE Jama LEFT + Kharch RIGHT side-by-side in print
+     (DOS cash book layout: Receipt | Payment columns) */
+  .cash-book-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+  body:has(.cash-book-grid) { /* may not apply universally */ }
+}
+
+/* Cash book pages print landscape for wider Jama|Kharch layout */
+@media print {
+  @page cashbook { size: A4 landscape; margin: 10mm; }
+  .cash-book-page { page: cashbook; }
 }

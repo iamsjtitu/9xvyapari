@@ -7,6 +7,8 @@ import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 export default function RokadPanna() {
   const [dateFrom, setDateFrom] = useState(todayISO());
   const [dateTo, setDateTo] = useState(todayISO());
+  const [bankFilter, setBankFilter] = useState("");        // "" = all
+  const [allBankEntries, setAllBankEntries] = useState([]); // entries for selected bank (no date filter)
   const [entries, setEntries] = useState([]);
   const [parties, setParties] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -30,6 +32,14 @@ export default function RokadPanna() {
     setEntries(data);
   };
 
+  // When bank filter changes, fetch ALL entries for that bank (for opening balance calc)
+  useEffect(() => {
+    if (!bankFilter) { setAllBankEntries([]); return; }
+    api.get("/rokad").then((r) => {
+      setAllBankEntries(r.data.filter((x) => x.cash_account_id === bankFilter));
+    });
+  }, [bankFilter]);
+
   useEffect(() => {
     load();
     // eslint-disable-next-line
@@ -48,17 +58,49 @@ export default function RokadPanna() {
     });
   }, []);
 
+  // Bank-filtered entries for display (visible range)
+  const visibleEntries = useMemo(() =>
+    bankFilter ? entries.filter((e) => e.cash_account_id === bankFilter) : entries,
+    [entries, bankFilter]);
+
   const totals = useMemo(() => {
     let jama = 0, kharch = 0;
-    for (const e of entries) {
+    for (const e of visibleEntries) {
       if (e.type === "jama") jama += e.amount;
       else kharch += e.amount;
     }
     return { jama, kharch, baki: jama - kharch };
-  }, [entries]);
+  }, [visibleEntries]);
 
-  const jamaList = entries.filter((e) => e.type === "jama");
-  const kharchList = entries.filter((e) => e.type === "kharch");
+  const jamaList = visibleEntries.filter((e) => e.type === "jama");
+  const kharchList = visibleEntries.filter((e) => e.type === "kharch");
+
+  // ---- Bank summary (opening / closing / voucher range) ----
+  const selectedBank = useMemo(
+    () => accounts.find((a) => a.id === bankFilter),
+    [accounts, bankFilter]
+  );
+
+  const bankSummary = useMemo(() => {
+    if (!bankFilter) return null;
+    const openingBalance = (selectedBank?.opening_balance) || 0;
+    let preJama = 0, preKharch = 0;
+    for (const e of allBankEntries) {
+      const d = (e.date || "").slice(0, 10);
+      if (d && d < dateFrom) {
+        if (e.type === "jama") preJama += e.amount;
+        else preKharch += e.amount;
+      }
+    }
+    const opening = openingBalance + preJama - preKharch;
+    const closing = opening + totals.jama - totals.kharch;
+    const vouchers = visibleEntries
+      .map((e) => parseInt(String(e.voucher_no || "").trim()))
+      .filter((n) => !isNaN(n));
+    const vMin = vouchers.length ? Math.min(...vouchers) : null;
+    const vMax = vouchers.length ? Math.max(...vouchers) : null;
+    return { opening, closing, vMin, vMax, count: visibleEntries.length };
+  }, [bankFilter, selectedBank, allBankEntries, dateFrom, totals, visibleEntries]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -171,7 +213,7 @@ export default function RokadPanna() {
   );
 
   return (
-    <div className="space-y-5" data-testid="page-rokad">
+    <div className="space-y-5 cash-book-page" data-testid="page-rokad">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="section-title">Operations · Cash Register / Rokad Panna</div>
@@ -208,6 +250,23 @@ export default function RokadPanna() {
               rows: kharchList,
             },
           ]} />
+          <div>
+            <label className="lbl">Cash / Bank A/C</label>
+            <select
+              className="input-dense"
+              style={{ minWidth: 180 }}
+              value={bankFilter}
+              onChange={(e) => setBankFilter(e.target.value)}
+              data-testid="select-bank-filter"
+            >
+              <option value="">— All Cash/Bank —</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.code ? `${a.code} · ` : ""}{a.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="lbl">From</label>
             <input
@@ -249,7 +308,45 @@ export default function RokadPanna() {
       </div>
 
       <FoxProPrintHeader title="CASH BOOK / ROKAD PANNA"
-        subtitle={`${dateFrom === dateTo ? `Date: ${dateFrom}` : `From: ${dateFrom} · To: ${dateTo}`} · Jama: ${inr(totals.jama)} · Kharch: ${inr(totals.kharch)} · Baki: ${inr(totals.baki)}`} />
+        subtitle={`${dateFrom === dateTo ? `Date: ${dateFrom}` : `From: ${dateFrom} · To: ${dateTo}`}${selectedBank ? ` · A/C: ${selectedBank.name}` : ""} · Jama: ${inr(totals.jama)} · Kharch: ${inr(totals.kharch)} · Baki: ${inr(totals.baki)}`} />
+
+      {/* Bank-specific summary bar */}
+      {bankSummary && selectedBank && (
+        <div className="card-flat px-5 py-3 border-l-4 border-terracotta" data-testid="bank-summary">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="section-title">Cash / Bank Account</div>
+              <div className="font-heading font-semibold text-lg text-terracotta">
+                {selectedBank.code ? `${selectedBank.code} · ` : ""}{selectedBank.name}
+              </div>
+              {selectedBank.group_name && (
+                <div className="text-[11px] text-muted2 uppercase tracking-wider">{selectedBank.group_name}</div>
+              )}
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-muted2">Opening Balance</div>
+              <div className="font-mono-data text-xl font-medium" style={{ color: bankSummary.opening >= 0 ? "#1A1A1A" : "#B71C1C" }}>
+                ₹ {inr(Math.abs(bankSummary.opening))} {bankSummary.opening >= 0 ? "Dr" : "Cr"}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-muted2">Closing Balance</div>
+              <div className="font-mono-data text-xl font-medium" style={{ color: bankSummary.closing >= 0 ? "#1B5E20" : "#B71C1C" }}>
+                ₹ {inr(Math.abs(bankSummary.closing))} {bankSummary.closing >= 0 ? "Dr" : "Cr"}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-muted2">V.No Range</div>
+              <div className="font-mono-data text-lg">
+                {bankSummary.vMin !== null
+                  ? `${bankSummary.vMin}${bankSummary.vMin !== bankSummary.vMax ? ` → ${bankSummary.vMax}` : ""}`
+                  : "—"}
+              </div>
+              <div className="text-[10px] text-muted2 font-mono-data">{bankSummary.count} entries</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary bar */}
       <div className="card-flat px-5 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -278,12 +375,12 @@ export default function RokadPanna() {
           </div>
         </div>
         <div className="text-xs text-muted2 font-mono-data">
-          Date: {dateFrom === dateTo ? dateFrom : `${dateFrom} → ${dateTo}`} · Entries: {entries.length}
+          Date: {dateFrom === dateTo ? dateFrom : `${dateFrom} → ${dateTo}`} · Entries: {visibleEntries.length}
         </div>
       </div>
 
-      {/* Two-column ledger */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Two-column ledger — Jama LEFT, Kharch RIGHT (same as DOS cash book) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 cash-book-grid">
         <Side
           side="jama"
           list={jamaList}
