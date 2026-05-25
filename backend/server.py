@@ -378,11 +378,23 @@ async def _compute_party_balance(party_id: str, opening: float) -> float:
             bal -= r["amount"]  # party paid us
         else:
             bal += r["amount"]  # we paid party
-    # Imported DOS journal entries (AN.DBF)
-    dosj = await db.dos_journal.find({"party_id": party_id}, {"_id": 0}).to_list(5000)
+    # Imported DOS journal entries (AN.DBF) for this party
+    # Match where this party is EITHER the primary (party_id) OR the counter-party
+    # For counter-party entries we flip debit/credit (since the other side has the
+    # opposite effect on this party's balance).
+    dosj = await db.dos_journal.find(
+        {"$or": [{"party_id": party_id}, {"counter_party_id": party_id}]},
+        {"_id": 0}
+    ).to_list(5000)
     for j in dosj:
-        bal += float(j.get("debit") or 0)
-        bal -= float(j.get("credit") or 0)
+        is_primary = (j.get("party_id") == party_id)
+        d = float(j.get("debit") or 0)
+        c = float(j.get("credit") or 0)
+        if is_primary:
+            bal += d - c
+        else:
+            # Counter side has opposite effect
+            bal += c - d
     return round(bal, 2)
 
 
@@ -565,10 +577,25 @@ async def party_ledger(pid: str, current=Depends(get_current_user)):
         raise HTTPException(404, "Party not found")
     bills = await db.bills.find({"party_id": pid}, {"_id": 0}).sort("date", 1).to_list(5000)
     rokads = await db.rokad.find({"party_id": pid}, {"_id": 0}).sort("date", 1).to_list(5000)
-    # Imported DOS journal entries (AN.DBF) for this party
-    dos_journal = await db.dos_journal.find(
-        {"party_id": pid}, {"_id": 0}
+    # Imported DOS journal entries (AN.DBF) - match primary OR counter-party
+    dos_raw = await db.dos_journal.find(
+        {"$or": [{"party_id": pid}, {"counter_party_id": pid}]},
+        {"_id": 0}
     ).sort([("date", 1), ("ref_no", 1)]).to_list(5000)
+    # Flip debit/credit for counter-party rows so the ledger displays correctly
+    dos_journal = []
+    for j in dos_raw:
+        is_primary = (j.get("party_id") == pid)
+        entry = dict(j)
+        if not is_primary:
+            entry["debit"], entry["credit"] = j.get("credit", 0), j.get("debit", 0)
+            entry["is_counter_side"] = True
+            # Show the primary party as "other side" in narration
+            entry["other_party_name"] = j.get("account_name") or ""
+        else:
+            entry["is_counter_side"] = False
+            entry["other_party_name"] = j.get("counter_party_name") or ""
+        dos_journal.append(entry)
     party["balance"] = await _compute_party_balance(pid, party.get("opening_balance", 0.0))
     return {"party": party, "bills": bills, "rokad": rokads, "dos_journal": dos_journal}
 
@@ -1469,6 +1496,10 @@ async def import_dbf_journal(payload: dict, current=Depends(get_current_user)):
     for idx, r in enumerate(rows):
         try:
             code = int(r.get("TR_GL_CODE") or 0) or None
+            # Counter-party code is in TR_GL_CD1 (TR_GL_CD is the cash/bank account)
+            counter_code = int(r.get("TR_GL_CD1") or 0) or None
+            if counter_code == code:
+                counter_code = None  # same as primary, ignore
             d = r.get("TR_DATE")
             if hasattr(d, "isoformat"):
                 d = d.isoformat()
@@ -1485,12 +1516,16 @@ async def import_dbf_journal(payload: dict, current=Depends(get_current_user)):
                 (r.get("TR_DESCR3") or "").strip(),
             ]))
             party = party_by_code.get(code) if code else None
+            counter_party = party_by_code.get(counter_code) if counter_code else None
             sgn = (r.get("SGN") or "").strip().upper()
             doc = {
                 "date": str(d or ""),
                 "ref_no": ref,
                 "code": code,
+                "counter_code": counter_code,
                 "party_id": (party["id"] if party else None),
+                "counter_party_id": (counter_party["id"] if counter_party else None),
+                "counter_party_name": (counter_party["name"] if counter_party else ""),
                 "account_name": (party["name"] if party else (r.get("GL_NAME") or "")),
                 "narration": descr,
                 "extra": extra,

@@ -42,15 +42,18 @@ export default function PartyLedger() {
       CB: "Cash Book",
       JR: "Journal",
     })[j.sgn] || j.sgn || "DOS";
+    const counter = j.other_party_name || "";
+    const label = `${sgnLabel} · ${j.narration || ""}${counter ? " | vs " + counter : ""}${j.extra ? " (" + j.extra + ")" : ""}`;
     rows.push({
       kind: "dos",
-      id: j.id,
+      id: `${j.imported_from}-${j.row_index}`,
       date: j.date,
-      label: `${sgnLabel} · ${j.narration || ""}${j.extra ? " (" + j.extra + ")" : ""}`,
+      label,
       debit: Number(j.debit || 0),
       credit: Number(j.credit || 0),
       ref_no: j.ref_no,
       sgn: j.sgn,
+      is_counter: !!j.is_counter_side,
     });
   });
   rows.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
