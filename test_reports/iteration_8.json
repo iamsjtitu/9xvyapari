@@ -1,0 +1,25 @@
+{
+  "summary": "Tested new Bill Edit feature (PUT /api/bills/{id}) end-to-end: backend pytest (6/6 passing) + frontend Playwright flow. Edit modal opens with 'EDIT BILL — P00004', bill-type toggles disabled, line 0 prefilled 194.9/4240 (rate derived from amount), total ₹7,97,844.00 matches list, save button 'Update Bill (Ctrl+S)'. Save with remark1='EDIT TEST' and payment_received=1000 updates bill, navigates to /bills/<id>, syncs rokad (1 entry type kharch, amount 1000, cash_account_name 'CASH IN HAND'). 'Edit Bill' button on BillView navigates to /bills?type=purchase&edit=<id> and reopens modal correctly. Revert restores payment_received=0 and removes rokad entry (back to 17). PUT nonexistent → 404; bill_type/bill_no cannot be changed via PUT. 'Naya Bill' after edit opens a clean empty form with proper title ('SALE / BILL ENTRY (नया बिल)'), enabled type toggles, 'Save Bill (Ctrl+S)' button. Parties/Rokad/Dashboard regression pages load fine. Final DB state verified: 4 bills unchanged, 17 rokad.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PartyKhata (/parties)", "issues": ["Hydration console warning: <span> rendered as child of <option> (tooling-injected span with style display:contents inside <option>) — not a functional bug but pollutes console in dev; harmless in production build."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_bill_edit.py", "/app/test_reports/pytest/bill_edit.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "PUT /bills/{bid}: existing['bill_type'] and existing['bill_no'] are preserved — correct. Immutability test passed (sending bill_type='sale' kept 'purchase').",
+    "_sync_bill_payment_rokad deletes & recreates rokad entries by ref_bill_id — idempotent, verified via revert flow.",
+    "BillIn is strict pydantic; frontend NayaBill.save() correctly strips id/bill_no/balance/created_at from payload. Good."
+  ],
+  "updated_files": ["/app/backend/tests/test_bill_edit.py (new)"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin / admin123",
+  "seed_data_creation": "None — tests use existing P00004 and revert all mutations.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend test file /app/backend/tests/test_bill_edit.py covers bill edit + rokad sync + 404 + immutability + final-state assertions. Reusable regression. DB expected to always have 4 bills, 17 rokad, P00004 total 797844 with payment_received 0."
+}

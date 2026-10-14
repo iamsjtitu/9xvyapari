@@ -49,6 +49,9 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - Rokad "All" view shows per-account Opening/Jama/Kharch/Closing table + TOTAL (click row → filter). Entries without cash account default to CASH IN HAND (code 301) on create/update; startup backfill links old unlinked entries; form preselects default cash.
 - Rokad **edit** (`PUT /api/rokad/{id}`, pencil button → same modal in edit mode). Tested: iteration_7 (9/9 backend, full UI flow).
 
+### Jun 2026 – Bill Edit
+- Pencil button on every bill row + "Edit Bill" on bill view (`/bills?type=..&edit=<id>`) open the NayaBill modal in edit mode (title "EDIT BILL — <no>", type toggle locked, "Update Bill"). `PUT /api/bills/{id}` keeps bill_no/type, recomputes balance, `updated_at`, re-syncs auto payment rokad (`_sync_bill_payment_rokad`, linked to CASH IN HAND). DOS-imported bills: rates derived from stored amounts so totals don't drift on edit. Tested iteration_8 (6/6 backend + UI flow).
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅
