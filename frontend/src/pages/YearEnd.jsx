@@ -30,7 +30,9 @@ export default function YearEnd() {
   const close = async () => {
     setBusy(true);
     try {
-      const { data } = await api.post("/year-end/close", { ...newFy, confirm });
+      const { data } = await api.post("/year-end/close", {
+        new_fy_start: newFy.fy_start, new_fy_end: newFy.fy_end, confirm,
+      });
       toast.success(`Naya saal shuru! FY ${data.new_fy.fy_start} → ${data.new_fy.fy_end}. ${data.carried} ledgers carry-forward, backup: ${data.backup_file}`);
       setConfirm(""); setAck(false);
       setTimeout(() => window.location.reload(), 1500);

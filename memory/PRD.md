@@ -33,6 +33,12 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - **NayaBill line-items grid** widened (`items-grid` CSS: no number spinners, tighter cell padding, fixed column widths)
 - Branding → 9x Vyapari (Layout, Login, BillView, index.html title, favicon, default firm name), app icon generated (`electron/build/icon.ico|png`)
 
+### Jun 2026 – Year-End Carry Forward (Naya Saal)
+- Page `/year-end` (nav "Naya Saal (Year-End)", Alt+Y): preview of every ledger's closing → new opening (asset/liability carry forward; income/expense P&L ledgers reset to 0 with "reset (P&L)" tag), counts of entries to archive, carry Dr/Cr totals, type-to-confirm ("NAYA SAAL") + checkbox guard
+- `POST /api/year-end/close`: full backup (`yearend_<fy>`) → snapshot into `fiscal_years` → move bills/rokad/journal/dos_journal/inward/gst_returns into `archive_*` (tagged `fy_id`) → set `opening_balance` on parties & accounts → settings FY/current_date advanced
+- `POST /api/year-end/undo` (only while new year has no entries) restores everything exactly; `GET /api/year-end/history`, `GET /api/year-end/{id}` (closed-year closing balances viewer in UI). Backups now include `fiscal_years` + `archive_*`
+- Verified: backend pytest 12/12 (iteration_6), UI close→undo cycle verified by screenshot, DB left in original state
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅
@@ -40,7 +46,6 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 
 ## Roadmap / Backlog
 - **P1**: First real GitHub Actions run — verify Save to GitHub pushes `.github/workflows` (may need manual add if token lacks `workflow` scope)
-- **P2**: Year-end carry-forward of balances (user asked: after Electron)
 - ~~Multi-user RBAC~~ — dropped, user wants single-user
 - **P2**: Render `dos_journal` history in a dedicated register page
 - **P3**: SMS/WhatsApp reminders for overdue bills

@@ -1,0 +1,48 @@
+{
+  "summary": "Tested the new Year-End (Naya Saal) carry-forward feature end-to-end. All 12 backend pytest cases pass (preview, 4 validation branches, full close+undo cycle, undo-blocked-with-new-entries, 404 on second undo, regression). DB left in original state (fy 2026-04-01..2027-03-31, bills 4, rokad 17, dos_journal 239, fiscal_years 0, archive_* 0). Frontend /year-end page renders correctly with all required data-testids, counts, carry totals, closing preview and disabled-button logic working. However, clicking 'Naya Saal Shuru Karein' on the UI fails: backend returns 422 'Field required' because the frontend POSTs {fy_start, fy_end, confirm} while the API schema expects {new_fy_start, new_fy_end, confirm}. The frontend close + undo cycle is therefore broken end-to-end, even though every underlying API is correct.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "YearEnd.jsx (close handler)",
+        "issue": "POST /year-end/close payload keys are wrong. Frontend sends {fy_start, fy_end, confirm} (spread of newFy, whose keys come from preview.suggested = {fy_start, fy_end}). Backend YearEndCloseIn requires {new_fy_start, new_fy_end, confirm} and returns 422 'Field required'. UI shows toast 'Field required Field required' and nothing happens.",
+        "selector": "[data-testid=\"btn-close-year\"]",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Year-End close from UI",
+        "issue": "Entire close+undo UI flow unusable until payload key rename. Fix: in /app/frontend/src/pages/YearEnd.jsx line 33 change `api.post('/year-end/close', { ...newFy, confirm })` to `api.post('/year-end/close', { new_fy_start: newFy.fy_start, new_fy_end: newFy.fy_end, confirm })`.",
+        "affected_selectors": ["[data-testid=\"btn-close-year\"]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_year_end.py",
+    "/app/test_reports/pytest/year_end.xml"
+  ],
+  "action_items": [
+    "Fix YearEnd.jsx payload: send {new_fy_start, new_fy_end, confirm} to /api/year-end/close.",
+    "After fix, re-run frontend cycle (close → verify FY/counts/history row → undo accept dialog → verify restored state)."
+  ],
+  "critical_code_review_comments": [
+    "YearEnd.jsx line 33 uses `{ ...newFy, confirm }` but newFy keys do not match backend contract — payload key mismatch is a classic bug that unit tests on API only won't catch. Add a Playwright or Cypress smoke test for the full close cycle to prevent regressions.",
+    "server.py `_yearend_snapshot` recomputes all party balances inside the request path (527 parties × balance query = ~1s). Acceptable for annual action but consider aggregation pipeline for scale.",
+    "Undo relies on `_id` order via closed_at descending; if two closes have identical closed_at, order is undefined. Minor."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_year_end.py"
+  ],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "render 100%, close/undo flow 0% (blocked by payload bug)"},
+  "test_credentials": "admin@galla.com / admin123",
+  "seed_data_creation": "None persistent; one test rokad was created and deleted inside the backend undo-blocked test; DB fully restored.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "After the one-line YearEnd.jsx payload fix, re-run frontend cycle test (see Playwright script in iteration 6 run). Backend suite /app/backend/tests/test_year_end.py is idempotent and leaves DB clean; safe to re-run anytime.",
+  "rca of the issue": "RCA: Frontend builds the close payload by spreading `newFy` which is populated from `preview.suggested` returning `{fy_start, fy_end}` (snapshot keys). Backend schema `YearEndCloseIn` expects `new_fy_start`/`new_fy_end`. FastAPI/Pydantic rejects with 422 'Field required'. Reproduction: login → /year-end → tick ack → type NAYA SAAL → click Naya Saal Shuru Karein → observe toast 'Field required Field required' and network 422 on POST /api/year-end/close. Mitigation: map keys explicitly in close() handler before POST."
+}
