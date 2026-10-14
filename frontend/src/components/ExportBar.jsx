@@ -23,7 +23,7 @@ export function ExportBar({ filename, sheets, title, hidePrint, className = "" }
 }
 
 /* FoxPro-style print header — same look as AA.TXT */
-export function FoxProPrintHeader({ firmName = "GALLA BAHI", title, subtitle, phones, fyText }) {
+export function FoxProPrintHeader({ firmName = "9X VYAPARI", title, subtitle, phones, fyText }) {
   const now = new Date();
   const dt = now.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
   const tm = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true });

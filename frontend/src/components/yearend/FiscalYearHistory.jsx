@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { ClosingPreviewTable } from "./ClosingPreviewTable";
-import { ArrowCounterClockwise, CaretDown, CaretUp, ClockCounterClockwise } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, CaretDown, CaretUp, ClockCounterClockwise, Printer } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
 export const FiscalYearHistory = ({ history, onChanged }) => {
@@ -50,14 +51,20 @@ export const FiscalYearHistory = ({ history, onChanged }) => {
         <div className="space-y-2">
           {years.map((y) => (
             <div key={y.id} className="border border-khaki rounded-sm" data-testid={`fy-row-${y.id}`}>
-              <button className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-parchment/60" onClick={() => toggle(y.id)}>
+              <div role="button" tabIndex={0} className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-parchment/60 cursor-pointer"
+                onClick={() => toggle(y.id)} onKeyDown={(e) => e.key === "Enter" && toggle(y.id)} data-testid={`fy-toggle-${y.id}`}>
                 <div className="font-mono-data font-medium">FY {y.fy_start} → {y.fy_end}</div>
                 <div className="text-xs text-muted2">
                   band kiya: {new Date(y.closed_at).toLocaleString("en-IN")} · bills {y.counts?.bills ?? 0} · rokad {y.counts?.rokad ?? 0} · journal {y.counts?.journal ?? 0}
                 </div>
-                <div className="ml-auto text-[11px] font-mono-data text-muted2 truncate max-w-[260px]">{y.backup_file}</div>
+                <div className="ml-auto text-[11px] font-mono-data text-muted2 truncate max-w-[220px]">{y.backup_file}</div>
+                <Link to={`/opening-balance?fy=${y.id}`} onClick={(e) => e.stopPropagation()}
+                  className="text-[11px] text-terracotta font-medium hover:underline whitespace-nowrap flex items-center gap-1"
+                  data-testid={`link-ob-${y.id}`} title="Is saal ke baad bane opening balances ka DOS print">
+                  <Printer size={12} /> Opening Print
+                </Link>
                 {openId === y.id ? <CaretUp size={14} /> : <CaretDown size={14} />}
-              </button>
+              </div>
               {openId === y.id && (
                 <div className="p-3 border-t border-khaki bg-bone">
                   {detail ? (

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api, { formatApiErrorDetail, inr } from "@/lib/api";
 import { ClosingPreviewTable } from "@/components/yearend/ClosingPreviewTable";
 import { FiscalYearHistory } from "@/components/yearend/FiscalYearHistory";
@@ -51,6 +52,9 @@ export default function YearEnd() {
         <h1 className="font-heading font-semibold text-3xl tracking-tight">Naya Saal (Carry Forward)</h1>
         <div className="text-muted2 text-sm mt-1">
           Saal band karein: sabhi party aur cash/bank ke closing balance naye saal ka opening ban jaate hain. Purane saal ki entries archive ho jaati hain.
+          {" "}<Link to="/opening-balance" className="text-terracotta font-medium hover:underline" data-testid="link-opening-balance">
+            Opening Balance Sheet print karein →
+          </Link>
         </div>
       </div>
 

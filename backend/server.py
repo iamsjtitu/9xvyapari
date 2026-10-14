@@ -986,6 +986,55 @@ async def yearend_undo(current=Depends(get_current_user)):
             "restored_counts": last.get("counts", {})}
 
 
+@api.get("/reports/opening-balances")
+async def opening_balances(fy_id: Optional[str] = None, current=Depends(get_current_user)):
+    """DOS-style Opening Balance Sheet: live openings, or the carried-forward snapshot of a closed year."""
+    s = await get_settings(current)
+    groups = sorted(await db.account_groups.find({}, {"_id": 0}).to_list(500), key=lambda g: g.get("fcode") or 0)
+    party_group = {p["id"]: p.get("group_id") for p in await db.parties.find({}, {"_id": 0, "id": 1, "group_id": 1}).to_list(20000)}
+    acc_group = {a["id"]: a.get("group_id") for a in await db.accounts.find({}, {"_id": 0, "id": 1, "group_id": 1}).to_list(5000)}
+
+    ledgers = []
+    if fy_id:
+        fy = await db.fiscal_years.find_one({"id": fy_id}, {"_id": 0})
+        if not fy:
+            raise HTTPException(404, "Fiscal year nahi mila")
+        as_on, fy_text = fy["new_fy_start"], f"{fy['new_fy_start']} to {fy['new_fy_end']}"
+        for r in fy.get("parties", []):
+            ledgers.append({"code": r.get("code") or 0, "name": r.get("name", ""), "group_id": party_group.get(r["id"]),
+                            "balance": float(r.get("new_opening") or 0), "kind": "party"})
+        for r in fy.get("accounts", []):
+            ledgers.append({"code": r.get("code") or 0, "name": r.get("name", ""), "group_id": acc_group.get(r["id"]),
+                            "balance": float(r.get("new_opening") or 0), "kind": "account"})
+    else:
+        as_on, fy_text = s.get("fy_start"), f"{s.get('fy_start')} to {s.get('fy_end')}"
+        for p in await db.parties.find({}, {"_id": 0}).to_list(20000):
+            ledgers.append({"code": p.get("code") or 0, "name": p.get("name", ""), "group_id": p.get("group_id"),
+                            "balance": float(p.get("opening_balance") or 0), "kind": "party"})
+        for a in await db.accounts.find({}, {"_id": 0}).to_list(5000):
+            ledgers.append({"code": a.get("code") or 0, "name": a.get("name", ""), "group_id": a.get("group_id"),
+                            "balance": float(a.get("opening_balance") or 0), "kind": "account"})
+
+    ledgers = [l for l in ledgers if abs(l["balance"]) >= 0.005]
+    sections = []
+    seen = set()
+    for g in groups + [{"id": None, "name": "OTHER / UNGROUPED", "nature": "", "fcode": "", "lcode": ""}]:
+        rows = sorted([l for l in ledgers if (l["group_id"] == g["id"]) or (g["id"] is None and l["group_id"] not in seen)],
+                      key=lambda x: (x["code"], x["name"]))
+        seen.add(g["id"])
+        if not rows:
+            continue
+        sections.append({"group_name": g["name"], "nature": g.get("nature", ""), "fcode": g.get("fcode"), "lcode": g.get("lcode"),
+                         "rows": rows,
+                         "dr_total": round(sum(r["balance"] for r in rows if r["balance"] > 0), 2),
+                         "cr_total": round(sum(-r["balance"] for r in rows if r["balance"] < 0), 2)})
+    grand_dr = round(sum(sec["dr_total"] for sec in sections), 2)
+    grand_cr = round(sum(sec["cr_total"] for sec in sections), 2)
+    return {"firm_name": s.get("firm_name") or "9x Vyapari", "as_on": as_on, "fy_text": fy_text, "fy_id": fy_id,
+            "sections": sections, "grand_dr": grand_dr, "grand_cr": grand_cr,
+            "difference": round(grand_dr - grand_cr, 2), "count": len(ledgers)}
+
+
 # Add cash_account_id to rokad – update field if not set by client (handled in model fallback)
 
 

@@ -17,6 +17,7 @@ import JournalEntry from "@/pages/JournalEntry";
 import Backup from "@/pages/Backup";
 import Settings from "@/pages/Settings";
 import YearEnd from "@/pages/YearEnd";
+import OpeningBalance from "@/pages/OpeningBalance";
 import Inward from "@/pages/Inward";
 import TrialBalance from "@/pages/TrialBalance";
 import ImportDBF from "@/pages/ImportDBF";
@@ -76,6 +77,7 @@ function App() {
             <Route path="backup" element={<Backup />} />
             <Route path="settings" element={<Settings />} />
             <Route path="year-end" element={<YearEnd />} />
+            <Route path="opening-balance" element={<OpeningBalance />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

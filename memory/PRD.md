@@ -39,6 +39,11 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - `POST /api/year-end/undo` (only while new year has no entries) restores everything exactly; `GET /api/year-end/history`, `GET /api/year-end/{id}` (closed-year closing balances viewer in UI). Backups now include `fiscal_years` + `archive_*`
 - Verified: backend pytest 12/12 (iteration_6), UI close→undo cycle verified by screenshot, DB left in original state
 
+### Jun 2026 – Opening Balance Sheet (DOS print)
+- Page `/opening-balance` (nav "Opening Balance", Alt+O): DOS-style monospace 2-column sheet grouped by account group (code, ledger, Dr, Cr, group totals, grand totals, difference, signature lines), A4 landscape print via FoxProPrintHeader, Excel export
+- `GET /api/reports/opening-balances?fy_id=` → live openings or a closed year's carried-forward snapshot (selector on page; "Opening Print" link per closed year on Year-End page)
+- Verified via curl (live + snapshot after close/undo) and screenshots (screen + print media)
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅
