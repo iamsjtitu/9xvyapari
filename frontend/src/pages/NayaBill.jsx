@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
-import { Plus, Trash, Receipt, X, MagnifyingGlass } from "@phosphor-icons/react";
+import { Plus, Trash, Receipt, X, MagnifyingGlass, PencilSimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import PartyAutocomplete from "@/components/PartyAutocomplete";
@@ -61,8 +61,57 @@ export default function NayaBill() {
   const [parties, setParties] = useState([]);
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState(null);
   const navigate = useNavigate();
   const [form, setForm] = useState(blank(initialType));
+
+  const billToForm = (b) => {
+    const items = (b.items || []);
+    const bags = items.reduce((s, it) => s + Number(it.bag || 0), 0);
+    const wt = items.reduce((s, it) => s + (Number(it.wb || 0) || Number(it.weight || 0)), 0);
+    const sub = items.reduce((s, it) => s + Number(it.amount || 0), 0);
+    // DOS-imported bills store amounts without rates → derive rates so auto-recalc keeps the same total
+    const rt = (rate, amt, base, pct = false) =>
+      Number(rate) || (Number(amt) && base ? (pct ? (Number(amt) * 100) / base : Number(amt) / base) : 0);
+    return {
+      ...blank(b.bill_type),
+      ...Object.fromEntries(Object.entries(b).filter(([k]) => k in blank())),
+      bill_no: b.bill_no,
+      buyer_id: b.buyer_id || "", agent_id: b.agent_id || "",
+      hamali_rt: rt(b.hamali_rt, b.hamali_amt, bags),
+      cartage_rt: rt(b.cartage_rt, b.cartage_amt, bags),
+      garrt: rt(b.garrt, b.garamt, bags),
+      bhada_rt: rt(b.bhada_rt, b.bhada_amt, wt),
+      discount_rt: rt(b.discount_rt, b.discount_amt, wt),
+      rebate_rt: rt(b.rebate_rt, b.rebate_amt, wt),
+      mandirt: rt(b.mandirt, b.mandiamt, sub, true),
+      dalali_rt: Number(b.dalali_rt) || (Number(b.dalali_amt) && sub ? (Number(b.dalali_amt) * 100) / sub : 0),
+      lines: items.length
+        ? items.map((it) => ({ ...blankLine(), ...it, bag: it.bag || "", pack: it.pack || "",
+            weight: it.weight || "", wb: it.wb || "", ghat: it.ghat || "", rate: it.rate ?? "" }))
+        : [blankLine()],
+    };
+  };
+
+  const startEdit = (b) => {
+    setForm(billToForm(b));
+    setEditId(b.id);
+    setOpen(true);
+  };
+
+  const closeForm = () => {
+    setOpen(false);
+    setEditId(null);
+    setForm(blank(filter === "purchase" ? "purchase" : "sale"));
+  };
+
+  // /bills?edit=<id> → open that bill in edit mode (used by Bill View page)
+  useEffect(() => {
+    const id = search.get("edit");
+    if (!id) return;
+    api.get(`/bills/${id}`).then((r) => startEdit(r.data)).catch(() => toast.error("Bill nahi mila"));
+    // eslint-disable-next-line
+  }, [search]);
 
   const load = async () => {
     const params = filter === "all" ? "" : `?bill_type=${filter}`;
@@ -219,9 +268,11 @@ export default function NayaBill() {
         payment_received: Number(form.payment_received || 0),
         notes: form.notes, remark1: form.remark1, remark2: form.remark2,
       };
-      const { data } = await api.post("/bills", payload);
-      toast.success(`Bill ${data.bill_no} ban gaya`);
-      setOpen(false); setForm(blank(filter === "purchase" ? "purchase" : "sale"));
+      const { data } = editId
+        ? await api.put(`/bills/${editId}`, payload)
+        : await api.post("/bills", payload);
+      toast.success(editId ? `Bill ${data.bill_no} update ho gaya` : `Bill ${data.bill_no} ban gaya`);
+      closeForm();
       load();
       navigate(`/bills/${data.id}`);
     } catch (err) {
@@ -248,11 +299,11 @@ export default function NayaBill() {
   // Keyboard shortcuts
   useKeyboardShortcuts([
     { key: "a", action: () => {
-        setForm(blank(filter === "purchase" ? "purchase" : "sale")); setOpen(true);
+        setEditId(null); setForm(blank(filter === "purchase" ? "purchase" : "sale")); setOpen(true);
       }, description: "Add new bill" },
     { ctrl: true, key: "s", action: () => open && save(),
       allowInInputs: true, description: "Save bill" },
-    { key: "Escape", action: () => setOpen(false), allowInInputs: true,
+    { key: "Escape", action: () => closeForm(), allowInInputs: true,
       description: "Close bill modal" },
     { key: "+", action: () => open && addLine(),
       description: "Add line item" },
@@ -354,7 +405,7 @@ export default function NayaBill() {
             rows: filtered,
           }]} />
           <button className="btn-primary" onClick={() => {
-            setForm(blank(filter === "purchase" ? "purchase" : "sale")); setOpen(true);
+            setEditId(null); setForm(blank(filter === "purchase" ? "purchase" : "sale")); setOpen(true);
           }} data-testid="btn-new-bill">
             <Plus size={16} weight="bold" /> Naya {filter === "purchase" ? "Purchase" : "Bill"} <span className="kbd ml-1">A</span>
           </button>
@@ -423,7 +474,10 @@ export default function NayaBill() {
                   <td className="num">{inr(tw)}</td>
                   <td className="num font-medium">₹ {inr(b.total)}</td>
                   <td className="num" style={{ color: b.balance > 0 ? "#B71C1C" : "#1B5E20" }}>₹ {inr(b.balance)}</td>
-                  <td><button className="btn-ghost p-1.5" onClick={() => del(b.id)}><Trash size={14} /></button></td>
+                  <td className="whitespace-nowrap">
+                    <button className="btn-ghost p-1.5" onClick={() => startEdit(b)} title="Edit" data-testid={`bill-edit-${b.id}`}><PencilSimple size={14} /></button>
+                    <button className="btn-ghost p-1.5" onClick={() => del(b.id)} title="Delete" data-testid={`bill-del-${b.id}`}><Trash size={14} /></button>
+                  </td>
                 </tr>
               );
             })}
@@ -433,23 +487,24 @@ export default function NayaBill() {
 
       {open && (
         <div className="fixed inset-0 bg-black/40 grid place-items-start z-50 p-4 overflow-y-auto"
-             onClick={() => setOpen(false)} data-testid="modal-bill">
+             onClick={closeForm} data-testid="modal-bill">
           <div onClick={(e) => e.stopPropagation()} className="card-flat w-full max-w-7xl my-4 p-5">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Receipt size={20} color="#8B2520" weight="bold" />
-                <div className="font-heading font-semibold text-lg">
-                  {isPurchase ? "PURCHASE ENTRY (कच्चा खरीद)" : "SALE / BILL ENTRY (नया बिल)"}
+                <div className="font-heading font-semibold text-lg" data-testid="bill-modal-title">
+                  {editId ? `EDIT BILL — ${form.bill_no || ""}` : isPurchase ? "PURCHASE ENTRY (कच्चा खरीद)" : "SALE / BILL ENTRY (नया बिल)"}
                 </div>
               </div>
-              <button className="btn-ghost p-1.5" onClick={() => setOpen(false)}><X size={16} /></button>
+              <button className="btn-ghost p-1.5" onClick={closeForm}><X size={16} /></button>
             </div>
 
             {/* Type toggle */}
             <div className="grid grid-cols-2 gap-2 mb-3">
               {["sale", "purchase"].map((t) => (
-                <button key={t} onClick={() => setForm({ ...form, bill_type: t })}
-                  className={`py-2 rounded-sm border font-heading font-medium text-xs uppercase tracking-wider ${
+                <button key={t} onClick={() => !editId && setForm({ ...form, bill_type: t })} disabled={!!editId}
+                  title={editId ? "Edit me bill type nahi badal sakte" : ""}
+                  className={`py-2 rounded-sm border font-heading font-medium text-xs uppercase tracking-wider disabled:cursor-not-allowed ${
                     form.bill_type === t
                       ? t === "sale" ? "bg-jama-bg border-jama text-jama" : "bg-kharch-bg border-terracotta text-terracotta"
                       : "bg-white border-khaki text-muted2"
@@ -786,9 +841,9 @@ export default function NayaBill() {
                 <span><span className="kbd">E</span>xit</span>
               </div>
               <div className="flex gap-2">
-                <button className="btn-outline" onClick={() => setOpen(false)}>Cancel (Esc)</button>
+                <button className="btn-outline" onClick={closeForm}>Cancel (Esc)</button>
                 <button className="btn-primary" onClick={save} data-testid="btn-save-bill">
-                  Save Bill (Ctrl+S)
+                  {editId ? "Update Bill (Ctrl+S)" : "Save Bill (Ctrl+S)"}
                 </button>
               </div>
             </div>

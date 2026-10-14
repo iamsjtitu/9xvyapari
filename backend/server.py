@@ -473,6 +473,29 @@ async def get_bill(bid: str, current=Depends(get_current_user)):
         raise HTTPException(404, "Bill not found")
     return b
 
+async def _sync_bill_payment_rokad(doc: dict):
+    """Keep the auto 'payment against bill' rokad entry in sync with the bill (create/replace/remove)."""
+    await db.rokad.delete_many({"ref_bill_id": doc["id"]})
+    paid = float(doc.get("payment_received") or 0)
+    if paid <= 0:
+        return
+    cash = await _default_cash_account()
+    await db.rokad.insert_one({
+        "id": str(uuid.uuid4()),
+        "date": doc["date"],
+        "type": "jama" if doc["bill_type"] == "sale" else "kharch",
+        "amount": paid,
+        "party_id": doc["party_id"],
+        "party_name": doc["party_name"],
+        "description": f"Bill {doc['bill_no']} ke against payment",
+        "ref_bill_id": doc["id"],
+        "mode": "Cash",
+        "cash_account_id": cash["id"] if cash else None,
+        "cash_account_name": cash["name"] if cash else "",
+        "created_at": now_iso(),
+    })
+
+
 @api.post("/bills")
 async def create_bill(body: BillIn, current=Depends(get_current_user)):
     doc = body.model_dump()
@@ -481,22 +504,25 @@ async def create_bill(body: BillIn, current=Depends(get_current_user)):
     doc["balance"] = round(body.total - body.payment_received, 2)
     doc["created_at"] = now_iso()
     await db.bills.insert_one(doc.copy())
-    # auto rokad entry for payment received/paid
-    if body.payment_received and body.payment_received > 0:
-        rokad = {
-            "id": str(uuid.uuid4()),
-            "date": body.date,
-            "type": "jama" if body.bill_type == "sale" else "kharch",
-            "amount": body.payment_received,
-            "party_id": body.party_id,
-            "party_name": body.party_name,
-            "description": f"Bill {doc['bill_no']} ke against payment",
-            "ref_bill_id": doc["id"],
-            "mode": "Cash",
-            "created_at": now_iso(),
-        }
-        await db.rokad.insert_one(rokad.copy())
+    await _sync_bill_payment_rokad(doc)
     doc.pop("_id", None)
+    return doc
+
+
+@api.put("/bills/{bid}")
+async def update_bill(bid: str, body: BillIn, current=Depends(get_current_user)):
+    existing = await db.bills.find_one({"id": bid}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Bill nahi mila")
+    doc = body.model_dump()
+    doc["id"] = bid
+    doc["bill_no"] = existing["bill_no"]  # number never changes on edit
+    doc["bill_type"] = existing["bill_type"]
+    doc["balance"] = round(body.total - body.payment_received, 2)
+    doc["created_at"] = existing.get("created_at")
+    doc["updated_at"] = now_iso()
+    await db.bills.update_one({"id": bid}, {"$set": doc})
+    await _sync_bill_payment_rokad(doc)
     return doc
 
 @api.delete("/bills/{bid}")

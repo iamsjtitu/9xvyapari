@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import api, { inr } from "@/lib/api";
-import { ArrowLeft, Storefront } from "@phosphor-icons/react";
+import { ArrowLeft, Storefront, PencilSimple } from "@phosphor-icons/react";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 
 export default function BillView() {
@@ -17,7 +17,12 @@ export default function BillView() {
   return (
     <div className="space-y-4" data-testid="page-bill-view">
       <div className="flex items-center justify-between print:hidden">
-        <Link to="/bills" className="btn-ghost"><ArrowLeft size={14} /> Wapas</Link>
+        <div className="flex items-center gap-2">
+          <Link to="/bills" className="btn-ghost"><ArrowLeft size={14} /> Wapas</Link>
+          <Link to={`/bills?type=${bill.bill_type}&edit=${bill.id}`} className="btn-outline" data-testid="btn-edit-bill">
+            <PencilSimple size={14} /> Edit Bill
+          </Link>
+        </div>
         <ExportBar filename={`bill-${bill.bill_no}`} sheets={[{
           name: `Bill ${bill.bill_no}`,
           columns: [
