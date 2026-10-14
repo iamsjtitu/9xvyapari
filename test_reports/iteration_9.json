@@ -1,0 +1,26 @@
+{
+  "summary": "Tested Journal Entry Edit feature (PUT /api/journal/{id}) end-to-end. Backend: 5/5 pytest cases pass (404 on missing id, 400 on zero amount, 400 on unbalanced debit/credit with DB unchanged, 200 on valid edit with voucher_no unchanged + updated_at present, and revert flow). Frontend: Journal page shows single entry J00001 with edit/delete buttons; clicking edit opens modal titled 'Journal Edit — J00001' with 'Update Journal' save button; narration/date/ref/lines prefilled. Changing narration to 'EDIT TEST' saves, toast 'Journal J00001 update ho gaya' appears, modal closes, table reflects new narration. Validation (unbalanced debit) prevents save on backend (verified via pytest). Escape closes modal. 'Nayi Journal' opens clean form titled 'Nayi Journal Entry' with 'Save Journal' button and empty fields. Cancel closes modal. Regression nav to Dashboard, /rokad, /bills, /parties works. Final DB state preserved: 1 journal entry, original (empty) narration, voucher_no J00001, total 100.00; parties count 527.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "JournalEntry modal", "issues": ["Narration/Date/Reference inputs lack data-testid attributes (date-input, ref-input, narration-input) and <label> elements lack htmlFor binding, making automated testing require placeholder-based selectors. Consider adding data-testid=\"journal-narration\", \"journal-date\", \"journal-ref\" for robust testability."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_journal_edit.py", "/app/test_reports/pytest/journal_edit.xml"],
+  "action_items": [
+    "(Optional) Add data-testid to narration/date/ref inputs in JournalEntry.jsx modal for easier future test automation."
+  ],
+  "critical_code_review_comments": [
+    "PUT /journal/{jid} correctly validates double-entry, preserves voucher_no (not overwritten because update only $set's doc from body which doesn't contain voucher_no), recomputes total and sets updated_at. Looks correct.",
+    "Narration/date/ref inputs in JournalEntry.jsx (lines 196-205, 271) lack data-testid; labels aren't bound via htmlFor making get_by_label unreliable."
+  ],
+  "updated_files": ["/app/backend/tests/test_journal_edit.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin / admin123",
+  "seed_data_creation": "None - used existing seed entry; restored narration to original empty value after tests.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Journal edit feature verified. 1 journal entry (id 0ad411d5-f6dd-410c-8d25-1c14eb2936ac, voucher J00001, narration='', total 100.00) exists in DB. 527 parties. Backend tests at /app/backend/tests/test_journal_edit.py."
+}

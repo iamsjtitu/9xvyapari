@@ -30,9 +30,15 @@ Software kholte hi ek chhoti window aati hai: **"Data Folder chunein"** — pich
 
 > **Zaroori:** Agar "Save to GitHub" ke baad Actions tab me workflow nahi dikhe, to GitHub par repo kholo → **Add file → Create new file** → naam `.github/workflows/build-desktop.yml` → is repo ki file ka content paste karke commit karo. (Kuch GitHub tokens workflow files push nahi kar paate.)
 
-### Auto-update ke liye repo setting
-- **Public repo** → kuch nahi karna, auto-update seedha chalega.
-- **Private repo** → GitHub par: Settings → Developer settings → Fine-grained token banao (sirf is repo par, *Contents: Read-only*). Phir repo → Settings → Secrets and variables → Actions → New secret → naam `UPDATE_TOKEN`, value = token. Agle build se private auto-update kaam karega.
+### ⚠️ Auto-update ke liye repo setting (ZAROORI)
+Aapka repo **private** hai to installed app me "Update check nahi ho paya (404)" aayega. Koi **ek** karo:
+- **Option A – Repo Public karo:** GitHub → repo → Settings → Danger Zone → Change visibility → Public. (Note: `backend/.env` jaisi files bhi dikhengi — preview JWT secret badal lena.)
+- **Option B – Private rakho + token do:**
+  1. GitHub → (apni profile) Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token
+  2. Repository access: *Only select repositories* → sirf yeh repo; Permissions → Repository permissions → **Contents: Read-only**; expiry lamba rakho (1 saal)
+  3. Token copy karo → repo → Settings → **Secrets and variables → Actions → New repository secret** → Name `UPDATE_TOKEN`, Value = token
+  4. "Save to GitHub" se naya build chalao → Releases se **naya Setup install karo** (token build me embed hota hai) → ab se updates khud aayenge
+- Build log me warning dikhegi agar repo private hai aur `UPDATE_TOKEN` nahi hai.
 
 ---
 

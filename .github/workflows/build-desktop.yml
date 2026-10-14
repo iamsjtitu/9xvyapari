@@ -78,11 +78,15 @@ jobs:
           UPDATE_TOKEN: ${{ secrets.UPDATE_TOKEN }}
         run: |
           @{
-            owner   = "${{ github.repository_owner }}"
-            repo    = "${{ github.event.repository.name }}"
-            private = [bool]$env:UPDATE_TOKEN
-            token   = "$env:UPDATE_TOKEN"
+            owner       = "${{ github.repository_owner }}"
+            repo        = "${{ github.event.repository.name }}"
+            repoPrivate = [System.Convert]::ToBoolean("${{ github.event.repository.private }}")
+            private     = [bool]$env:UPDATE_TOKEN
+            token       = "$env:UPDATE_TOKEN"
           } | ConvertTo-Json | Set-Content -Encoding utf8 update-config.json
+          if ("${{ github.event.repository.private }}" -eq "true" -and -not $env:UPDATE_TOKEN) {
+            Write-Host "::warning title=Auto-update::Repo PRIVATE hai aur UPDATE_TOKEN secret set nahi hai - installed app me auto-update 404 dega. Repo public karo ya UPDATE_TOKEN (fine-grained PAT, Contents: read-only) secret add karo. Dekhein electron/README.md"
+          }
 
       - name: Set version 1.0.${{ github.run_number }}
         working-directory: electron

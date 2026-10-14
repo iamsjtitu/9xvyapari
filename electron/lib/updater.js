@@ -3,6 +3,7 @@ const { app, dialog, shell, net } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const log = require("electron-log");
+const { friendlyUpdateError, resolveFeed } = require("./update-messages");
 
 function readUpdateConfig() {
   try {
@@ -10,6 +11,13 @@ function readUpdateConfig() {
   } catch {
     return {};
   }
+}
+
+function showUpdateProblem(getWin, err, cfg) {
+  dialog.showMessageBox(getWin(), {
+    type: "warning", title: "Update", message: "Update check nahi ho paya",
+    detail: friendlyUpdateError(err, cfg),
+  });
 }
 
 // Portable / zip builds can't self-install: just check GitHub for a newer release and open the page
@@ -41,7 +49,7 @@ function setupPortableCheck(getWin, cfg) {
       }
     } catch (err) {
       log.warn("portable update check failed", err?.message);
-      if (manual) dialog.showMessageBox(getWin(), { type: "warning", title: "Update", message: "Update check nahi ho paya", detail: "Internet connection check karein.\n" + String(err?.message || err) });
+      if (manual) showUpdateProblem(getWin, err, cfg);
     }
   };
   setTimeout(() => check(false), 8000);
@@ -55,9 +63,13 @@ function setupAutoUpdate(getWin, { portable } = {}) {
   autoUpdater.logger = log;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
-  if (cfg.private && cfg.token && cfg.owner && cfg.repo) {
-    autoUpdater.setFeedURL({ provider: "github", owner: cfg.owner, repo: cfg.repo, private: true, token: cfg.token });
+  // Private repo: a read-only token baked in at build time (UPDATE_TOKEN secret) unlocks the GitHub API feed
+  const { mode, feed } = resolveFeed(cfg);
+  if (feed) {
+    autoUpdater.setFeedURL(feed);
     log.info("Auto-update: private GitHub feed configured");
+  } else if (mode === "private-missing-token") {
+    log.warn("Auto-update: repo is private but no UPDATE_TOKEN was provided at build time");
   }
 
   let manual = false;
@@ -87,12 +99,7 @@ function setupAutoUpdate(getWin, { portable } = {}) {
 
   autoUpdater.on("error", (err) => {
     log.warn("autoUpdater error", err?.message);
-    if (manual) {
-      dialog.showMessageBox(getWin(), {
-        type: "warning", title: "Update", message: "Update check nahi ho paya",
-        detail: "Internet connection check karein.\n" + String(err?.message || err),
-      });
-    }
+    if (manual) showUpdateProblem(getWin, err, cfg);
     manual = false;
   });
 
