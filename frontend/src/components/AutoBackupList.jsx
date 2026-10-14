@@ -7,6 +7,7 @@ const fmtSize = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math
 
 export const AutoBackupList = () => {
   const [info, setInfo] = useState({ folder: "", files: [] });
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -14,6 +15,7 @@ export const AutoBackupList = () => {
       const { data } = await api.get("/backup/files");
       setInfo(data);
     } catch {}
+    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -61,7 +63,9 @@ export const AutoBackupList = () => {
         </button>
       </div>
 
-      {info.files.length === 0 ? (
+      {loading ? (
+        <div className="text-sm text-muted2 py-4 text-center" data-testid="backups-loading">Loading...</div>
+      ) : info.files.length === 0 ? (
         <div className="text-sm text-muted2 py-4 text-center" data-testid="no-backups">Abhi koi auto backup nahi hai.</div>
       ) : (
         <div className="overflow-auto max-h-72 border border-khaki rounded-sm">

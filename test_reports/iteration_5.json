@@ -1,0 +1,45 @@
+{
+  "summary": "v1.4 single-user auth + change-password + auto-backup on logout + widened purchase bill grid – all backend (9/9) and frontend flows verified end-to-end on preview URL. Admin password restored to admin123 before finishing. Previous suites (51 tests in backend_test.py) still green.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/change-password", "issue": "No rate-limiting / brute-force lockout on current_password – an attacker with a valid access token can brute force the old password. Minor since token is already a bearer. Carry-over: still no lockout on /api/auth/login either."},
+      {"endpoint": "/api/backup/auto", "issue": "Writes full JSON synchronously inside the request path – for the 527-party dataset the response was fast (<1s) but as dataset grows this will block the event loop. Consider streaming or offloading to a background task."},
+      {"endpoint": "/api/backup/restore-file", "issue": "Does _restore_all which delete_many({}) + insert_many for every collection with no transaction – a partial failure mid-restore leaves the DB in an inconsistent state. Users collection excluded (good), but no backup of pre-restore state."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Sidebar header", "issues": ["Firm name slot shows persisted settings.firm_name ('Galla Bahi' from an earlier test save) instead of the new default '9x Vyapari'. The data-testid app-version-badge below correctly reads '9x Vyapari · Hisab Kitab'. If the intent is to visually re-brand everywhere, the main agent may want to reseed settings.firm_name to '9x Vyapari' on fresh installs or expose a reset-to-default button."}, 
+      {"screen": "AutoBackupList", "issues": ["On first paint (~1-2s before /api/backup/files resolves) the 'Folder:' label is empty and the 'Abhi koi auto backup nahi hai' row flashes – a Skeleton or 'Loading...' row would improve perceived performance."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_v14_features.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_v14.xml"
+  ],
+  "action_items": [
+    "Optional: show a loading state in AutoBackupList while /api/backup/files is in flight (small UX polish).",
+    "Optional: on fresh install, seed settings.firm_name='9x Vyapari' so the sidebar header matches the new branding (currently old 'Galla Bahi' is still in Mongo settings from prior saves).",
+    "Carry-over: brute-force lockout on /api/auth/login (and /auth/change-password)."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now ~1600 lines – strongly recommend splitting into routers (auth, parties, items, bills, rokad, inward, accounts, journal, reports, backup, settings, import_dbf, gst_returns). Growing monolith makes future diffs painful.",
+    "ChangePasswordCard client-side validation (nw.length<4, nw===confirm) duplicates server-side rules. Fine, but keep in sync when backend min_length changes.",
+    "Layout.handleLogout fires POST /backup/auto, then logout, then navigate – if backup fails it still logs out (good) but the toast error can be missed because navigation to /login happens immediately. Consider awaiting the toast or delaying navigate(0.5s) so user sees the failure.",
+    "AutoBackupList.restoreFile uses window.confirm (native) rather than a shadcn AlertDialog – inconsistent with the rest of the app's styling and not themeable."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_v14_features.py (NEW – 9 tests covering register-removed, change-password full flow, auto-backup contents+sort, restore path traversal, dashboard+settings regression)"
+  ],
+  "success_rate": {"backend": "100% (9/9 new + 51/51 existing)", "frontend": "100% on all v1.4 flows (login w/o register, change-password happy+2 negative paths, logout w/ auto-backup, backup list+manual+restore, grid widths & amount calc)"},
+  "test_credentials": "admin@galla.com / admin123 (restored after testing — verified via final login test)",
+  "seed_data_creation": "Created several backup files in /app/backend/backups via /api/backup/auto (manual + logout reasons) during testing. These are kept by the BACKUP_KEEP=30 policy. No new parties/bills were created – backup/restore flow re-wrote existing 527 parties identically.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "v1.4 features (register removed, change-password, auto-backup on logout, widened bill grid) fully verified on preview URL. Run: `REACT_APP_BACKEND_URL=https://khata-book-18.preview.emergentagent.com python -m pytest backend/tests/test_v14_features.py -v` (9 tests, ~10s). The admin password is restored to admin123 at suite end (test_zz_admin123_restored). Backup folder is /app/backend/backups. Sidebar top-left firm label reads persisted settings.firm_name (currently 'Galla Bahi') – data-testid app-version-badge below is '9x Vyapari · Hisab Kitab'. Items grid widths measured: line-bag-0=76px, line-weight-0=96px, line-rate-0=96px (all >=70 as required). Amount for bag=1000, weight=500.25, rate=2250 shows ₹ 11,25,562.50 correctly.",
+  "rca of the issue": "No bugs found this iteration. One timing nit in AutoBackupList (empty state flashes before fetch) and one data drift (settings.firm_name='Galla Bahi' persisted from older tests) – both documented as design/UX notes, not bugs."
+}
