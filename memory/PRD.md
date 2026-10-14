@@ -44,6 +44,11 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - `GET /api/reports/opening-balances?fy_id=` → live openings or a closed year's carried-forward snapshot (selector on page; "Opening Print" link per closed year on Year-End page)
 - Verified via curl (live + snapshot after close/undo) and screenshots (screen + print media)
 
+### Jun 2026 – Rokad fixes + Electron print preview
+- Electron: Print/PDF buttons & Ctrl+P open a **PDF print-preview window** (`webContents.printToPDF` → Chromium PDF viewer with print/download), `lib/printing.js`; renderer `triggerPrint()` routes to `window.vyapari.printPreview` when desktop. Toasts hidden in print CSS.
+- Rokad "All" view shows per-account Opening/Jama/Kharch/Closing table + TOTAL (click row → filter). Entries without cash account default to CASH IN HAND (code 301) on create/update; startup backfill links old unlinked entries; form preselects default cash.
+- Rokad **edit** (`PUT /api/rokad/{id}`, pencil button → same modal in edit mode). Tested: iteration_7 (9/9 backend, full UI flow).
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅

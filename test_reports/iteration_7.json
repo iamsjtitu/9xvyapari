@@ -1,0 +1,26 @@
+{
+  "summary": "Tested Rokad Panna v15 features end-to-end: (1) ALL-view per-account summary card with Opening/Jama/Kharch/Closing + TOTAL row; (2) default CASH IN HAND (code 301) auto-link on POST /api/rokad with empty cash_account_id; (3) Startup backfill left zero unlinked entries; (4) PUT /api/rokad/{id} edit flow with 404 on nonexistent; (5) Frontend edit modal (title 'Rokad Entry Edit', 'Update Entry' button, prefilled fields); (6) Clean 'Nayi Rokad Entry' form after editing with cash account still preselected. 9/9 backend pytest cases pass. Full Playwright flow passes (login \u2192 /rokad \u2192 create 9,08,400 jama (auto-linked to 301) \u2192 filter to 301 shows entry \u2192 edit to 5000/edited \u2192 reopen clean form \u2192 delete). DB restored to original 17 rokad entries.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_rokad_v15.py",
+    "/app/test_reports/pytest/rokad_v15.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "RokadPanna.jsx is 707 lines \u2014 close to the 700-line threshold; consider extracting the modal form, allAccountsSummary card and bankSummary memo into separate components for maintainability.",
+    "Default-cash preselect effect (line 128) depends on `defaultCash` but the dependency array includes only [showAdd, accounts, bankFilter, defaultCash]; `form.cash_account_id` is read as early-return but not in deps. Current behaviour is correct but ESLint rule is intentionally disabled \u2014 add an inline comment explaining why.",
+    "PUT /api/rokad/{rid} re-applies default cash account fallback (good) and sets updated_at, but does NOT preserve the original created_at vs. the response (uses `{**existing, **doc}` so created_at is retained from existing \u2014 OK). Consider also persisting any voucher_no uniqueness checks \u2014 currently none.",
+    "The frontend accounts list is rebuilt from parties under group 'CASH & BANK BALANCE' + legacy accounts collection every mount; consider memoising / server-side `/cash-accounts` endpoint (already exists per line 615) for consistency."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_rokad_v15.py"
+  ],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% (full flow passed)"},
+  "test_credentials": "admin / admin123",
+  "seed_data_creation": "Transient: one 9,08,400 jama entry created, edited to 5,000, then deleted. DB left with exactly 17 rokad entries (verified).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Rokad v15 (default cash link, PUT edit, backfill, all-accounts summary) is fully working. /app/backend/tests/test_rokad_v15.py is idempotent and safe to re-run. Admin creds unchanged.",
+  "rca of the issue": "No bugs found in the three reported fixes. All three Rokad Panna changes verified working via UI + API."
+}
