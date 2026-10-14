@@ -11,7 +11,7 @@ const LOGIN_BG =
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("admin@galla.com");
+  const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -20,7 +20,7 @@ export default function Login() {
     e.preventDefault();
     setBusy(true);
     try {
-      await login(email, password);
+      await login(username.trim(), password);
       toast.success("Swagat hai!");
       navigate("/", { replace: true });
     } catch (err) {
@@ -86,15 +86,17 @@ export default function Login() {
 
           <form onSubmit={submit} className="space-y-4">
             <div>
-              <label className="lbl">Email</label>
+              <label className="lbl">Username</label>
               <input
-                type="email"
+                type="text"
                 required
+                autoComplete="username"
+                autoCapitalize="none"
                 className="input-dense"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="aap@example.com"
-                data-testid="input-email"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="admin"
+                data-testid="input-username"
               />
             </div>
             <div>
@@ -130,7 +132,7 @@ export default function Login() {
           </form>
 
           <div className="mt-8 text-[11px] text-muted2/70 text-center font-mono-data">
-            Single-user software · Password badalne ke liye Settings me jayein
+            Single-user software · Username/Password badalne ke liye Settings me jayein
           </div>
         </div>
       </div>

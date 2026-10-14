@@ -4,6 +4,7 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 import os
+import re
 import logging
 import uuid
 import bcrypt
@@ -35,8 +36,8 @@ def hash_password(password: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
-def create_access_token(user_id: str, email: str) -> str:
-    payload = {"sub": user_id, "email": email,
+def create_access_token(user_id: str, username: str) -> str:
+    payload = {"sub": user_id, "username": username,
                "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_MIN),
                "type": "access"}
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
@@ -86,10 +87,11 @@ class UserOut(BaseModel):
 
 class ChangePasswordIn(BaseModel):
     current_password: str
-    new_password: str = Field(min_length=4, max_length=128)
+    new_password: Optional[str] = Field(default=None, min_length=4, max_length=128)
+    new_username: Optional[str] = Field(default=None, min_length=3, max_length=32)
 
 class LoginIn(BaseModel):
-    email: EmailStr
+    username: str = Field(min_length=1, max_length=64)
     password: str
 
 class PartyIn(BaseModel):
@@ -285,31 +287,58 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
-# ---------- AUTH (single-user: no public registration) ----------
+# ---------- AUTH (single-user, username based, no public registration) ----------
+USERNAME_RE = re.compile(r"^[a-z0-9._-]{3,32}$")
+
+
+def _norm_username(u: str) -> str:
+    return (u or "").strip().lower()
+
+
+def _user_out(user: dict, access: Optional[str] = None) -> dict:
+    out = {"id": user["id"], "username": user.get("username") or "", "name": user.get("name", ""),
+           "role": user.get("role", "user")}
+    if access:
+        out["access_token"] = access
+    return out
+
+
 @api.post("/auth/change-password")
 async def change_password(body: ChangePasswordIn, current=Depends(get_current_user)):
+    """Change password and/or username (current password required)."""
     user = await db.users.find_one({"id": current["id"]})
     if not user or not verify_password(body.current_password, user["password_hash"]):
         raise HTTPException(status_code=400, detail="Purana password galat hai")
-    if body.current_password == body.new_password:
-        raise HTTPException(status_code=400, detail="Naya password purane se alag hona chahiye")
-    await db.users.update_one(
-        {"id": current["id"]},
-        {"$set": {"password_hash": hash_password(body.new_password), "password_changed_at": now_iso()}},
-    )
-    return {"ok": True}
+    if not body.new_password and not body.new_username:
+        raise HTTPException(status_code=400, detail="Naya password ya naya username dein")
+    updates = {}
+    if body.new_password:
+        if body.current_password == body.new_password:
+            raise HTTPException(status_code=400, detail="Naya password purane se alag hona chahiye")
+        updates["password_hash"] = hash_password(body.new_password)
+        updates["password_changed_at"] = now_iso()
+    if body.new_username:
+        uname = _norm_username(body.new_username)
+        if not USERNAME_RE.match(uname):
+            raise HTTPException(status_code=400, detail="Username 3-32 chars: sirf a-z, 0-9, . _ - allowed")
+        clash = await db.users.find_one({"username": uname, "id": {"$ne": user["id"]}})
+        if clash:
+            raise HTTPException(status_code=400, detail="Yeh username pehle se hai")
+        updates["username"] = uname
+    await db.users.update_one({"id": current["id"]}, {"$set": updates})
+    return {"ok": True, "username": updates.get("username") or user.get("username")}
+
 
 @api.post("/auth/login")
 async def login(body: LoginIn, response: Response):
-    email = body.email.lower().strip()
-    user = await db.users.find_one({"email": email})
+    uname = _norm_username(body.username)
+    user = await db.users.find_one({"username": uname})
     if not user or not verify_password(body.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    access = create_access_token(user["id"], email)
+        raise HTTPException(status_code=401, detail="Username ya password galat hai")
+    access = create_access_token(user["id"], uname)
     refresh = create_refresh_token(user["id"])
     set_auth_cookies(response, access, refresh)
-    return {"id": user["id"], "email": user["email"], "name": user["name"],
-            "role": user.get("role", "user"), "access_token": access}
+    return _user_out(user, access)
 
 @api.post("/auth/logout")
 async def logout(response: Response):
@@ -319,8 +348,7 @@ async def logout(response: Response):
 
 @api.get("/auth/me")
 async def me(current=Depends(get_current_user)):
-    return {"id": current["id"], "email": current["email"],
-            "name": current["name"], "role": current.get("role", "user")}
+    return _user_out(current)
 
 
 # ---------- PARTIES ----------
@@ -931,7 +959,7 @@ async def yearend_close(body: YearEndCloseIn, current=Depends(get_current_user))
         "fy_start": body.new_fy_start, "fy_end": body.new_fy_end, "current_date": body.new_fy_start}})
 
     doc = {"id": fy_id, "fy_start": s.get("fy_start"), "fy_end": s.get("fy_end"),
-           "closed_at": now_iso(), "closed_by": current.get("email"), "backup_file": backup["name"],
+           "closed_at": now_iso(), "closed_by": current.get("username"), "backup_file": backup["name"],
            "new_fy_start": body.new_fy_start, "new_fy_end": body.new_fy_end,
            "prev_current_date": s.get("current_date"), "counts": counts,
            "parties": parties, "accounts": accounts}
@@ -1984,7 +2012,7 @@ if FRONTEND_DIST and Path(FRONTEND_DIST).is_dir():
 @app.on_event("startup")
 async def on_start():
     # indexes
-    await db.users.create_index("email", unique=True)
+    await db.users.create_index("username", unique=True, sparse=True)
     await db.users.create_index("id", unique=True)
     await db.parties.create_index("id", unique=True)
     await db.items.create_index("id", unique=True)
@@ -1998,19 +2026,25 @@ async def on_start():
     await db.dos_journal.create_index("id", unique=True)
 
     # Seed admin only once – never overwrite a password the user changed in-app
-    admin_email = os.environ.get("ADMIN_EMAIL", "admin@galla.com").lower()
+    admin_username = _norm_username(os.environ.get("ADMIN_USERNAME", "admin"))
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
-    existing = await db.users.find_one({"email": admin_email})
+    legacy_email = os.environ.get("ADMIN_EMAIL", "admin@galla.com").lower()
+    existing = await db.users.find_one({"username": admin_username})
     if not existing:
-        await db.users.insert_one({
-            "id": str(uuid.uuid4()),
-            "email": admin_email,
-            "name": "Admin",
-            "password_hash": hash_password(admin_password),
-            "role": "admin",
-            "created_at": now_iso(),
-        })
-        logger.info(f"Seeded admin: {admin_email}")
+        legacy = await db.users.find_one({"email": legacy_email, "username": {"$exists": False}})
+        if legacy:  # migrate old email-based admin to username login
+            await db.users.update_one({"id": legacy["id"]}, {"$set": {"username": admin_username}})
+            logger.info(f"Migrated admin {legacy_email} -> username '{admin_username}'")
+        else:
+            await db.users.insert_one({
+                "id": str(uuid.uuid4()),
+                "username": admin_username,
+                "name": "Admin",
+                "password_hash": hash_password(admin_password),
+                "role": "admin",
+                "created_at": now_iso(),
+            })
+            logger.info(f"Seeded admin: {admin_username}")
 
     # Seed sample galla items if empty
     if await db.items.count_documents({}) == 0:

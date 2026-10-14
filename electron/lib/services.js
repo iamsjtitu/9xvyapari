@@ -65,7 +65,7 @@ function loadConfig(userData) {
   try { cfg = JSON.parse(fs.readFileSync(file, "utf8")); } catch { cfg = {}; }
   const next = {
     jwt_secret: cfg.jwt_secret || crypto.randomBytes(32).toString("hex"),
-    admin_email: cfg.admin_email || "admin@galla.com",
+    admin_username: cfg.admin_username || "admin",
     admin_password: cfg.admin_password || "admin123",
     db_name: cfg.db_name || "vyapari",
   };
@@ -120,7 +120,7 @@ async function startServices({ dataRoot, resourcesPath, isPackaged, onStatus }) 
     MONGO_URL: `mongodb://127.0.0.1:${mongoPort}`,
     DB_NAME: cfg.db_name,
     JWT_SECRET: cfg.jwt_secret,
-    ADMIN_EMAIL: cfg.admin_email,
+    ADMIN_USERNAME: cfg.admin_username,
     ADMIN_PASSWORD: cfg.admin_password,
     PORT: String(apiPort),
     HOST: "127.0.0.1",

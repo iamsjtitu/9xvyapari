@@ -39,7 +39,7 @@ Software kholte hi ek chhoti window aati hai: **"Data Folder chunein"** — pich
 ## 2. Install & pehla login
 
 - Installer / portable chalao → "Windows protected your PC" aaye to **More info → Run anyway** (app signed nahi hai, yeh normal hai).
-- Data Folder window me **Shuru Karein** → app khulega → Login: `admin@galla.com` / `admin123`
+- Data Folder window me **Shuru Karein** → app khulega → Login: username `admin` / password `admin123`
 - Single-user software hai (register option nahi). Password badalne ke liye: **Settings → Login Password Badlein**.
 - Pehli start par Database + Hisab engine start hone me 10–20 sec lag sakte hain (splash screen dikhega).
 

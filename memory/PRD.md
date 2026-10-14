@@ -10,7 +10,7 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - Backend: FastAPI + Motor MongoDB (`/app/backend/server.py`)
 - DBF parsing: `dbfread`
 - Exports: PDF/Print (CSS), XLSX (`xlsx`), Word (`docx`)
-- Auth: JWT + bcrypt (admin@galla.com / admin123 — see `/app/memory/test_credentials.md`). No registration.
+- Auth: JWT + bcrypt, **username-based** (admin / admin123 — see `/app/memory/test_credentials.md`). No email, no registration. Username + password changeable in Settings. Startup migrates legacy email admin → username `admin` (env `ADMIN_USERNAME`).
 - **Desktop: Electron 33 + electron-builder 25 + electron-updater** (`/app/electron`), backend via **PyInstaller** (`backend/desktop.spec`, entry `backend/desktop_main.py`), **MongoDB 4.4.29** mongod.exe bundled (no-AVX CPUs supported)
 - CI: `.github/workflows/build-desktop.yml` — Windows build on every push → GitHub Release (`1.0.<run_number>`)
 

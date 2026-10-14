@@ -168,8 +168,8 @@ export default function Layout() {
               <div className="text-[12px] text-white truncate" data-testid="user-name">
                 {user?.name || "User"}
               </div>
-              <div className="text-[10px] text-white/50 truncate">
-                {user?.email}
+              <div className="text-[10px] text-white/50 truncate" data-testid="user-username">
+                @{user?.username}
               </div>
             </div>
             <button
