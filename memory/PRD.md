@@ -52,6 +52,10 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 ### Jun 2026 – Bill Edit
 - Pencil button on every bill row + "Edit Bill" on bill view (`/bills?type=..&edit=<id>`) open the NayaBill modal in edit mode (title "EDIT BILL — <no>", type toggle locked, "Update Bill"). `PUT /api/bills/{id}` keeps bill_no/type, recomputes balance, `updated_at`, re-syncs auto payment rokad (`_sync_bill_payment_rokad`, linked to CASH IN HAND). DOS-imported bills: rates derived from stored amounts so totals don't drift on edit. Tested iteration_8 (6/6 backend + UI flow).
 
+### Jun 2026 – Journal Edit + Auto-update fix
+- Journal: pencil edit → same modal ("Journal Edit — J0000x", "Update Journal"); `PUT /api/journal/{id}` validates double entry, keeps voucher_no (iteration_9 passed).
+- Auto-update: user's repo `iamsjtitu/9xvyapari` is PRIVATE → releases.atom 404. `lib/update-messages.js` (pure) gives Hinglish guidance (make public OR `UPDATE_TOKEN` fine-grained PAT secret), token used whenever present; CI writes `repoPrivate` + ::warning. README updated. (iteration_10 passed). **User must either make repo public or add UPDATE_TOKEN secret, then rebuild + install new Setup.**
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅
