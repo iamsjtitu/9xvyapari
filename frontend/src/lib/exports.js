@@ -41,16 +41,27 @@ function detectOrientation() {
   if (path.includes("/rokad") || path.includes("/gst-returns") ||
       path.includes("/trial-balance") || path.includes("/reports") ||
       path.includes("/bills") || path.includes("/parties") ||
-      path.includes("/inward") || path.includes("/journal")) {
+      path.includes("/inward") || path.includes("/journal") ||
+      path.includes("/opening-balance")) {
     return "landscape";
   }
   return "portrait";
 }
 
 export function triggerPrint() {
-  injectPageRule(detectOrientation());
+  const orientation = detectOrientation();
+  injectPageRule(orientation);
+  // Desktop app: Electron has no print preview → open our PDF preview window instead
+  if (window.vyapari?.printPreview) {
+    setTimeout(() => window.vyapari.printPreview({ landscape: orientation === "landscape", title: document.title }), 30);
+    return;
+  }
   // give browser time to apply the new stylesheet
   setTimeout(() => window.print(), 30);
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("vyapari:print", () => triggerPrint());
 }
 
 export function exportPDF() {

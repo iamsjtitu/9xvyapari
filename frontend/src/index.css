@@ -389,6 +389,7 @@ label.lbl {
 .dos-sign { display: flex; justify-content: space-between; margin-top: 36px; font-family: "IBM Plex Mono", monospace; font-size: 11px; break-inside: avoid; }
 .dos-sign div { border-top: 1px solid #000; padding-top: 4px; width: 28%; text-align: center; text-transform: uppercase; }
 @media print {
+  [data-sonner-toaster] { display: none !important; }
   .dos-sheet { font-size: 7.5pt; }
   .dos-sheet .dos-cols { column-count: 2; column-gap: 20pt; }
   .dos-line { border-bottom-color: #999; }

@@ -520,14 +520,52 @@ async def list_rokad(date_from: Optional[str] = None, date_to: Optional[str] = N
     entries = await db.rokad.find(q, {"_id": 0}).sort("date", -1).to_list(5000)
     return entries
 
+async def _default_cash_account() -> Optional[dict]:
+    """Primary CASH IN HAND ledger: party code 301 → cash-named party in cash group → accounts collection."""
+    p = await db.parties.find_one({"code": 301}, {"_id": 0, "id": 1, "name": 1})
+    if p:
+        return p
+    cash_group = await db.account_groups.find_one({"name": "CASH & BANK BALANCE"}, {"_id": 0, "id": 1})
+    if cash_group:
+        p = await db.parties.find_one({"group_id": cash_group["id"], "name": {"$regex": "cash", "$options": "i"}},
+                                      {"_id": 0, "id": 1, "name": 1})
+        if p:
+            return p
+    a = await db.accounts.find_one({"code": 301}, {"_id": 0, "id": 1, "name": 1})
+    if a:
+        return a
+    return await db.accounts.find_one({"name": {"$regex": "cash", "$options": "i"}}, {"_id": 0, "id": 1, "name": 1})
+
+
 @api.post("/rokad")
 async def create_rokad(body: RokadIn, current=Depends(get_current_user)):
     doc = body.model_dump()
+    if not doc.get("cash_account_id"):
+        cash = await _default_cash_account()
+        if cash:
+            doc["cash_account_id"] = cash["id"]
+            doc["cash_account_name"] = doc.get("cash_account_name") or cash["name"]
     doc["id"] = str(uuid.uuid4())
     doc["created_at"] = now_iso()
     await db.rokad.insert_one(doc.copy())
     doc.pop("_id", None)
     return doc
+
+@api.put("/rokad/{rid}")
+async def update_rokad(rid: str, body: RokadIn, current=Depends(get_current_user)):
+    existing = await db.rokad.find_one({"id": rid}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Entry nahi mili")
+    doc = body.model_dump()
+    if not doc.get("cash_account_id"):
+        cash = await _default_cash_account()
+        if cash:
+            doc["cash_account_id"] = cash["id"]
+            doc["cash_account_name"] = doc.get("cash_account_name") or cash["name"]
+    doc["updated_at"] = now_iso()
+    await db.rokad.update_one({"id": rid}, {"$set": doc})
+    return {**existing, **doc}
+
 
 @api.delete("/rokad/{rid}")
 async def delete_rokad(rid: str, current=Depends(get_current_user)):
@@ -2108,6 +2146,15 @@ async def on_start():
                  "created_at": now_iso()},
             ])
         logger.info("Seeded default cash/bank accounts")
+
+    # Backfill: rokad entries saved without a cash/bank account belong to the default CASH IN HAND
+    cash = await _default_cash_account()
+    if cash:
+        res = await db.rokad.update_many(
+            {"$or": [{"cash_account_id": None}, {"cash_account_id": ""}, {"cash_account_id": {"$exists": False}}]},
+            {"$set": {"cash_account_id": cash["id"], "cash_account_name": cash["name"]}})
+        if res.modified_count:
+            logger.info(f"Linked {res.modified_count} rokad entries to default cash account {cash['name']}")
 
 
 @app.on_event("shutdown")

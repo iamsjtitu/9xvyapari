@@ -6,9 +6,9 @@ function buildMenu({ getWin, services, checkUpdates, changeFolder }) {
       label: "File",
       submenu: [
         {
-          label: "Print...",
+          label: "Print Preview...",
           accelerator: "CmdOrCtrl+P",
-          click: () => getWin()?.webContents.print({ printBackground: true }),
+          click: () => getWin()?.webContents.send("print:request"),
         },
         { type: "separator" },
         { label: "Data Folder kholein", click: () => shell.openPath(services.dataDir) },

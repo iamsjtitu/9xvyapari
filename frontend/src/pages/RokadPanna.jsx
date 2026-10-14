@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
-import { Plus, Trash, ArrowDown, ArrowUp, X } from "@phosphor-icons/react";
+import { Plus, Trash, ArrowDown, ArrowUp, X, PencilSimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -9,12 +9,12 @@ export default function RokadPanna() {
   const [dateFrom, setDateFrom] = useState(todayISO());
   const [dateTo, setDateTo] = useState(todayISO());
   const [bankFilter, setBankFilter] = useState("");        // "" = all
-  const [allBankEntries, setAllBankEntries] = useState([]); // entries for selected bank (no date filter)
   const [entries, setEntries] = useState([]);
   const [parties, setParties] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({
+  const [editId, setEditId] = useState(null);
+  const emptyForm = {
     date: todayISO(),
     type: "jama",
     amount: "",
@@ -26,20 +26,22 @@ export default function RokadPanna() {
     cash_account_name: "",
     voucher_no: "",
     chq_no: "",
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
 
   const load = async () => {
     const { data } = await api.get(`/rokad?date_from=${dateFrom}&date_to=${dateTo}`);
     setEntries(data);
   };
 
-  // When bank filter changes, fetch ALL entries for that bank (for opening balance calc)
-  useEffect(() => {
-    if (!bankFilter) { setAllBankEntries([]); return; }
-    api.get("/rokad").then((r) => {
-      setAllBankEntries(r.data.filter((x) => x.cash_account_id === bankFilter));
-    });
-  }, [bankFilter]);
+  // All rokad entries (for opening balance calc of every cash/bank account)
+  const [allEntries, setAllEntries] = useState([]);
+  const loadAll = () => api.get("/rokad").then((r) => setAllEntries(r.data)).catch(() => {});
+  useEffect(() => { loadAll(); }, []);
+  const allBankEntries = useMemo(
+    () => (bankFilter ? allEntries.filter((x) => x.cash_account_id === bankFilter) : []),
+    [allEntries, bankFilter]
+  );
 
   useEffect(() => {
     load();
@@ -69,7 +71,7 @@ export default function RokadPanna() {
       description: "Payment (Kharch) entry" },
     { key: "t", action: () => { setDateFrom(todayISO()); setDateTo(todayISO()); },
       description: "Set to Today" },
-    { key: "Escape", action: () => setShowAdd(false), allowInInputs: true,
+    { key: "Escape", action: () => closeForm(), allowInInputs: true,
       description: "Close dialog" },
   ], [dateTo]);
 
@@ -118,6 +120,52 @@ export default function RokadPanna() {
     return { opening, closing, vMin, vMax, count: visibleEntries.length };
   }, [bankFilter, selectedBank, allBankEntries, dateFrom, totals, visibleEntries]);
 
+  // Default cash account (CASH IN HAND) – preselected when the form opens
+  const defaultCash = useMemo(
+    () => accounts.find((a) => Number(a.code) === 301) || accounts.find((a) => /cash/i.test(a.name || "")) || accounts[0],
+    [accounts]
+  );
+  useEffect(() => {
+    if (!showAdd || editId || form.cash_account_id) return;
+    const a = accounts.find((x) => x.id === bankFilter) || defaultCash;
+    if (a) setForm((f) => ({ ...f, cash_account_id: a.id, cash_account_name: a.name,
+      mode: /bank/i.test(a.group_name || a.name || "") ? "Bank" : "Cash" }));
+    // eslint-disable-next-line
+  }, [showAdd, accounts, bankFilter, defaultCash]);
+
+  // Per-account opening/closing for the "All" view
+  const allAccountsSummary = useMemo(() => {
+    if (bankFilter || accounts.length === 0) return null;
+    const rows = accounts.map((a) => {
+      let pre = 0, jama = 0, kharch = 0;
+      for (const e of allEntries) {
+        if (e.cash_account_id !== a.id) continue;
+        const d = (e.date || "").slice(0, 10);
+        const signed = e.type === "jama" ? e.amount : -e.amount;
+        if (d < dateFrom) pre += signed;
+        else if (d <= dateTo) { if (e.type === "jama") jama += e.amount; else kharch += e.amount; }
+      }
+      const opening = (a.opening_balance || 0) + pre;
+      return { ...a, opening, jama, kharch, closing: opening + jama - kharch };
+    });
+    const total = rows.reduce((t, r) => ({ opening: t.opening + r.opening, jama: t.jama + r.jama,
+      kharch: t.kharch + r.kharch, closing: t.closing + r.closing }), { opening: 0, jama: 0, kharch: 0, closing: 0 });
+    return { rows, total };
+  }, [bankFilter, accounts, allEntries, dateFrom, dateTo]);
+
+  const closeForm = () => { setShowAdd(false); setEditId(null); setForm({ ...emptyForm, date: dateTo }); };
+
+  const startEdit = (e) => {
+    setEditId(e.id);
+    setForm({
+      date: (e.date || "").slice(0, 10), type: e.type, amount: String(e.amount ?? ""),
+      party_id: e.party_id || "", party_name: e.party_name || "", description: e.description || "",
+      mode: e.mode || "Cash", cash_account_id: e.cash_account_id || "", cash_account_name: e.cash_account_name || "",
+      voucher_no: e.voucher_no || "", chq_no: e.chq_no || "",
+    });
+    setShowAdd(true);
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     try {
@@ -126,23 +174,16 @@ export default function RokadPanna() {
         toast.error("Amount daalein");
         return;
       }
-      await api.post("/rokad", payload);
-      toast.success("Entry add ki gayi");
-      setShowAdd(false);
-      setForm({
-        date: dateTo,
-        type: "jama",
-        amount: "",
-        party_id: "",
-        party_name: "",
-        description: "",
-        mode: "Cash",
-        cash_account_id: "",
-        cash_account_name: "",
-        voucher_no: "",
-        chq_no: "",
-      });
+      if (editId) {
+        await api.put(`/rokad/${editId}`, payload);
+        toast.success("Entry update ho gayi");
+      } else {
+        await api.post("/rokad", payload);
+        toast.success("Entry add ki gayi");
+      }
+      closeForm();
       load();
+      loadAll();
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
     }
@@ -153,6 +194,7 @@ export default function RokadPanna() {
     await api.delete(`/rokad/${id}`);
     toast.success("Entry delete ki gayi");
     load();
+    loadAll();
   };
 
   const Side = ({ side, list, color, bg, label, icon: Icon }) => (
@@ -209,10 +251,19 @@ export default function RokadPanna() {
                 <td className="num" style={{ color }}>
                   ₹ {inr(e.amount)}
                 </td>
-                <td className="print:hidden">
+                <td className="print:hidden whitespace-nowrap">
+                  <button
+                    className="btn-ghost p-1.5"
+                    onClick={() => startEdit(e)}
+                    title="Edit"
+                    data-testid={`rokad-edit-${e.id}`}
+                  >
+                    <PencilSimple size={14} />
+                  </button>
                   <button
                     className="btn-ghost p-1.5"
                     onClick={() => del(e.id)}
+                    title="Delete"
                     data-testid={`rokad-del-${e.id}`}
                   >
                     <Trash size={14} />
@@ -362,6 +413,51 @@ export default function RokadPanna() {
         </div>
       )}
 
+      {/* All accounts summary (when no bank filter) */}
+      {allAccountsSummary && (
+        <div className="card-flat overflow-hidden" data-testid="all-accounts-summary">
+          <div className="px-5 py-2.5 border-b border-khaki flex items-center justify-between">
+            <div className="section-title">Sabhi Cash / Bank Accounts — Balance</div>
+            <div className="text-[11px] text-muted2 font-mono-data">{dateFrom === dateTo ? `As on ${dateFrom}` : `${dateFrom} → ${dateTo}`}</div>
+          </div>
+          <table className="dense w-full text-sm">
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th className="num">Opening</th>
+                <th className="num">Jama</th>
+                <th className="num">Kharch</th>
+                <th className="num">Closing</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allAccountsSummary.rows.map((r) => (
+                <tr key={r.id} className="cursor-pointer hover:bg-parchment/60" onClick={() => setBankFilter(r.id)}
+                  title="Is account ka cash book kholein" data-testid={`acct-row-${r.id}`}>
+                  <td className="font-medium">{r.code ? `${r.code} · ` : ""}{r.name}</td>
+                  <td className="num font-mono-data" style={{ color: r.opening < 0 ? "#B71C1C" : "#1A1A1A" }}>
+                    ₹ {inr(Math.abs(r.opening))} {r.opening < 0 ? "Cr" : "Dr"}
+                  </td>
+                  <td className="num font-mono-data amount-jama">{r.jama ? `₹ ${inr(r.jama)}` : "—"}</td>
+                  <td className="num font-mono-data amount-kharch">{r.kharch ? `₹ ${inr(r.kharch)}` : "—"}</td>
+                  <td className="num font-mono-data font-medium" style={{ color: r.closing < 0 ? "#B71C1C" : "#1B5E20" }}
+                    data-testid={`acct-closing-${r.id}`}>
+                    ₹ {inr(Math.abs(r.closing))} {r.closing < 0 ? "Cr" : "Dr"}
+                  </td>
+                </tr>
+              ))}
+              <tr className="bg-parchment/60 font-semibold" data-testid="acct-total-row">
+                <td>TOTAL</td>
+                <td className="num font-mono-data">₹ {inr(Math.abs(allAccountsSummary.total.opening))} {allAccountsSummary.total.opening < 0 ? "Cr" : "Dr"}</td>
+                <td className="num font-mono-data amount-jama">₹ {inr(allAccountsSummary.total.jama)}</td>
+                <td className="num font-mono-data amount-kharch">₹ {inr(allAccountsSummary.total.kharch)}</td>
+                <td className="num font-mono-data" data-testid="acct-total-closing">₹ {inr(Math.abs(allAccountsSummary.total.closing))} {allAccountsSummary.total.closing < 0 ? "Cr" : "Dr"}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* Summary bar */}
       <div className="card-flat px-5 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-6">
@@ -417,7 +513,7 @@ export default function RokadPanna() {
       {showAdd && (
         <div
           className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4"
-          onClick={() => setShowAdd(false)}
+          onClick={closeForm}
           data-testid="modal-add-rokad"
         >
           <form
@@ -426,8 +522,10 @@ export default function RokadPanna() {
             className="card-flat w-full max-w-lg p-5"
           >
             <div className="flex items-center justify-between mb-4">
-              <div className="font-heading font-semibold text-lg">Nayi Rokad Entry</div>
-              <button type="button" className="btn-ghost p-1.5" onClick={() => setShowAdd(false)}>
+              <div className="font-heading font-semibold text-lg" data-testid="rokad-modal-title">
+                {editId ? "Rokad Entry Edit" : "Nayi Rokad Entry"}
+              </div>
+              <button type="button" className="btn-ghost p-1.5" onClick={closeForm}>
                 <X size={16} />
               </button>
             </div>
@@ -528,7 +626,7 @@ export default function RokadPanna() {
                     }}
                     data-testid="select-cash-account"
                   >
-                    <option value="">— Default Cash —</option>
+                    <option value="">— Chunein —</option>
                     {accounts.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.code ? `${a.code} · ` : ""}{a.name}
@@ -593,11 +691,11 @@ export default function RokadPanna() {
             </div>
 
             <div className="flex justify-end gap-2 mt-5">
-              <button type="button" className="btn-outline" onClick={() => setShowAdd(false)}>
+              <button type="button" className="btn-outline" onClick={closeForm}>
                 Cancel
               </button>
               <button type="submit" className="btn-primary" data-testid="btn-save-rokad">
-                Save Entry
+                {editId ? "Update Entry" : "Save Entry"}
               </button>
             </div>
           </form>

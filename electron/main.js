@@ -6,11 +6,13 @@ const { buildMenu } = require("./lib/menu");
 const { setupAutoUpdate } = require("./lib/updater");
 const { loadAppConfig, saveAppConfig } = require("./lib/config");
 const { chooseDataRoot } = require("./lib/chooser");
+const { registerPrintIpc } = require("./lib/printing");
 
 log.transports.file.level = "info";
 Object.assign(console, log.functions);
 
 if (!app.requestSingleInstanceLock()) app.quit();
+registerPrintIpc();
 
 const ICON = path.join(__dirname, "build", "icon.png");
 let mainWin = null;
