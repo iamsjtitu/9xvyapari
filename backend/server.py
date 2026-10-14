@@ -747,7 +747,9 @@ async def update_settings(body: SettingsIn, current=Depends(get_current_user)):
 
 # ---------- BACKUP / RESTORE ----------
 BACKUP_COLLECTIONS = ["account_groups", "accounts", "parties", "items", "bills", "rokad",
-                      "journal", "settings", "inward", "gst_returns", "dos_journal"]
+                      "journal", "settings", "inward", "gst_returns", "dos_journal",
+                      "fiscal_years", "archive_bills", "archive_rokad", "archive_journal",
+                      "archive_dos_journal", "archive_inward", "archive_gst_returns"]
 BACKUP_DIR = Path(os.environ.get("BACKUP_DIR") or (ROOT_DIR / "backups"))
 BACKUP_KEEP = 30
 
@@ -791,12 +793,9 @@ async def restore(payload: dict, current=Depends(get_current_user)):
     return {"ok": True, "restored": summary}
 
 
-@api.post("/backup/auto")
-async def backup_auto(payload: Optional[dict] = None, current=Depends(get_current_user)):
-    """Write a timestamped JSON backup to BACKUP_DIR (used on logout). Keeps last BACKUP_KEEP files."""
+async def _write_backup(reason: str) -> dict:
     import json
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    reason = (payload or {}).get("reason") or "manual"
     stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     target = BACKUP_DIR / f"vyapari-backup_{stamp}_{reason}.json"
     data = await _dump_all()
@@ -806,6 +805,13 @@ async def backup_auto(payload: Optional[dict] = None, current=Depends(get_curren
         old.unlink(missing_ok=True)
     return {"ok": True, "folder": str(BACKUP_DIR), **_backup_file_info(target),
             "counts": {k: len(v) for k, v in data["data"].items()}}
+
+
+@api.post("/backup/auto")
+async def backup_auto(payload: Optional[dict] = None, current=Depends(get_current_user)):
+    """Write a timestamped JSON backup to BACKUP_DIR (used on logout). Keeps last BACKUP_KEEP files."""
+    reason = "".join(ch for ch in str((payload or {}).get("reason") or "manual") if ch.isalnum() or ch in "-_")[:40]
+    return await _write_backup(reason or "manual")
 
 
 @api.get("/backup/files")
@@ -826,6 +832,158 @@ async def backup_restore_file(payload: dict, current=Depends(get_current_user)):
     data = json.loads(target.read_text(encoding="utf-8"))
     summary = await _restore_all(data.get("data") or {})
     return {"ok": True, "restored": summary, "name": name}
+
+
+# ---------- YEAR-END (Naya Saal / Carry Forward) ----------
+ARCHIVE_COLLECTIONS = ["bills", "rokad", "journal", "dos_journal", "inward", "gst_returns"]
+YEAREND_CONFIRM = "NAYA SAAL"
+
+
+class YearEndCloseIn(BaseModel):
+    new_fy_start: str
+    new_fy_end: str
+    confirm: str = ""
+
+
+def _shift_year(iso: str) -> str:
+    d = datetime.fromisoformat(iso).date()
+    try:
+        return d.replace(year=d.year + 1).isoformat()
+    except ValueError:  # 29 Feb
+        return d.replace(year=d.year + 1, day=28).isoformat()
+
+
+async def _yearend_snapshot():
+    """Closing balance of every ledger. Asset/liability ledgers carry forward; income/expense reset to 0."""
+    groups = {g["id"]: g for g in await db.account_groups.find({}, {"_id": 0}).to_list(500)}
+
+    def nature_of(doc):
+        g = groups.get(doc.get("group_id"))
+        return g["nature"] if g else "asset"
+
+    def row(doc, closing):
+        nat = nature_of(doc)
+        carry = nat in ("asset", "liability")
+        return {"id": doc["id"], "code": doc.get("code") or 0, "name": doc.get("name", ""), "nature": nat,
+                "opening_before": float(doc.get("opening_balance") or 0), "closing": closing,
+                "carry": carry, "new_opening": closing if carry else 0.0}
+
+    parties = [row(p, await _compute_party_balance(p["id"], p.get("opening_balance", 0.0)))
+               for p in await db.parties.find({}, {"_id": 0}).sort("code", 1).to_list(20000)]
+    accounts = [row(a, await _compute_account_balance(a["id"], a.get("opening_balance", 0.0)))
+                for a in await db.accounts.find({}, {"_id": 0}).sort("code", 1).to_list(5000)]
+    counts = {c: await db[c].count_documents({}) for c in ARCHIVE_COLLECTIONS}
+    return parties, accounts, counts
+
+
+@api.get("/year-end/preview")
+async def yearend_preview(current=Depends(get_current_user)):
+    s = await get_settings(current)
+    parties, accounts, counts = await _yearend_snapshot()
+    pending_bills = await db.bills.count_documents({"$expr": {"$lt": [{"$ifNull": ["$payment_received", 0]}, "$total"]}})
+    rows = parties + accounts
+    return {
+        "fy_start": s.get("fy_start"), "fy_end": s.get("fy_end"),
+        "suggested": {"fy_start": _shift_year(s["fy_start"]), "fy_end": _shift_year(s["fy_end"])},
+        "counts": counts, "pending_bills": pending_bills,
+        "parties": parties, "accounts": accounts,
+        "totals": {
+            "carry_dr": round(sum(r["new_opening"] for r in rows if r["new_opening"] > 0), 2),
+            "carry_cr": round(sum(-r["new_opening"] for r in rows if r["new_opening"] < 0), 2),
+            "reset_count": sum(1 for r in rows if not r["carry"] and r["closing"] != 0),
+        },
+        "confirm_text": YEAREND_CONFIRM,
+    }
+
+
+@api.post("/year-end/close")
+async def yearend_close(body: YearEndCloseIn, current=Depends(get_current_user)):
+    if body.confirm.strip().upper() != YEAREND_CONFIRM:
+        raise HTTPException(400, f'Confirm karne ke liye "{YEAREND_CONFIRM}" likhein')
+    s = await get_settings(current)
+    try:
+        ns, ne = datetime.fromisoformat(body.new_fy_start).date(), datetime.fromisoformat(body.new_fy_end).date()
+    except ValueError:
+        raise HTTPException(400, "Nayi FY dates galat hain")
+    if ns >= ne:
+        raise HTTPException(400, "FY end, FY start ke baad hona chahiye")
+    if body.new_fy_start <= (s.get("fy_end") or ""):
+        raise HTTPException(400, "Naya saal purane saal ke khatam hone ke baad shuru hona chahiye")
+
+    backup = await _write_backup(f"yearend_{s.get('fy_start')}_{s.get('fy_end')}")
+    parties, accounts, counts = await _yearend_snapshot()
+    fy_id = str(uuid.uuid4())
+
+    for c in ARCHIVE_COLLECTIONS:
+        docs = await db[c].find({}, {"_id": 0}).to_list(500000)
+        if docs:
+            for d in docs:
+                d["fy_id"] = fy_id
+            await db[f"archive_{c}"].insert_many(docs)
+            await db[c].delete_many({})
+
+    for p in parties:
+        await db.parties.update_one({"id": p["id"]}, {"$set": {"opening_balance": p["new_opening"]}})
+    for a in accounts:
+        await db.accounts.update_one({"id": a["id"]}, {"$set": {"opening_balance": a["new_opening"]}})
+
+    await db.settings.update_one({"id": "default"}, {"$set": {
+        "fy_start": body.new_fy_start, "fy_end": body.new_fy_end, "current_date": body.new_fy_start}})
+
+    doc = {"id": fy_id, "fy_start": s.get("fy_start"), "fy_end": s.get("fy_end"),
+           "closed_at": now_iso(), "closed_by": current.get("email"), "backup_file": backup["name"],
+           "new_fy_start": body.new_fy_start, "new_fy_end": body.new_fy_end,
+           "prev_current_date": s.get("current_date"), "counts": counts,
+           "parties": parties, "accounts": accounts}
+    await db.fiscal_years.insert_one(doc.copy())
+    logger.info(f"Year-end closed FY {s.get('fy_start')}..{s.get('fy_end')} -> {body.new_fy_start}")
+    return {"ok": True, "fy_id": fy_id, "archived": counts, "backup_file": backup["name"],
+            "carried": sum(1 for r in parties + accounts if r["carry"] and r["new_opening"] != 0),
+            "new_fy": {"fy_start": body.new_fy_start, "fy_end": body.new_fy_end}}
+
+
+@api.get("/year-end/history")
+async def yearend_history(current=Depends(get_current_user)):
+    years = await db.fiscal_years.find({}, {"_id": 0, "parties": 0, "accounts": 0}).sort("closed_at", -1).to_list(200)
+    live = {c: await db[c].count_documents({}) for c in ARCHIVE_COLLECTIONS}
+    return {"years": years, "undo_possible": bool(years) and not any(live.values()), "live_counts": live}
+
+
+@api.get("/year-end/{fy_id}")
+async def yearend_detail(fy_id: str, current=Depends(get_current_user)):
+    doc = await db.fiscal_years.find_one({"id": fy_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Fiscal year nahi mila")
+    return doc
+
+
+@api.post("/year-end/undo")
+async def yearend_undo(current=Depends(get_current_user)):
+    """Reverse the most recent year-end close. Only allowed while the new year has no entries."""
+    last = await db.fiscal_years.find_one({}, {"_id": 0}, sort=[("closed_at", -1)])
+    if not last:
+        raise HTTPException(404, "Koi closed saal nahi hai")
+    live = {c: await db[c].count_documents({}) for c in ARCHIVE_COLLECTIONS}
+    if any(live.values()):
+        busy = ", ".join(f"{k}: {v}" for k, v in live.items() if v)
+        raise HTTPException(400, f"Naye saal me entries ho chuki hain ({busy}). Undo possible nahi.")
+    for c in ARCHIVE_COLLECTIONS:
+        docs = await db[f"archive_{c}"].find({"fy_id": last["id"]}, {"_id": 0}).to_list(500000)
+        for d in docs:
+            d.pop("fy_id", None)
+        if docs:
+            await db[c].insert_many(docs)
+        await db[f"archive_{c}"].delete_many({"fy_id": last["id"]})
+    for p in last.get("parties", []):
+        await db.parties.update_one({"id": p["id"]}, {"$set": {"opening_balance": p["opening_before"]}})
+    for a in last.get("accounts", []):
+        await db.accounts.update_one({"id": a["id"]}, {"$set": {"opening_balance": a["opening_before"]}})
+    await db.settings.update_one({"id": "default"}, {"$set": {
+        "fy_start": last["fy_start"], "fy_end": last["fy_end"],
+        "current_date": last.get("prev_current_date") or last["fy_end"]}})
+    await db.fiscal_years.delete_one({"id": last["id"]})
+    return {"ok": True, "restored_fy": {"fy_start": last["fy_start"], "fy_end": last["fy_end"]},
+            "restored_counts": last.get("counts", {})}
 
 
 # Add cash_account_id to rokad – update field if not set by client (handled in model fallback)

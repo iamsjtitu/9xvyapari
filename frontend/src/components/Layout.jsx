@@ -8,7 +8,7 @@ import ShortcutHelp from "@/components/ShortcutHelp";
 import {
   House, Notebook, UsersThree, Package, Receipt, ChartBar, SignOut, Storefront,
   TreeStructure, IdentificationCard, BookOpenText, CloudArrowUp, Calendar, Power,
-  Truck, Scales, Database, Keyboard,
+  Truck, Scales, Database, Keyboard, CalendarCheck,
 } from "@phosphor-icons/react";
 
 const sections = [
@@ -41,6 +41,7 @@ const sections = [
       { to: "/import-dbf", label: "Import (DBF)", key: "K", icon: Database, tid: "nav-import" },
       { to: "/backup", label: "Backup / Restore", key: "H", icon: CloudArrowUp, tid: "nav-backup" },
       { to: "/settings", label: "Settings / Date", key: "J", icon: Calendar, tid: "nav-settings" },
+      { to: "/year-end", label: "Naya Saal (Year-End)", key: "Y", icon: CalendarCheck, tid: "nav-yearend" },
     ],
   },
 ];

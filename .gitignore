@@ -101,3 +101,4 @@ electron/dist/linux-arm64-unpacked/resources/mongodb/mongod
 electron/node_modules/electron/dist/electron
 electron/resources/mongodb/mongod
 frontend/node_modules/.cache/default-development/5.pack
+frontend/node_modules/.cache/default-development/7.pack
