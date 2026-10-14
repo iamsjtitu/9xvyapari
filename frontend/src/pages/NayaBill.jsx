@@ -595,20 +595,20 @@ export default function NayaBill() {
 
             {/* Items table */}
             <div className="border border-khaki rounded-sm overflow-x-auto mb-3">
-              <table className="dense w-full text-[11px]" style={{ minWidth: 1000 }}>
+              <table className="dense items-grid w-full text-[11px]" style={{ minWidth: 1240, tableLayout: "fixed" }}>
                 <thead>
                   <tr>
-                    <th>Item Name</th>
-                    <th style={{ width: 78 }}>Bag Pack</th>
-                    <th className="num" style={{ width: 65 }}>Bag</th>
-                    <th className="num" style={{ width: 65 }}>Pack</th>
-                    <th className="num" style={{ width: 78 }}>Weight</th>
-                    <th className="num" style={{ width: 78 }}>W.B.</th>
-                    <th className="num" style={{ width: 60 }}>Ghat</th>
-                    <th className="num" style={{ width: 78 }}>Net Wt</th>
-                    <th className="num" style={{ width: 85 }}>Rate</th>
-                    <th className="num" style={{ width: 105 }}>Amount</th>
-                    <th style={{ width: 28 }}></th>
+                    <th style={{ minWidth: 260 }}>Item Name</th>
+                    <th style={{ width: 96 }}>Bag Pack</th>
+                    <th className="num" style={{ width: 88 }}>Bag</th>
+                    <th className="num" style={{ width: 88 }}>Pack</th>
+                    <th className="num" style={{ width: 108 }}>Weight</th>
+                    <th className="num" style={{ width: 108 }}>W.B.</th>
+                    <th className="num" style={{ width: 88 }}>Ghat</th>
+                    <th className="num" style={{ width: 100 }}>Net Wt</th>
+                    <th className="num" style={{ width: 108 }}>Rate</th>
+                    <th className="num" style={{ width: 128 }}>Amount</th>
+                    <th style={{ width: 34 }}></th>
                   </tr>
                 </thead>
                 <tbody>

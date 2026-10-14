@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8" />
+  <title>9x Vyapari</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #1a1612; color: #f3efe6; font-family: "Segoe UI", system-ui, sans-serif; overflow: hidden; }
+    .wrap { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; -webkit-app-region: drag; }
+    .logo { width: 84px; height: 84px; border-radius: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+    h1 { margin: 0; font-size: 26px; letter-spacing: .5px; }
+    .sub { font-size: 11px; text-transform: uppercase; letter-spacing: 3px; color: rgba(243,239,230,.5); }
+    .status { margin-top: 6px; font-size: 13px; color: rgba(243,239,230,.8); display: flex; align-items: center; gap: 10px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #8B2520; border-top-color: transparent; animation: spin .9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <img class="logo" src="build/icon.png" alt="" />
+    <h1>9x Vyapari</h1>
+    <div class="sub">Galla · Kaccha Arhat · Hisab Kitab</div>
+    <div class="status"><span class="dot"></span><span id="status">Start ho raha hai...</span></div>
+  </div>
+  <script>
+    window.setStatus = function (msg) { document.getElementById("status").textContent = msg; };
+  </script>
+</body>
+</html>

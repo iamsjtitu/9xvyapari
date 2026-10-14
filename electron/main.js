@@ -1,0 +1,139 @@
+const { app, BrowserWindow, Menu, dialog, shell, ipcMain } = require("electron");
+const path = require("path");
+const log = require("electron-log");
+const { startServices, stopServices } = require("./lib/services");
+const { buildMenu } = require("./lib/menu");
+const { setupAutoUpdate } = require("./lib/updater");
+const { loadAppConfig, saveAppConfig } = require("./lib/config");
+const { chooseDataRoot } = require("./lib/chooser");
+
+log.transports.file.level = "info";
+Object.assign(console, log.functions);
+
+if (!app.requestSingleInstanceLock()) app.quit();
+
+const ICON = path.join(__dirname, "build", "icon.png");
+let mainWin = null;
+let splash = null;
+let services = null;
+let updater = null;
+let quitting = false;
+
+function showSplash() {
+  splash = new BrowserWindow({
+    width: 440, height: 280, frame: false, resizable: false, alwaysOnTop: true,
+    show: false, icon: ICON, backgroundColor: "#1a1612",
+  });
+  splash.loadFile(path.join(__dirname, "splash.html"));
+  splash.once("ready-to-show", () => splash.show());
+}
+
+function setSplashStatus(msg) {
+  log.info(msg);
+  if (splash && !splash.isDestroyed()) {
+    splash.webContents.executeJavaScript(`window.setStatus(${JSON.stringify(msg)})`).catch(() => {});
+  }
+}
+
+function closeSplash() {
+  if (splash && !splash.isDestroyed()) splash.destroy();
+  splash = null;
+}
+
+async function showMain(url) {
+  mainWin = new BrowserWindow({
+    width: 1366, height: 820, minWidth: 1024, minHeight: 640, show: false,
+    title: "9x Vyapari", icon: ICON, backgroundColor: "#f3efe6",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+  mainWin.once("ready-to-show", () => {
+    closeSplash();
+    mainWin.maximize();
+    mainWin.show();
+  });
+  mainWin.webContents.setWindowOpenHandler(({ url: target }) => {
+    shell.openExternal(target);
+    return { action: "deny" };
+  });
+  mainWin.on("closed", () => { mainWin = null; });
+  await mainWin.loadURL(url);
+}
+
+ipcMain.on("app:info", (event) => {
+  event.returnValue = {
+    version: app.getVersion(),
+    isPackaged: app.isPackaged,
+    portable: !!services?.portable,
+    dataDir: services?.dataDir || "",
+    dosDir: services?.dosDir || "",
+    backupDir: services?.backupDir || "",
+  };
+});
+
+async function resolveDataRoot() {
+  const appCfg = loadAppConfig();
+  if (process.env.VYAPARI_DATA_DIR) return { dataRoot: process.env.VYAPARI_DATA_DIR, appCfg };
+  if (!app.isPackaged) return { dataRoot: appCfg.dataRoot, appCfg };
+  const chosen = await chooseDataRoot(appCfg, ICON);
+  return { dataRoot: chosen, appCfg };
+}
+
+app.whenReady().then(async () => {
+  try {
+    const { dataRoot, appCfg } = await resolveDataRoot();
+    if (!dataRoot) { quitting = true; app.quit(); return; }
+    saveAppConfig(dataRoot, appCfg);
+
+    showSplash();
+    services = await startServices({
+      dataRoot,
+      resourcesPath: process.resourcesPath,
+      isPackaged: app.isPackaged,
+      onStatus: setSplashStatus,
+    });
+    services.portable = appCfg.portable;
+
+    Menu.setApplicationMenu(buildMenu({
+      getWin: () => mainWin,
+      services,
+      checkUpdates: () => updater?.check(),
+      changeFolder: () => { app.relaunch(); app.quit(); },
+    }));
+    setSplashStatus("9x Vyapari khul raha hai...");
+    await showMain(services.url);
+    if (app.isPackaged) updater = setupAutoUpdate(() => mainWin, { portable: appCfg.portable });
+  } catch (err) {
+    log.error("Startup failed", err);
+    closeSplash();
+    dialog.showErrorBox(
+      "9x Vyapari start nahi ho paya",
+      `${err?.message || err}\n\nLog file: ${log.transports.file.getFile().path}`
+    );
+    quitting = true;
+    stopServices(services).finally(() => app.exit(1));
+  }
+});
+
+app.on("second-instance", () => {
+  if (mainWin) {
+    if (mainWin.isMinimized()) mainWin.restore();
+    mainWin.focus();
+  }
+});
+
+// chooser window closes before splash/main exist – only quit once the app is actually running
+app.on("window-all-closed", () => { if (services || quitting) app.quit(); });
+process.on("SIGTERM", () => app.quit());
+
+app.on("before-quit", (event) => {
+  if (quitting) return;
+  quitting = true;
+  if (!services?.children?.length) return;
+  event.preventDefault();
+  stopServices(services).finally(() => app.quit());
+});

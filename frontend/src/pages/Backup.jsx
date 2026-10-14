@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { CloudArrowUp, CloudArrowDown, Warning } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { AutoBackupList } from "@/components/AutoBackupList";
 
 export default function Backup() {
   const [stats, setStats] = useState(null);
@@ -31,7 +32,7 @@ export default function Backup() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `galla-bahi-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `9x-vyapari-backup-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Backup download ho gaya");
@@ -82,6 +83,8 @@ export default function Backup() {
           </div>
         </div>
       )}
+
+      <AutoBackupList />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="card-flat p-6">

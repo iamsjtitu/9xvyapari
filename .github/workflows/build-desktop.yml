@@ -1,0 +1,109 @@
+name: Build 9x Vyapari Desktop (Windows)
+
+on:
+  push:
+    branches: ["**"]
+    paths-ignore:
+      - "**.md"
+      - "memory/**"
+      - "test_reports/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    env:
+      MONGODB_VERSION: "4.4.29"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build frontend (desktop mode)
+        working-directory: frontend
+        env:
+          CI: "false"
+          REACT_APP_DESKTOP: "1"
+          DISABLE_ESLINT_PLUGIN: "true"
+          GENERATE_SOURCEMAP: "false"
+        run: |
+          yarn install --network-timeout 600000
+          yarn build
+
+      - name: Build backend (PyInstaller)
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-desktop.txt
+          pyinstaller --noconfirm --clean desktop.spec
+
+      - name: Download MongoDB ${{ env.MONGODB_VERSION }}
+        shell: pwsh
+        run: |
+          $zip = "mongodb-windows-x86_64-$env:MONGODB_VERSION.zip"
+          Invoke-WebRequest -Uri "https://fastdl.mongodb.org/windows/$zip" -OutFile $zip
+          New-Item -ItemType Directory -Force mongo-tmp | Out-Null
+          tar -xf $zip -C mongo-tmp
+          New-Item -ItemType Directory -Force electron/resources/mongodb | Out-Null
+          $mongod = Get-ChildItem -Recurse mongo-tmp -Filter mongod.exe | Select-Object -First 1
+          Copy-Item $mongod.FullName electron/resources/mongodb/mongod.exe
+          Get-ChildItem -Recurse mongo-tmp -Filter *.dll | ForEach-Object { Copy-Item $_.FullName electron/resources/mongodb/ }
+          Get-ChildItem electron/resources/mongodb
+
+      - name: Stage backend + frontend resources
+        shell: pwsh
+        run: |
+          Copy-Item -Recurse backend/dist/vyapari-backend electron/resources/backend
+          Copy-Item -Recurse frontend/build electron/resources/frontend
+          Get-ChildItem electron/resources
+
+      - name: Write update config
+        working-directory: electron
+        shell: pwsh
+        env:
+          UPDATE_TOKEN: ${{ secrets.UPDATE_TOKEN }}
+        run: |
+          @{
+            owner   = "${{ github.repository_owner }}"
+            repo    = "${{ github.event.repository.name }}"
+            private = [bool]$env:UPDATE_TOKEN
+            token   = "$env:UPDATE_TOKEN"
+          } | ConvertTo-Json | Set-Content -Encoding utf8 update-config.json
+
+      - name: Set version 1.0.${{ github.run_number }}
+        working-directory: electron
+        shell: pwsh
+        run: |
+          $v = "1.0.${{ github.run_number }}"
+          npm version $v --no-git-tag-version --allow-same-version
+          "APP_VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Build installer & publish GitHub Release
+        working-directory: electron
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          yarn install --network-timeout 600000
+          yarn electron-builder --win --x64 --publish always --config.publish.owner=${{ github.repository_owner }} --config.publish.repo=${{ github.event.repository.name }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 9x-Vyapari-Setup-${{ env.APP_VERSION }}
+          path: |
+            electron/dist/*.exe
+            electron/dist/*.zip
+            electron/dist/latest.yml

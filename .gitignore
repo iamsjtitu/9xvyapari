@@ -80,3 +80,24 @@ memory/test_credentials.md
 
 # Mobile development
 android-sdk/
+# Desktop (Electron) build outputs
+electron/resources/
+electron/dist/
+electron/node_modules/
+backend/build/
+backend/dist/
+frontend/build/
+
+# Desktop (Electron) build outputs
+electron/resources/
+electron/dist/
+electron/node_modules/
+backend/build/
+backend/dist/
+frontend/build/
+backend/backups/
+electron/dist/linux-arm64-unpacked/9x-vyapari
+electron/dist/linux-arm64-unpacked/resources/mongodb/mongod
+electron/node_modules/electron/dist/electron
+electron/resources/mongodb/mongod
+frontend/node_modules/.cache/default-development/5.pack

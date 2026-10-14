@@ -1,81 +1,49 @@
-# Galla Bahi – Hisab Kitab Software (PRD)
+# 9x Vyapari – Hisab Kitab Software (PRD)
 
 ## Original Problem Statement
-User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla / Kaccha Arhat businessmen — exactly like his old DOS-based FoxPro 2.6 system. Same 18-group ledger structure, detailed Purchase/Sale entry with Hamali/Dalali/Bhada/Mandi Tax etc., DOS-style A4 landscape Jama/Kharch print, Rokad Panna (cash book) bank-wise filtering, Trial Balance, GST Returns, and complete DBF data migration from his old workspace at `/tmp/galla_audit/FOXPRO2/WS2026/`. Hindi/Hinglish UI.
+User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla / Kaccha Arhat businessmen — exactly like his old DOS-based FoxPro 2.6 system. Same 18-group ledger structure, detailed Purchase/Sale entry with Hamali/Dalali/Bhada/Mandi Tax etc., DOS-style A4 landscape Jama/Kharch print, Rokad Panna (cash book) bank-wise filtering, Trial Balance, GST Returns, and complete DBF data migration. Hindi/Hinglish UI.
+
+**Branding (Jun 2026):** App ka naam **"9x Vyapari"** (pehle "Galla Bahi"). **Single-user software** — register option hata diya, password change Settings me.
 
 ## Tech Stack
-- Frontend: React + Tailwind + Shadcn UI (`/app/frontend`)
+- Frontend: React + Tailwind + Shadcn UI (`/app/frontend`) — fonts self-hosted via `@fontsource` (offline ready)
 - Backend: FastAPI + Motor MongoDB (`/app/backend/server.py`)
 - DBF parsing: `dbfread`
 - Exports: PDF/Print (CSS), XLSX (`xlsx`), Word (`docx`)
-- Auth: JWT (admin@galla.com / admin123 — see `/app/memory/test_credentials.md`)
+- Auth: JWT + bcrypt (admin@galla.com / admin123 — see `/app/memory/test_credentials.md`). No registration.
+- **Desktop: Electron 33 + electron-builder 25 + electron-updater** (`/app/electron`), backend via **PyInstaller** (`backend/desktop.spec`, entry `backend/desktop_main.py`), **MongoDB 4.4.29** mongod.exe bundled (no-AVX CPUs supported)
+- CI: `.github/workflows/build-desktop.yml` — Windows build on every push → GitHub Release (`1.0.<run_number>`)
 
 ## What's Implemented
 - FoxPro-matching schema: 18 Account Groups, Parties, Items, detailed Bills with 30+ fields
-- DBF Import for LEDGR/CASHBOOK/TRANSPR/TRANSPUR/PROFIT/INWARDS/AAGSTRET/AN
-- Rokad Panna (Cash Book) with bank-wise filter, opening/closing balance, per-cash voucher numbering
+- DBF Import for LEDGR/CASHBOOK/TRANSPR/TRANSPUR/PROFIT/INWARDS/AAGSTRET/AN (+ one-click complete migration, idempotent; `DOS_BACKUP_DIR` env configurable)
+- Rokad Panna (Cash Book) with bank-wise filter, opening/closing balance
 - DOS-style Jama/Kharch side-by-side A4 landscape print/PDF
-- Trial Balance grouped by FoxPro master ranges
-- GST Returns, Inward Register, Journal Entry, Galla Master
-- Global keyboard shortcuts + ShortcutHelp overlay
-- Arrow-key table navigation (`useTableNav.js`)
-- Payment Cond → auto-compute Due Date in bills
-- Dashboard "Bills Due" notifications (overdue / today / 7-day soon)
-- PDF/Excel/Word exports on every register
+- Trial Balance, GST Returns, Inward Register, Journal Entry, Galla Master
+- Global keyboard shortcuts + ShortcutHelp overlay, arrow-key table nav
+- Party & Item autocomplete with inline create (`PartyAutocomplete.jsx`)
+- Dashboard "Bills Due" notifications, PDF/Excel/Word exports
 
-### Feb 2026 Additions
-- **Auto-suggesting Party fields in Sale/Purchase entry** (Seller / Buyer / Agent — all 3 in both modes) with inline "+ Add as new party" — `PartyAutocomplete.jsx`
-- **Item autocomplete in line-items** with same "+ Add as new item" pattern (`NayaBill.jsx`)
-- **Mahajani Party Ledger Printout** — traditional Hindi bahi-khata format with Devanagari numerals, "॥ श्री गणेशाय नमः ॥" header, parchment-style sheet, नाम/जमा/बाकी columns. Toggle inline preview + dedicated "Mahajani Print" button (`PartyLedger.jsx`)
-- **Complete DOS Data Migration** — one-click button on Import (DBF) page that reads all DBFs from `/tmp/galla_audit/FOXPRO2/WS2026/` and runs every importer in sequence. **Idempotent** — composite keys ensure re-runs don't duplicate. New endpoint `POST /api/migrate-dos-data` and `POST /api/import-dbf/journal` for AN.DBF. Migration covers:
-  - LEDGR.DBF (526 parties), PROFIT.DBF (9 items), CASHBOOK+CASHTEM (15 rokad), INWARDP+INWARDS (42 inward), AAGSTRET (50 GST), TRANSTEM (4 bills), **AN.DBF (126 journal/transaction history rows → `dos_journal` collection)**.
+### Jun 2026 – Desktop release work
+- **Electron offline desktop app** (`/app/electron`): spawns bundled `mongod.exe` + PyInstaller backend on free ports, backend serves React build (same-origin, `REACT_APP_DESKTOP=1` → `window.location.origin`), splash screen, Hinglish menu (Print, folders, Data Folder badlein, Update check, About), single-instance lock, graceful MongoDB shutdown via `POST /api/desktop/shutdown` (token-protected), parent-PID watchdog in backend (no orphan processes)
+- **Data Folder chooser** on every start (remembers last + recent list; `VYAPARI_DATA_DIR` env skips). Layout: `<root>/mongo`, `/backups`, `/dos_backup`, `/logs`, `/config.json`
+- **3 Windows targets**: NSIS installer (auto-update via GitHub Releases, `releaseType: release`), Portable single exe (checks GitHub API, opens release page), Portable folder zip. Private-repo updates via `UPDATE_TOKEN` secret → `update-config.json`
+- **Auto backup on logout** → `POST /api/backup/auto` writes `vyapari-backup_<stamp>_<reason>.json` to `BACKUP_DIR` (keeps 30). `GET /api/backup/files`, `POST /api/backup/restore-file`. Backup page shows list + Restore + "Abhi Backup Lein". Backup now covers inward/gst_returns/dos_journal too
+- **Change password**: `POST /api/auth/change-password` + `ChangePasswordCard` in Settings. `/auth/register` removed. Admin seed no longer overwrites a changed password
+- **NayaBill line-items grid** widened (`items-grid` CSS: no number spinners, tighter cell padding, fixed column widths)
+- Branding → 9x Vyapari (Layout, Login, BillView, index.html title, favicon, default firm name), app icon generated (`electron/build/icon.ico|png`)
 
-## Database Counts (post-migration)
-| Collection | Rows |
-|---|---|
-| account_groups | 18 |
-| parties | 528 |
-| items | 15 |
-| bills | 4 |
-| rokad | 16 |
-| inward | 42 |
-| gst_returns | 50 |
-| **dos_journal (AN.DBF)** | **126** |
-
-## Architecture
-```
-/app
-├── backend/server.py          # Single-file FastAPI app
-└── frontend/src
-    ├── components/
-    │   ├── Layout.jsx, ExportBar.jsx, ShortcutHelp.jsx
-    │   └── PartyAutocomplete.jsx   # generic name-search + inline create
-    ├── hooks/
-    │   ├── useKeyboardShortcuts.js
-    │   └── useTableNav.js
-    └── pages/
-        ├── Dashboard.jsx, Login.jsx, Settings.jsx, Backup.jsx
-        ├── RokadPanna.jsx (Cash Book), PartyKhata.jsx, PartyLedger.jsx (Mahajani)
-        ├── Accounts.jsx, AccountGroups.jsx, GallaMaster.jsx
-        ├── NayaBill.jsx (Sale + Purchase, autosuggest everywhere)
-        ├── BillView.jsx, Inward.jsx, JournalEntry.jsx
-        ├── TrialBalance.jsx, GSTReturns.jsx, Reports.jsx
-        └── ImportDBF.jsx (one-click "Migrate Complete DOS Data")
-```
+## Verification (Jun 2026)
+- Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
+- Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅
+- Windows .exe can only be produced by GitHub Actions (Windows runner) or on a Windows PC — see `/app/electron/README.md`
 
 ## Roadmap / Backlog
-- **P0**: Electron desktop packaging (.exe for Windows) — user's original ask, still deferred
-- **P1**: Render `dos_journal` history in a dedicated "DOS Transactions" register page (data is in MongoDB, just needs UI)
-- **P2**: Year-end carry-forward of balances
-- **P2**: Multi-user / role-based access
-- **P2**: SMS/WhatsApp reminders for overdue bills
-
-## Verification Status
-- Party autocomplete: ✅ verified live (suggestions on "tar", inline create)
-- Item autocomplete: ✅ verified live (suggestions on "geh" → Gehu, inline create works)
-- Mahajani print: ✅ verified screenshot (Hindi headers, Devanagari numerals, parchment look)
-- Complete migration: ✅ verified via curl + DB counts; idempotent (2 successive runs produce same DB state)
+- **P1**: First real GitHub Actions run — verify Save to GitHub pushes `.github/workflows` (may need manual add if token lacks `workflow` scope)
+- **P2**: Year-end carry-forward of balances (user asked: after Electron)
+- ~~Multi-user RBAC~~ — dropped, user wants single-user
+- **P2**: Render `dos_journal` history in a dedicated register page
+- **P3**: SMS/WhatsApp reminders for overdue bills
 
 ## Test Credentials
-See `/app/memory/test_credentials.md`
-- admin@galla.com / admin123
+See `/app/memory/test_credentials.md` — admin@galla.com / admin123

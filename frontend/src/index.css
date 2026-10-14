@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -121,6 +119,14 @@ table.dense td.num, table.dense th.num { text-align: right; font-family: "IBM Pl
   font-family: "IBM Plex Mono", monospace;
   text-align: right;
 }
+
+/* Bill line-items grid: tighter cells, roomier inputs, no number spinners */
+table.dense.items-grid th, table.dense.items-grid td { padding: 6px 6px; }
+table.dense.items-grid td:first-child, table.dense.items-grid th:first-child { padding-left: 10px; }
+table.dense.items-grid .input-dense { width: 100%; min-width: 0; padding: 0 8px; }
+table.dense.items-grid input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+table.dense.items-grid input[type="number"]::-webkit-outer-spin-button,
+table.dense.items-grid input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 label.lbl {
   display: block;

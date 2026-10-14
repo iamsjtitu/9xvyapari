@@ -84,10 +84,9 @@ class UserOut(BaseModel):
     name: str
     role: str
 
-class RegisterIn(BaseModel):
-    email: EmailStr
-    password: str
-    name: str
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=4, max_length=128)
 
 class LoginIn(BaseModel):
     email: EmailStr
@@ -271,7 +270,7 @@ class JournalIn(BaseModel):
     ref: Optional[str] = ""
 
 class SettingsIn(BaseModel):
-    firm_name: Optional[str] = "Galla Bahi"
+    firm_name: Optional[str] = "9x Vyapari"
     fy_start: str = ""   # ISO date
     fy_end: str = ""     # ISO date
     current_date: str = ""
@@ -286,23 +285,19 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
-# ---------- AUTH ----------
-@api.post("/auth/register")
-async def register(body: RegisterIn, response: Response):
-    email = body.email.lower().strip()
-    existing = await db.users.find_one({"email": email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email pehle se registered hai")
-    uid = str(uuid.uuid4())
-    doc = {"id": uid, "email": email, "name": body.name,
-           "password_hash": hash_password(body.password),
-           "role": "user", "created_at": now_iso()}
-    await db.users.insert_one(doc)
-    access = create_access_token(uid, email)
-    refresh = create_refresh_token(uid)
-    set_auth_cookies(response, access, refresh)
-    return {"id": uid, "email": email, "name": body.name, "role": "user",
-            "access_token": access}
+# ---------- AUTH (single-user: no public registration) ----------
+@api.post("/auth/change-password")
+async def change_password(body: ChangePasswordIn, current=Depends(get_current_user)):
+    user = await db.users.find_one({"id": current["id"]})
+    if not user or not verify_password(body.current_password, user["password_hash"]):
+        raise HTTPException(status_code=400, detail="Purana password galat hai")
+    if body.current_password == body.new_password:
+        raise HTTPException(status_code=400, detail="Naya password purane se alag hona chahiye")
+    await db.users.update_one(
+        {"id": current["id"]},
+        {"$set": {"password_hash": hash_password(body.new_password), "password_changed_at": now_iso()}},
+    )
+    return {"ok": True}
 
 @api.post("/auth/login")
 async def login(body: LoginIn, response: Response):
@@ -734,7 +729,7 @@ async def get_settings(current=Depends(get_current_user)):
         fy_year = today.year if today.month >= 4 else today.year - 1
         s = {
             "id": "default",
-            "firm_name": "Galla Bahi",
+            "firm_name": "9x Vyapari",
             "fy_start": f"{fy_year}-04-01",
             "fy_end": f"{fy_year + 1}-03-31",
             "current_date": today.isoformat(),
@@ -751,30 +746,86 @@ async def update_settings(body: SettingsIn, current=Depends(get_current_user)):
 
 
 # ---------- BACKUP / RESTORE ----------
+BACKUP_COLLECTIONS = ["account_groups", "accounts", "parties", "items", "bills", "rokad",
+                      "journal", "settings", "inward", "gst_returns", "dos_journal"]
+BACKUP_DIR = Path(os.environ.get("BACKUP_DIR") or (ROOT_DIR / "backups"))
+BACKUP_KEEP = 30
+
+
+async def _dump_all() -> dict:
+    data = {"exported_at": now_iso(), "version": "1.2", "app": "9x Vyapari", "data": {}}
+    for c in BACKUP_COLLECTIONS:
+        data["data"][c] = await db[c].find({}, {"_id": 0}).to_list(200000)
+    return data
+
+
+async def _restore_all(data: dict) -> dict:
+    summary = {}
+    for c in BACKUP_COLLECTIONS:
+        if c not in data:
+            continue
+        await db[c].delete_many({})
+        docs = data.get(c) or []
+        if docs:
+            await db[c].insert_many(docs)
+        summary[c] = len(docs)
+    return summary
+
+
+def _backup_file_info(p: Path) -> dict:
+    st = p.stat()
+    return {"name": p.name, "size": st.st_size,
+            "created_at": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat()}
+
+
 @api.get("/backup")
 async def backup(current=Depends(get_current_user)):
     """Export full database (except users) as JSON."""
-    collections = ["account_groups", "accounts", "parties", "items",
-                   "bills", "rokad", "journal", "settings"]
-    data = {"exported_at": now_iso(), "version": "1.1", "data": {}}
-    for c in collections:
-        data["data"][c] = await db[c].find({}, {"_id": 0}).to_list(50000)
-    return data
+    return await _dump_all()
+
 
 @api.post("/restore")
 async def restore(payload: dict, current=Depends(get_current_user)):
     """Restore from backup JSON. Wipes existing app data (not users)."""
-    data = payload.get("data") or {}
-    collections = ["account_groups", "accounts", "parties", "items",
-                   "bills", "rokad", "journal", "settings"]
-    summary = {}
-    for c in collections:
-        await db[c].delete_many({})
-        docs = data.get(c, [])
-        if docs:
-            await db[c].insert_many(docs)
-        summary[c] = len(docs)
+    summary = await _restore_all(payload.get("data") or {})
     return {"ok": True, "restored": summary}
+
+
+@api.post("/backup/auto")
+async def backup_auto(payload: Optional[dict] = None, current=Depends(get_current_user)):
+    """Write a timestamped JSON backup to BACKUP_DIR (used on logout). Keeps last BACKUP_KEEP files."""
+    import json
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    reason = (payload or {}).get("reason") or "manual"
+    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    target = BACKUP_DIR / f"vyapari-backup_{stamp}_{reason}.json"
+    data = await _dump_all()
+    target.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    files = sorted(BACKUP_DIR.glob("vyapari-backup_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    for old in files[BACKUP_KEEP:]:
+        old.unlink(missing_ok=True)
+    return {"ok": True, "folder": str(BACKUP_DIR), **_backup_file_info(target),
+            "counts": {k: len(v) for k, v in data["data"].items()}}
+
+
+@api.get("/backup/files")
+async def backup_files(current=Depends(get_current_user)):
+    if not BACKUP_DIR.is_dir():
+        return {"folder": str(BACKUP_DIR), "files": []}
+    files = sorted(BACKUP_DIR.glob("vyapari-backup_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    return {"folder": str(BACKUP_DIR), "files": [_backup_file_info(p) for p in files]}
+
+
+@api.post("/backup/restore-file")
+async def backup_restore_file(payload: dict, current=Depends(get_current_user)):
+    import json
+    name = Path(str(payload.get("name") or "")).name
+    target = BACKUP_DIR / name
+    if not name.startswith("vyapari-backup_") or not target.is_file():
+        raise HTTPException(404, "Backup file nahi mili")
+    data = json.loads(target.read_text(encoding="utf-8"))
+    summary = await _restore_all(data.get("data") or {})
+    return {"ok": True, "restored": summary, "name": name}
 
 
 # Add cash_account_id to rokad – update field if not set by client (handled in model fallback)
@@ -1583,7 +1634,7 @@ async def migrate_dos_data(payload: dict = None, current=Depends(get_current_use
     except ImportError:
         raise HTTPException(500, "dbfread not installed")
 
-    folder = (payload or {}).get("folder") or "/app/backend/dos_backup/FOXPRO2/WS2026"
+    folder = (payload or {}).get("folder") or os.environ.get("DOS_BACKUP_DIR") or "/app/backend/dos_backup/FOXPRO2/WS2026"
     if not _os.path.isdir(folder):
         raise HTTPException(400, f"DOS folder not found: {folder}")
 
@@ -1669,7 +1720,20 @@ async def migrate_dos_data(payload: dict = None, current=Depends(get_current_use
 # ---------- ROOT ----------
 @api.get("/")
 async def root():
-    return {"app": "Galla Hisab-Kitab", "status": "ok"}
+    return {"app": "9x Vyapari", "status": "ok", "desktop": bool(os.environ.get("FRONTEND_DIST"))}
+
+
+@api.post("/desktop/shutdown")
+async def desktop_shutdown(request: Request):
+    # Called only by the Electron shell (token passed via env) to stop bundled MongoDB gracefully
+    token = os.environ.get("DESKTOP_TOKEN")
+    if not token or request.headers.get("x-desktop-token") != token:
+        raise HTTPException(404, "Not found")
+    try:
+        await client.admin.command("shutdown", force=True)
+    except Exception:
+        pass
+    return {"ok": True}
 
 
 app.include_router(api)
@@ -1688,6 +1752,27 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Desktop mode: serve the built React app from the same origin (set by Electron shell)
+FRONTEND_DIST = os.environ.get("FRONTEND_DIST")
+if FRONTEND_DIST and Path(FRONTEND_DIST).is_dir():
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+
+    _dist = Path(FRONTEND_DIST).resolve()
+    if (_dist / "static").is_dir():
+        app.mount("/static", StaticFiles(directory=_dist / "static"), name="static")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        if full_path.startswith("api/"):
+            raise HTTPException(404, "Not found")
+        target = (_dist / full_path).resolve()
+        if full_path and str(target).startswith(str(_dist)) and target.is_file():
+            return FileResponse(target)
+        return FileResponse(_dist / "index.html")
+
+    logger.info(f"Serving desktop frontend from {_dist}")
+
 
 @app.on_event("startup")
 async def on_start():
@@ -1705,7 +1790,7 @@ async def on_start():
     await db.gst_returns.create_index("id", unique=True)
     await db.dos_journal.create_index("id", unique=True)
 
-    # Seed admin
+    # Seed admin only once – never overwrite a password the user changed in-app
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@galla.com").lower()
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
     existing = await db.users.find_one({"email": admin_email})
@@ -1719,12 +1804,6 @@ async def on_start():
             "created_at": now_iso(),
         })
         logger.info(f"Seeded admin: {admin_email}")
-    elif not verify_password(admin_password, existing["password_hash"]):
-        await db.users.update_one(
-            {"email": admin_email},
-            {"$set": {"password_hash": hash_password(admin_password)}}
-        )
-        logger.info(f"Updated admin password: {admin_email}")
 
     # Seed sample galla items if empty
     if await db.items.count_documents({}) == 0:

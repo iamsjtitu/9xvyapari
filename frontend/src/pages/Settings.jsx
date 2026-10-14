@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api, { formatApiErrorDetail, todayISO } from "@/lib/api";
 import { FloppyDisk, Calendar } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { ChangePasswordCard } from "@/components/ChangePasswordCard";
 
 export default function Settings() {
   const [form, setForm] = useState(null);
@@ -90,6 +91,8 @@ export default function Settings() {
           </button>
         </div>
       </div>
+
+      <ChangePasswordCard />
     </div>
   );
 }

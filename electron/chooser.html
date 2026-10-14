@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8" />
+  <title>9x Vyapari – Data Folder</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: #1a1612; color: #f3efe6; font-family: "Segoe UI", system-ui, sans-serif; font-size: 14px; }
+    .wrap { padding: 26px 30px; display: flex; flex-direction: column; height: 100%; gap: 16px; }
+    .head { display: flex; align-items: center; gap: 12px; }
+    .head img { width: 44px; height: 44px; border-radius: 10px; }
+    .head h1 { margin: 0; font-size: 20px; }
+    .head .sub { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: rgba(243,239,230,.5); }
+    .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: rgba(243,239,230,.55); margin-bottom: 6px; }
+    .row { display: flex; gap: 8px; }
+    .path { flex: 1; background: #2c2a29; border: 1px solid rgba(255,255,255,.12); border-radius: 4px; padding: 10px 12px; font-family: Consolas, "IBM Plex Mono", monospace; font-size: 12.5px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    button { cursor: pointer; border: 0; border-radius: 4px; padding: 10px 16px; font-size: 13px; font-weight: 600; font-family: inherit; }
+    .ghost { background: transparent; color: #f3efe6; border: 1px solid rgba(255,255,255,.25); }
+    .ghost:hover { background: rgba(255,255,255,.08); }
+    .primary { background: #8B2520; color: #fff; padding: 12px 22px; font-size: 15px; width: 100%; }
+    .primary:hover { background: #a12d27; }
+    .primary:disabled { opacity: .5; cursor: default; }
+    .recent { flex: 1; overflow: auto; border: 1px solid rgba(255,255,255,.1); border-radius: 4px; min-height: 90px; }
+    .recent div { padding: 8px 12px; font-family: Consolas, monospace; font-size: 12px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,.06); color: rgba(243,239,230,.8); }
+    .recent div:hover { background: rgba(255,255,255,.06); color: #fff; }
+    .recent div.active { background: rgba(139,37,32,.35); color: #fff; }
+    .recent .empty { cursor: default; color: rgba(243,239,230,.4); }
+    .hint { font-size: 12px; color: rgba(243,239,230,.55); line-height: 1.5; }
+    .err { color: #ff8a80; font-size: 12px; min-height: 16px; }
+    .badge { font-size: 10px; background: #2c2a29; border: 1px solid rgba(255,255,255,.15); border-radius: 999px; padding: 2px 8px; margin-left: auto; color: rgba(243,239,230,.7); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="head">
+      <img src="build/icon.png" alt="" />
+      <div>
+        <h1>9x Vyapari</h1>
+        <div class="sub">Data Folder chunein</div>
+      </div>
+      <span class="badge" id="mode"></span>
+    </div>
+
+    <div>
+      <div class="lbl">Data Folder (database · backups · DOS files sab yahin rahenge)</div>
+      <div class="row">
+        <div class="path" id="path" title=""></div>
+        <button class="ghost" id="browse">Badlein...</button>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+      <div class="lbl">Pichle Folders</div>
+      <div class="recent" id="recent"></div>
+    </div>
+
+    <div class="hint">
+      Pen drive ya D: drive ka folder bhi chun sakte ho — software usi folder ka data kholega.
+      Alag firm / alag saal ke liye alag folder rakh sakte ho.
+    </div>
+    <div class="err" id="err"></div>
+    <button class="primary" id="start">Shuru Karein &nbsp;⏎</button>
+  </div>
+
+  <script>
+    let current = "";
+    const $ = (id) => document.getElementById(id);
+
+    function render(state) {
+      current = state.current;
+      $("path").textContent = current;
+      $("path").title = current;
+      $("mode").textContent = state.portable ? "Portable" : "Installed";
+      const box = $("recent");
+      box.innerHTML = "";
+      if (!state.recent.length) {
+        const d = document.createElement("div"); d.className = "empty"; d.textContent = "Abhi koi pichla folder nahi."; box.appendChild(d);
+      }
+      state.recent.forEach((r) => {
+        const d = document.createElement("div");
+        d.textContent = r; d.title = r;
+        if (r === current) d.classList.add("active");
+        d.onclick = () => { current = r; $("path").textContent = r; $("path").title = r; [...box.children].forEach((c) => c.classList.toggle("active", c.textContent === r)); };
+        box.appendChild(d);
+      });
+    }
+
+    async function start() {
+      $("err").textContent = "";
+      $("start").disabled = true;
+      const res = await window.chooser.start(current);
+      if (!res.ok) { $("err").textContent = res.error || "Folder select nahi ho paya"; $("start").disabled = false; }
+    }
+
+    $("browse").onclick = async () => {
+      const p = await window.chooser.browse();
+      if (p) { current = p; $("path").textContent = p; $("path").title = p; }
+    };
+    $("start").onclick = start;
+    document.addEventListener("keydown", (e) => { if (e.key === "Enter") start(); });
+
+    window.chooser.state().then(render);
+  </script>
+</body>
+</html>

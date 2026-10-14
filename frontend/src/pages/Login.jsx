@@ -9,12 +9,10 @@ const LOGIN_BG =
   "https://static.prod-images.emergentagent.com/jobs/5310cfb1-247e-4bde-89f4-53c2779393b0/images/3a7d9f0a75e96c1d8e8a4a3bd61df26ccfd6fcfc9a9bcd8a4c653ad039d30bc7.png";
 
 export default function Login() {
-  const { login, register } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState("login"); // login | register
   const [email, setEmail] = useState("admin@galla.com");
-  const [password, setPassword] = useState("admin123");
-  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -22,13 +20,8 @@ export default function Login() {
     e.preventDefault();
     setBusy(true);
     try {
-      if (mode === "login") {
-        await login(email, password);
-        toast.success("Swagat hai!");
-      } else {
-        await register(email, password, name || email.split("@")[0]);
-        toast.success("Account banaya gaya.");
-      }
+      await login(email, password);
+      toast.success("Swagat hai!");
       navigate("/", { replace: true });
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
@@ -57,7 +50,7 @@ export default function Login() {
               <Storefront size={22} weight="bold" />
             </div>
             <div>
-              <div className="font-heading font-bold text-lg">Galla Bahi</div>
+              <div className="font-heading font-bold text-lg">9x Vyapari</div>
               <div className="text-[11px] uppercase tracking-widest text-white/70">
                 Kaccha Arhat Hisab
               </div>
@@ -87,29 +80,11 @@ export default function Login() {
       <div className="w-full md:w-1/2 grid place-items-center paper-bg px-6">
         <div className="w-full max-w-sm">
           <div className="mb-8">
-            <div className="font-heading font-bold text-2xl tracking-tight">
-              {mode === "login" ? "Swagat hai" : "Naya Khata"}
-            </div>
-            <div className="text-muted2 text-sm mt-1">
-              {mode === "login"
-                ? "Apne hisab-kitab me login karein."
-                : "Apna account banayein."}
-            </div>
+            <div className="font-heading font-bold text-2xl tracking-tight">Swagat hai</div>
+            <div className="text-muted2 text-sm mt-1">Apne hisab-kitab me login karein.</div>
           </div>
 
           <form onSubmit={submit} className="space-y-4">
-            {mode === "register" && (
-              <div>
-                <label className="lbl">Naam</label>
-                <input
-                  className="input-dense"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Aapka naam"
-                  data-testid="input-name"
-                />
-              </div>
-            )}
             <div>
               <label className="lbl">Email</label>
               <input
@@ -150,38 +125,12 @@ export default function Login() {
               className="btn-primary w-full justify-center"
               data-testid="btn-submit"
             >
-              {busy ? "Ek sec..." : mode === "login" ? "Login karein" : "Account banao"}
+              {busy ? "Ek sec..." : "Login karein"}
             </button>
           </form>
 
-          <div className="mt-5 text-center text-sm text-muted2">
-            {mode === "login" ? (
-              <>
-                Naya user?{" "}
-                <button
-                  className="text-terracotta font-medium hover:underline"
-                  onClick={() => setMode("register")}
-                  data-testid="link-register"
-                >
-                  Account banao
-                </button>
-              </>
-            ) : (
-              <>
-                Pehle se account hai?{" "}
-                <button
-                  className="text-terracotta font-medium hover:underline"
-                  onClick={() => setMode("login")}
-                  data-testid="link-login"
-                >
-                  Login karein
-                </button>
-              </>
-            )}
-          </div>
-
           <div className="mt-8 text-[11px] text-muted2/70 text-center font-mono-data">
-            Default: admin@galla.com / admin123
+            Single-user software · Password badalne ke liye Settings me jayein
           </div>
         </div>
       </div>

@@ -1,7 +1,8 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import api from "@/lib/api";
+import api, { formatApiErrorDetail } from "@/lib/api";
+import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import ShortcutHelp from "@/components/ShortcutHelp";
 import {
@@ -54,8 +55,19 @@ export default function Layout() {
     api.get("/settings").then((r) => setSettings(r.data)).catch(() => {});
   }, []);
 
+  const [loggingOut, setLoggingOut] = useState(false);
+
   const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      const { data } = await api.post("/backup/auto", { reason: "logout" });
+      toast.success(`Auto backup ban gaya: ${data.name}`);
+    } catch (err) {
+      toast.error("Auto backup nahi ban paya: " + (formatApiErrorDetail(err.response?.data?.detail) || err.message));
+    }
     await logout();
+    setLoggingOut(false);
     navigate("/login", { replace: true });
   };
 
@@ -96,10 +108,10 @@ export default function Layout() {
             </div>
             <div className="leading-tight">
               <div className="font-heading font-semibold text-[15px] text-white">
-                {settings?.firm_name || "Galla Bahi"}
+                {settings?.firm_name || "9x Vyapari"}
               </div>
-              <div className="text-[10px] uppercase tracking-widest text-white/50">
-                Hisab Kitab v1.4
+              <div className="text-[10px] uppercase tracking-widest text-white/50" data-testid="app-version-badge">
+                {window.vyapari?.version ? `9x Vyapari Desktop v${window.vyapari.version}` : "9x Vyapari · Hisab Kitab"}
               </div>
             </div>
           </div>
@@ -160,8 +172,9 @@ export default function Layout() {
             </div>
             <button
               onClick={handleLogout}
-              className="p-2 rounded-sm hover:bg-white/10 text-white/70 hover:text-white"
-              title="Quit / Logout"
+              disabled={loggingOut}
+              className="p-2 rounded-sm hover:bg-white/10 text-white/70 hover:text-white disabled:opacity-50"
+              title="Logout (auto backup ke saath)"
               data-testid="btn-logout"
             >
               <Power size={16} />
