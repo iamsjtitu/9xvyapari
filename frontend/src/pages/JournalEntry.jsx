@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
-import { Plus, Trash, BookOpenText, X } from "@phosphor-icons/react";
+import { Plus, Trash, BookOpenText, X, PencilSimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -20,7 +20,19 @@ export default function JournalEntry() {
   const [accounts, setAccounts] = useState([]);
   const [parties, setParties] = useState([]);
   const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(blank());
+
+  const closeForm = () => { setOpen(false); setEditId(null); setForm(blank()); };
+  const startEdit = (j) => {
+    setForm({
+      date: (j.date || "").slice(0, 10), narration: j.narration || "", ref: j.ref || "", voucher_no: j.voucher_no,
+      lines: (j.lines || []).map((l) => ({ account_id: l.account_id, account_name: l.account_name,
+        debit: l.debit ? String(l.debit) : "", credit: l.credit ? String(l.credit) : "" })),
+    });
+    setEditId(j.id);
+    setOpen(true);
+  };
 
   const load = async () => setEntries((await api.get("/journal")).data);
   useEffect(() => { load(); }, []);
@@ -63,9 +75,14 @@ export default function JournalEntry() {
         }));
       if (lines.length < 2) return toast.error("Kam se kam 2 lines daalein");
       const payload = { date: form.date, narration: form.narration, ref: form.ref, lines };
-      await api.post("/journal", payload);
-      toast.success("Journal saved");
-      setOpen(false); setForm(blank()); load();
+      if (editId) {
+        await api.put(`/journal/${editId}`, payload);
+        toast.success(`Journal ${form.voucher_no || ""} update ho gaya`);
+      } else {
+        await api.post("/journal", payload);
+        toast.success("Journal saved");
+      }
+      closeForm(); load();
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
     }
@@ -79,11 +96,11 @@ export default function JournalEntry() {
 
   // Keyboard shortcuts
   useKeyboardShortcuts([
-    { key: "a", action: () => { setForm(blank()); setOpen(true); },
+    { key: "a", action: () => { setEditId(null); setForm(blank()); setOpen(true); },
       description: "Add new journal" },
     { ctrl: true, key: "s", action: () => open && save(),
       allowInInputs: true, description: "Save journal" },
-    { key: "Escape", action: () => setOpen(false), allowInInputs: true,
+    { key: "Escape", action: () => closeForm(), allowInInputs: true,
       description: "Close modal" },
   ], [open]);
 
@@ -108,7 +125,7 @@ export default function JournalEntry() {
             ],
             rows: entries,
           }]} />
-          <button className="btn-primary" onClick={() => { setForm(blank()); setOpen(true); }} data-testid="btn-new-journal">
+          <button className="btn-primary" onClick={() => { setEditId(null); setForm(blank()); setOpen(true); }} data-testid="btn-new-journal">
             <Plus size={16} weight="bold" /> Nayi Journal <span className="kbd ml-1">D</span>
           </button>
         </div>
@@ -151,7 +168,8 @@ export default function JournalEntry() {
                 </td>
                 <td className="num font-medium">₹ {inr(j.total)}</td>
                 <td>
-                  <button className="btn-ghost p-1.5" onClick={() => del(j.id)}><Trash size={14} /></button>
+                  <button className="btn-ghost p-1.5" onClick={() => startEdit(j)} title="Edit" data-testid={`journal-edit-${j.id}`}><PencilSimple size={14} /></button>
+                  <button className="btn-ghost p-1.5" onClick={() => del(j.id)} title="Delete" data-testid={`journal-del-${j.id}`}><Trash size={14} /></button>
                 </td>
               </tr>
             ))}
@@ -161,14 +179,16 @@ export default function JournalEntry() {
 
       {open && (
         <div className="fixed inset-0 bg-black/40 grid place-items-start z-50 p-4 overflow-y-auto"
-             onClick={() => setOpen(false)}>
+             onClick={closeForm}>
           <div onClick={(e) => e.stopPropagation()} className="card-flat w-full max-w-3xl my-6 p-6">
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2">
                 <BookOpenText size={20} color="#8B2520" weight="bold" />
-                <div className="font-heading font-semibold text-lg">Nayi Journal Entry</div>
+                <div className="font-heading font-semibold text-lg" data-testid="journal-modal-title">
+                  {editId ? `Journal Edit — ${form.voucher_no || ""}` : "Nayi Journal Entry"}
+                </div>
               </div>
-              <button className="btn-ghost p-1.5" onClick={() => setOpen(false)}><X size={16} /></button>
+              <button className="btn-ghost p-1.5" onClick={closeForm}><X size={16} /></button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
@@ -254,10 +274,10 @@ export default function JournalEntry() {
             </div>
 
             <div className="flex justify-end gap-2 mt-5">
-              <button className="btn-outline" onClick={() => setOpen(false)}>Cancel</button>
+              <button className="btn-outline" onClick={closeForm}>Cancel</button>
               <button className="btn-primary" onClick={save} disabled={totals.diff !== 0 || totals.d === 0}
                 data-testid="btn-save-journal">
-                Save Journal
+                {editId ? "Update Journal" : "Save Journal"}
               </button>
             </div>
           </div>

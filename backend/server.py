@@ -787,23 +787,40 @@ async def list_journal(date_from: Optional[str] = None, date_to: Optional[str] =
     entries = await db.journal.find(q, {"_id": 0}).sort("date", -1).to_list(5000)
     return entries
 
-@api.post("/journal")
-async def create_journal(body: JournalIn, current=Depends(get_current_user)):
-    # double-entry validation
+def _validate_journal(body: JournalIn) -> float:
     tot_d = sum(ln.debit for ln in body.lines)
     tot_c = sum(ln.credit for ln in body.lines)
     if round(tot_d, 2) != round(tot_c, 2):
         raise HTTPException(400, f"Debit ({tot_d}) aur Credit ({tot_c}) match nahi karte")
     if tot_d <= 0:
         raise HTTPException(400, "Amount > 0 hona chahiye")
+    return round(tot_d, 2)
+
+
+@api.post("/journal")
+async def create_journal(body: JournalIn, current=Depends(get_current_user)):
+    total = _validate_journal(body)
     doc = body.model_dump()
     doc["id"] = str(uuid.uuid4())
     doc["voucher_no"] = f"J{(await db.journal.count_documents({}) + 1):05d}"
-    doc["total"] = round(tot_d, 2)
+    doc["total"] = total
     doc["created_at"] = now_iso()
     await db.journal.insert_one(doc.copy())
     doc.pop("_id", None)
     return doc
+
+
+@api.put("/journal/{jid}")
+async def update_journal(jid: str, body: JournalIn, current=Depends(get_current_user)):
+    existing = await db.journal.find_one({"id": jid}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Journal entry nahi mili")
+    total = _validate_journal(body)
+    doc = body.model_dump()
+    doc["total"] = total
+    doc["updated_at"] = now_iso()
+    await db.journal.update_one({"id": jid}, {"$set": doc})
+    return {**existing, **doc}
 
 @api.delete("/journal/{jid}")
 async def delete_journal(jid: str, current=Depends(get_current_user)):
