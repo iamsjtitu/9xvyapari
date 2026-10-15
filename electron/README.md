@@ -40,6 +40,12 @@ Aapka repo **private** hai to installed app me "Update check nahi ho paya (404)"
   4. "Save to GitHub" se naya build chalao → Releases se **naya Setup install karo** (token build me embed hota hai) → ab se updates khud aayenge
 - Build log me warning dikhegi agar repo private hai aur `UPDATE_TOKEN` nahi hai.
 
+### Update kaise dikhta hai (app ke andar)
+- App khulne ke ~8 sec baad (aur har 6 ghante) khud check hota hai. Naya version mila to **neeche-right me banner**: "Naya Update Available · v1.0.x" → download progress bar (MB / %, speed) → "Update Taiyaar Hai" ke saath **Abhi Restart Karein / Baad Me**.
+- **Settings → Software Update** card me version, last status/progress aur "Update Check Karein" button hai. (Help menu → "Update Check Karein" bhi wahi karta hai.)
+- Portable version download nahi karta — banner me "Download Page Kholein" aata hai.
+- UI test karne ke liye (bina real release): `VYAPARI_SIMULATE_UPDATE=1` env ke saath app chalao → fake update v9.9.9 ka pura flow banner me dikhega.
+
 ---
 
 ## 2. Install & pehla login

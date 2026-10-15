@@ -383,9 +383,13 @@ async def delete_party(pid: str, current=Depends(get_current_user)):
     await db.parties.delete_one({"id": pid})
     return {"ok": True}
 
-async def _compute_party_balance(party_id: str, opening: float) -> float:
+def _upto(as_on: Optional[str]) -> dict:
+    return {"date": {"$lte": as_on}} if as_on else {}
+
+
+async def _compute_party_balance(party_id: str, opening: float, as_on: Optional[str] = None) -> float:
     bal = opening
-    bills = await db.bills.find({"party_id": party_id}, {"_id": 0}).to_list(5000)
+    bills = await db.bills.find({"party_id": party_id, **_upto(as_on)}, {"_id": 0}).to_list(5000)
     for b in bills:
         # sale: party owes us total - payment_received
         # purchase: we owe party total - payment_received => subtract
@@ -393,7 +397,7 @@ async def _compute_party_balance(party_id: str, opening: float) -> float:
             bal += b["total"] - b.get("payment_received", 0)
         else:
             bal -= b["total"] - b.get("payment_received", 0)
-    rokads = await db.rokad.find({"party_id": party_id}, {"_id": 0}).to_list(5000)
+    rokads = await db.rokad.find({"party_id": party_id, **_upto(as_on)}, {"_id": 0}).to_list(5000)
     for r in rokads:
         if r.get("ref_bill_id"):
             continue  # already counted in bill payment_received
@@ -401,12 +405,17 @@ async def _compute_party_balance(party_id: str, opening: float) -> float:
             bal -= r["amount"]  # party paid us
         else:
             bal += r["amount"]  # we paid party
+    # Journal vouchers can post directly to a party ledger (Dr = party owes more)
+    async for j in db.journal.find({"lines.account_id": party_id, **_upto(as_on)}, {"_id": 0, "lines": 1}):
+        for line in j.get("lines", []):
+            if line.get("account_id") == party_id:
+                bal += float(line.get("debit") or 0) - float(line.get("credit") or 0)
     # Imported DOS journal entries (AN.DBF) for this party
     # Match where this party is EITHER the primary (party_id) OR the counter-party
     # For counter-party entries we flip debit/credit (since the other side has the
     # opposite effect on this party's balance).
     dosj = await db.dos_journal.find(
-        {"$or": [{"party_id": party_id}, {"counter_party_id": party_id}]},
+        {"$or": [{"party_id": party_id}, {"counter_party_id": party_id}], **_upto(as_on)},
         {"_id": 0}
     ).to_list(5000)
     for j in dosj:
@@ -756,16 +765,16 @@ async def delete_account(aid: str, current=Depends(get_current_user)):
     await db.accounts.delete_one({"id": aid})
     return {"ok": True}
 
-async def _compute_account_balance(aid: str, opening: float) -> float:
+async def _compute_account_balance(aid: str, opening: float, as_on: Optional[str] = None) -> float:
     """Compute account balance from journal entries + rokad with cash_account_id."""
     bal = opening
     # journal lines
-    async for j in db.journal.find({}, {"_id": 0}):
+    async for j in db.journal.find({"lines.account_id": aid, **_upto(as_on)}, {"_id": 0}):
         for line in j.get("lines", []):
             if line.get("account_id") == aid:
                 bal += line.get("debit", 0) - line.get("credit", 0)
     # rokad mapped to this cash account
-    async for r in db.rokad.find({"cash_account_id": aid}, {"_id": 0}):
+    async for r in db.rokad.find({"cash_account_id": aid, **_upto(as_on)}, {"_id": 0}):
         if r["type"] == "jama":
             bal += r["amount"]    # receipt – cash account debited (increases)
         else:
@@ -1096,8 +1105,9 @@ async def yearend_undo(current=Depends(get_current_user)):
 
 
 @api.get("/reports/opening-balances")
-async def opening_balances(fy_id: Optional[str] = None, current=Depends(get_current_user)):
-    """DOS-style Opening Balance Sheet: live openings, or the carried-forward snapshot of a closed year."""
+async def opening_balances(fy_id: Optional[str] = None, as_on: Optional[str] = None, current=Depends(get_current_user)):
+    """DOS-style Balance Sheet: live balances as on a date (opening + entries till then),
+    or the carried-forward opening snapshot of a closed year."""
     s = await get_settings(current)
     groups = sorted(await db.account_groups.find({}, {"_id": 0}).to_list(500), key=lambda g: g.get("fcode") or 0)
     party_group = {p["id"]: p.get("group_id") for p in await db.parties.find({}, {"_id": 0, "id": 1, "group_id": 1}).to_list(20000)}
@@ -1116,13 +1126,16 @@ async def opening_balances(fy_id: Optional[str] = None, current=Depends(get_curr
             ledgers.append({"code": r.get("code") or 0, "name": r.get("name", ""), "group_id": acc_group.get(r["id"]),
                             "balance": float(r.get("new_opening") or 0), "kind": "account"})
     else:
-        as_on, fy_text = s.get("fy_start"), f"{s.get('fy_start')} to {s.get('fy_end')}"
+        if as_on and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", as_on):
+            raise HTTPException(400, "as_on date YYYY-MM-DD format me do")
+        as_on = as_on or datetime.now(timezone.utc).date().isoformat()
+        fy_text = f"{s.get('fy_start')} to {s.get('fy_end')}"
         for p in await db.parties.find({}, {"_id": 0}).to_list(20000):
             ledgers.append({"code": p.get("code") or 0, "name": p.get("name", ""), "group_id": p.get("group_id"),
-                            "balance": float(p.get("opening_balance") or 0), "kind": "party"})
+                            "balance": await _compute_party_balance(p["id"], float(p.get("opening_balance") or 0), as_on), "kind": "party"})
         for a in await db.accounts.find({}, {"_id": 0}).to_list(5000):
             ledgers.append({"code": a.get("code") or 0, "name": a.get("name", ""), "group_id": a.get("group_id"),
-                            "balance": float(a.get("opening_balance") or 0), "kind": "account"})
+                            "balance": await _compute_account_balance(a["id"], float(a.get("opening_balance") or 0), as_on), "kind": "account"})
 
     ledgers = [l for l in ledgers if abs(l["balance"]) >= 0.005]
     sections = []

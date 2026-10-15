@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "sonner";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import Layout from "@/components/Layout";
+import UpdateBanner from "@/components/UpdateBanner";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import RokadPanna from "@/pages/RokadPanna";
@@ -50,6 +51,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Sonner position="top-right" richColors />
+        <UpdateBanner />
         <Routes>
           <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
           <Route

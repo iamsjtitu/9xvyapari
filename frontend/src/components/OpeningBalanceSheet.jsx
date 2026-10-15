@@ -40,7 +40,7 @@ export const OpeningBalanceSheet = ({ data }) => (
     </div>
 
     <div className="dos-grand" data-testid="ob-grand">
-      <div className="flex justify-between"><span>LEDGERS WITH OPENING BALANCE</span><span>{data.count}</span></div>
+      <div className="flex justify-between"><span>LEDGERS WITH BALANCE</span><span>{data.count}</span></div>
       <div className="flex justify-between font-bold"><span>GRAND TOTAL DEBIT</span><span data-testid="ob-grand-dr">₹ {inr(data.grand_dr)}</span></div>
       <div className="flex justify-between font-bold"><span>GRAND TOTAL CREDIT</span><span data-testid="ob-grand-cr">₹ {inr(data.grand_cr)}</span></div>
       <div className="flex justify-between border-t border-black mt-1 pt-1">

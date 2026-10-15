@@ -1,9 +1,29 @@
 const { autoUpdater } = require("electron-updater");
-const { app, dialog, shell, net } = require("electron");
+const { app, dialog, shell, net, ipcMain } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const log = require("electron-log");
 const { friendlyUpdateError, resolveFeed } = require("./update-messages");
+const { makeStatus, progressStatus, simulateSequence } = require("./update-status");
+
+// Single status hub: renderer gets live pushes ("update:status") + can pull the last one ("update:get-status")
+const hub = { status: makeStatus("idle"), actions: {}, getWin: () => null };
+
+function emit(status) {
+  hub.status = status;
+  log.info(`update: ${status.state} ${status.message || ""}`);
+  const win = hub.getWin();
+  if (win && !win.isDestroyed()) win.webContents.send("update:status", status);
+}
+
+function registerUpdateIpc() {
+  ipcMain.handle("update:get-status", () => hub.status);
+  ipcMain.handle("update:action", async (_e, action) => {
+    const fn = hub.actions[String(action)];
+    if (typeof fn === "function") await fn();
+    return hub.status;
+  });
+}
 
 function readUpdateConfig() {
   try {
@@ -13,21 +33,23 @@ function readUpdateConfig() {
   }
 }
 
-function showUpdateProblem(getWin, err, cfg) {
-  dialog.showMessageBox(getWin(), {
-    type: "warning", title: "Update", message: "Update check nahi ho paya",
-    detail: friendlyUpdateError(err, cfg),
-  });
+function reportError(err, cfg, manual) {
+  const detail = friendlyUpdateError(err, cfg);
+  emit(makeStatus("error", { manual, message: detail.split("\n")[0], detail }));
+  if (manual) {
+    dialog.showMessageBox(hub.getWin(), { type: "warning", title: "Update", message: "Update check nahi ho paya", detail });
+  }
 }
 
-// Portable / zip builds can't self-install: just check GitHub for a newer release and open the page
-function setupPortableCheck(getWin, cfg) {
+// Portable / zip builds can't self-install: check GitHub for a newer release and point to the download page
+function setupPortableCheck(cfg) {
   const releases = `https://github.com/${cfg.owner}/${cfg.repo}/releases/latest`;
   const check = async (manual) => {
     if (!cfg.owner || !cfg.repo) {
-      if (manual) dialog.showMessageBox(getWin(), { type: "info", title: "Update", message: "Update source configure nahi hai." });
+      if (manual) emit(makeStatus("error", { manual, message: "Update source configure nahi hai." }));
       return;
     }
+    emit(makeStatus("checking", { manual }));
     try {
       const headers = { "User-Agent": "9x-Vyapari", Accept: "application/vnd.github+json" };
       if (cfg.token) headers.Authorization = `Bearer ${cfg.token}`;
@@ -36,29 +58,33 @@ function setupPortableCheck(getWin, cfg) {
       const latest = String((await res.json()).tag_name || "").replace(/^v/, "");
       const cur = app.getVersion();
       const newer = latest && latest.localeCompare(cur, undefined, { numeric: true }) > 0;
-      if (newer) {
-        const { response } = await dialog.showMessageBox(getWin(), {
-          type: "info", buttons: ["Download Page Kholein", "Baad Me"], defaultId: 0, cancelId: 1,
-          title: "Naya version available",
-          message: `9x Vyapari v${latest} available hai (aapka: v${cur}).`,
-          detail: "Portable version khud update nahi hota — nayi file download karke purani ki jagah rakhein. Data folder same rahega.",
-        });
-        if (response === 0) shell.openExternal(releases);
-      } else if (manual) {
-        dialog.showMessageBox(getWin(), { type: "info", title: "Update", message: "Aap already latest version par hain." });
-      }
+      if (newer) emit(makeStatus("portable-available", { version: latest, releaseUrl: releases }));
+      else emit(makeStatus("not-available", { version: cur, manual }));
     } catch (err) {
       log.warn("portable update check failed", err?.message);
-      if (manual) showUpdateProblem(getWin, err, cfg);
+      reportError(err, cfg, manual);
     }
   };
+  hub.actions = { check: () => check(true), openRelease: () => shell.openExternal(releases) };
   setTimeout(() => check(false), 8000);
   return { check: () => check(true) };
 }
 
+function setupSimulated() {
+  const run = (manual) => simulateSequence(emit, { manual });
+  hub.actions = {
+    check: () => run(true),
+    install: () => dialog.showMessageBox(hub.getWin(), { type: "info", title: "Update (simulation)", message: "Yahan app restart hokar naya version install hota." }),
+  };
+  setTimeout(() => run(false), 3000);
+  return { check: () => run(true) };
+}
+
 function setupAutoUpdate(getWin, { portable } = {}) {
+  hub.getWin = getWin;
+  if (process.env.VYAPARI_SIMULATE_UPDATE) return setupSimulated();
   const cfg = readUpdateConfig();
-  if (portable) return setupPortableCheck(getWin, cfg);
+  if (portable) return setupPortableCheck(cfg);
 
   autoUpdater.logger = log;
   autoUpdater.autoDownload = true;
@@ -73,33 +99,25 @@ function setupAutoUpdate(getWin, { portable } = {}) {
   }
 
   let manual = false;
+  let pendingVersion = "";
 
-  autoUpdater.on("update-available", (info) => log.info(`Update available: v${info.version}`));
-
+  autoUpdater.on("checking-for-update", () => emit(makeStatus("checking", { manual })));
+  autoUpdater.on("update-available", (info) => {
+    pendingVersion = info.version;
+    emit(makeStatus("available", { version: info.version }));
+  });
+  autoUpdater.on("download-progress", (p) => emit(progressStatus(p, pendingVersion)));
   autoUpdater.on("update-not-available", () => {
-    if (manual) {
-      dialog.showMessageBox(getWin(), { type: "info", title: "Update", message: "Aap already latest version par hain." });
-    }
+    emit(makeStatus("not-available", { version: app.getVersion(), manual }));
     manual = false;
   });
-
-  autoUpdater.on("update-downloaded", async (info) => {
+  autoUpdater.on("update-downloaded", (info) => {
+    emit(makeStatus("downloaded", { version: info.version }));
     manual = false;
-    const { response } = await dialog.showMessageBox(getWin(), {
-      type: "info",
-      buttons: ["Abhi Restart Karein", "Baad Me"],
-      defaultId: 0,
-      cancelId: 1,
-      title: "Update taiyaar hai",
-      message: `9x Vyapari v${info.version} download ho gaya hai.`,
-      detail: "Restart karne par naya version install ho jayega. Aapka data surakshit rahega.",
-    });
-    if (response === 0) autoUpdater.quitAndInstall(false, true);
   });
-
   autoUpdater.on("error", (err) => {
     log.warn("autoUpdater error", err?.message);
-    if (manual) showUpdateProblem(getWin, err, cfg);
+    reportError(err, cfg, manual);
     manual = false;
   });
 
@@ -107,6 +125,7 @@ function setupAutoUpdate(getWin, { portable } = {}) {
     manual = isManual;
     autoUpdater.checkForUpdates().catch(() => {});
   };
+  hub.actions = { check: () => check(true), install: () => autoUpdater.quitAndInstall(false, true) };
 
   setTimeout(() => check(false), 8000);
   setInterval(() => check(false), 6 * 60 * 60 * 1000);
@@ -114,4 +133,4 @@ function setupAutoUpdate(getWin, { portable } = {}) {
   return { check: () => check(true) };
 }
 
-module.exports = { setupAutoUpdate };
+module.exports = { setupAutoUpdate, registerUpdateIpc };

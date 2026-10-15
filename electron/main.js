@@ -3,7 +3,7 @@ const path = require("path");
 const log = require("electron-log");
 const { startServices, stopServices } = require("./lib/services");
 const { buildMenu } = require("./lib/menu");
-const { setupAutoUpdate } = require("./lib/updater");
+const { setupAutoUpdate, registerUpdateIpc } = require("./lib/updater");
 const { loadAppConfig, saveAppConfig } = require("./lib/config");
 const { chooseDataRoot } = require("./lib/chooser");
 const { registerPrintIpc } = require("./lib/printing");
@@ -13,6 +13,7 @@ Object.assign(console, log.functions);
 
 if (!app.requestSingleInstanceLock()) app.quit();
 registerPrintIpc();
+registerUpdateIpc();
 
 const ICON = path.join(__dirname, "build", "icon.png");
 let mainWin = null;
@@ -108,7 +109,9 @@ app.whenReady().then(async () => {
     }));
     setSplashStatus("9x Vyapari khul raha hai...");
     await showMain(services.url);
-    if (app.isPackaged) updater = setupAutoUpdate(() => mainWin, { portable: appCfg.portable });
+    if (app.isPackaged || process.env.VYAPARI_SIMULATE_UPDATE) {
+      updater = setupAutoUpdate(() => mainWin, { portable: appCfg.portable });
+    }
   } catch (err) {
     log.error("Startup failed", err);
     closeSplash();

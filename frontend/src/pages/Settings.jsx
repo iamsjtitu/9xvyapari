@@ -3,6 +3,7 @@ import api, { formatApiErrorDetail, todayISO } from "@/lib/api";
 import { FloppyDisk, Calendar } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ChangePasswordCard } from "@/components/ChangePasswordCard";
+import { SoftwareUpdateCard } from "@/components/SoftwareUpdateCard";
 
 export default function Settings() {
   const [form, setForm] = useState(null);
@@ -93,6 +94,7 @@ export default function Settings() {
       </div>
 
       <ChangePasswordCard />
+      <SoftwareUpdateCard />
     </div>
   );
 }
