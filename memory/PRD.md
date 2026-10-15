@@ -64,6 +64,12 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 ### Jun 2026 – Security audit (read-only)
 - Findings: SEC-001 HIGH CSRF (SameSite=None cookies, no CSRF token — web deployment only); SEC-002 MEDIUM default `admin123` + plaintext `config.json` in desktop. Hardening: login rate-limit, hide /docs in prod, honor `password_changed_at`, openExternal scheme allowlist, restrict migrate-dos-data folder, remove unused python-jose. **Not yet fixed — awaiting user decision.**
 
+### Jun 2026 – In-app Update Banner + Progress, Balance Sheet "As on date"
+- Auto-update UI: `electron/lib/update-status.js` (pure status builder, unit tests `scripts/test_update_status.js`), `updater.js` pushes `update:status` over IPC + `update:get-status` pull + `update:action` (check/install/openRelease); `preload.js` exposes `onUpdateStatus/getUpdateStatus/updateAction`. Frontend: `hooks/useDesktopUpdate.js` (also listens to window event `vyapari:update` for web simulation), `components/UpdateBanner.jsx` (bottom-right: available → downloading with MB/%/speed progress bar → "Update Taiyaar Hai" Restart/Baad Me; portable → Download page; manual error → retry + details), `components/SoftwareUpdateCard.jsx` on Settings (version, status, progress, "Update Check Karein"). `VYAPARI_SIMULATE_UPDATE=1` env runs a fake v9.9.9 flow. Verified in packaged Linux Electron via `scripts/e2e_update_banner.py` (pull + live push paths) + testing agent iteration_11.
+- Opening Balance Sheet: user chose "As on date" (default today) → `/api/reports/opening-balances?as_on=YYYY-MM-DD` = opening + all entries ≤ date (`_compute_party_balance/_compute_account_balance` got `as_on`); fy_id snapshot mode unchanged. UI: date input + chips Aaj / Working Date / FY Start / FY End (URL `?as_on=`). Far-future as_on == Trial Balance totals exactly.
+- Bug fixed: journal lines posted to a PARTY were ignored in party balance (ledger/TB/year-end). `todayISO()` now local date (was UTC → wrong before 05:30 IST).
+- Known data artifact in preview DB: 15 rokad rows reference a deleted bank account id (dangling `cash_account_id`) — consider blocking account delete when entries exist.
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅

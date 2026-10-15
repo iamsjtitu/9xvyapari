@@ -1128,7 +1128,7 @@ async def opening_balances(fy_id: Optional[str] = None, as_on: Optional[str] = N
     else:
         if as_on and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", as_on):
             raise HTTPException(400, "as_on date YYYY-MM-DD format me do")
-        as_on = as_on or datetime.now(timezone.utc).date().isoformat()
+        as_on = as_on or datetime.now().date().isoformat()  # local date of the machine running the app
         fy_text = f"{s.get('fy_start')} to {s.get('fy_end')}"
         for p in await db.parties.find({}, {"_id": 0}).to_list(20000):
             ledgers.append({"code": p.get("code") or 0, "name": p.get("name", ""), "group_id": p.get("group_id"),

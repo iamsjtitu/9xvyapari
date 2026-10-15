@@ -1,0 +1,25 @@
+{
+  "summary": "Iteration 11: Verified (a) opening-balance 'as on date' endpoint & journal-on-party fix via pytest (6/6 pass), (b) full Opening Balance /opening-balance UI with as_on default, quick chips, URL sync, grand totals changing between FY start and today, (c) UpdateBanner state machine simulation (available/downloading 43%/downloaded/error-manual with retry+detail, older-at ignored, Later hides banner, non-manual not-available & error suppressed), (d) Settings 'Software Update' card in web mode (disabled check, downloading message, Restart & Install v1.0.1), (e) regression: login, dashboard, trial-balance, rokad, footer. Also ran node electron update-status unit tests (all pass). All checks passed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_opening_balance_asof.py",
+    "/app/test_reports/pytest/iteration_11.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now 2219 lines — consider splitting into routers (parties, journal, reports, dbf-import). Not blocking.",
+    "/api/reports/opening-balances with as_on=2099-12-31 takes ~1-2s because it iterates every party+account and performs multiple Mongo queries each. Consider aggregating via $lookup/$facet for scale.",
+    "Default as_on uses datetime.now(timezone.utc).date() which may differ from server local date in some deployments; today the UTC date matches, but worth noting."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_opening_balance_asof.py (new)"
+  ],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100% (all simulated flows & regression)"},
+  "test_credentials": "admin / admin123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Journal entry (party Dr 1000 / Cash IN Hand Cr 1000) created & cleanly deleted inside test; no residual TEST_ data.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression test file for as_on + journal-on-party at /app/backend/tests/test_opening_balance_asof.py (6 tests, run via: REACT_APP_BACKEND_URL=... pytest). The fixture 'M M TRADERS.' (exact match) party has a 13,00,000 jama rokad on 2026-05-01 — magnitude asserted (sign depends on dr/cr convention). Future-dated as_on=2099-12-31 matches trial-balance grand totals exactly. UpdateBanner responds to window CustomEvent('vyapari:update',{detail:...}) and ignores detail.at older than last processed timestamp. Settings 'software-update-check-btn' is disabled in web mode. All opening-balance quick chips (today/working/fystart/fyend) + select-ob-source dropdown present. No code changes made.",
+  "rca of the issue": "N/A — nothing broken."
+}

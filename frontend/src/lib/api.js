@@ -31,6 +31,10 @@ export function formatApiErrorDetail(detail) {
 export const inr = (n) =>
   new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(Number(n || 0));
 
-export const todayISO = () => new Date().toISOString().slice(0, 10);
+// Local calendar date (toISOString() is UTC → wrong date before 05:30 IST)
+export const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 export default api;
