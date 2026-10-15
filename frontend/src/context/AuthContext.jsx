@@ -25,8 +25,15 @@ export function AuthProvider({ children }) {
   const login = async (username, password) => {
     const { data } = await api.post("/auth/login", { username, password });
     if (data.access_token) localStorage.setItem("access_token", data.access_token);
-    setUser({ id: data.id, username: data.username, name: data.name, role: data.role });
+    setUser({ id: data.id, username: data.username, name: data.name, role: data.role,
+      must_change_password: !!data.must_change_password });
     return data;
+  };
+
+  // After a password change the old tokens are revoked → store the fresh one and clear the first-run flag
+  const passwordChanged = (data) => {
+    if (data?.access_token) localStorage.setItem("access_token", data.access_token);
+    setUser((u) => (u ? { ...u, username: data?.username || u.username, must_change_password: false } : u));
   };
 
   const logout = async () => {
@@ -36,7 +43,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthCtx.Provider value={{ user, loading, login, logout, refresh }}>
+    <AuthCtx.Provider value={{ user, loading, login, logout, refresh, passwordChanged }}>
       {children}
     </AuthCtx.Provider>
   );

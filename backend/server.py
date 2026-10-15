@@ -13,9 +13,12 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Literal
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
+from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
+
+from security import LoginThrottle, client_ip, cookie_policy, csrf_block_reason
 
 # --- Mongo ---
 mongo_url = os.environ['MONGO_URL']
@@ -26,6 +29,9 @@ db = client[os.environ['DB_NAME']]
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_MIN = 60 * 24  # 1 day (desktop usage – long session)
 REFRESH_TOKEN_DAYS = 30
+COOKIE = cookie_policy()
+DEFAULT_ADMIN_PASSWORD = "admin123"
+login_throttle = LoginThrottle()
 
 def get_jwt_secret() -> str:
     return os.environ["JWT_SECRET"]
@@ -37,22 +43,30 @@ def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
 def create_access_token(user_id: str, username: str) -> str:
-    payload = {"sub": user_id, "username": username,
-               "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_MIN),
+    now = datetime.now(timezone.utc)
+    payload = {"sub": user_id, "username": username, "iat": int(now.timestamp()),
+               "exp": now + timedelta(minutes=ACCESS_TOKEN_MIN),
                "type": "access"}
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 def create_refresh_token(user_id: str) -> str:
-    payload = {"sub": user_id,
-               "exp": datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_DAYS),
+    now = datetime.now(timezone.utc)
+    payload = {"sub": user_id, "iat": int(now.timestamp()),
+               "exp": now + timedelta(days=REFRESH_TOKEN_DAYS),
                "type": "refresh"}
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 def set_auth_cookies(response: Response, access: str, refresh: str):
-    response.set_cookie("access_token", access, httponly=True, secure=True, samesite="none",
+    response.set_cookie("access_token", access, httponly=True, secure=COOKIE["secure"], samesite=COOKIE["samesite"],
                         max_age=ACCESS_TOKEN_MIN * 60, path="/")
-    response.set_cookie("refresh_token", refresh, httponly=True, secure=True, samesite="none",
+    response.set_cookie("refresh_token", refresh, httponly=True, secure=COOKIE["secure"], samesite=COOKIE["samesite"],
                         max_age=REFRESH_TOKEN_DAYS * 86400, path="/")
+
+def _password_changed_ts(user: dict) -> int:
+    try:
+        return int(datetime.fromisoformat(user.get("password_changed_at") or "").timestamp())
+    except ValueError:
+        return 0
 
 async def get_current_user(request: Request) -> dict:
     token = request.cookies.get("access_token")
@@ -64,18 +78,21 @@ async def get_current_user(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
         payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
-        if payload.get("type") != "access":
-            raise HTTPException(status_code=401, detail="Invalid token type")
-        user = await db.users.find_one({"id": payload["sub"]})
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
-        user.pop("_id", None)
-        user.pop("password_hash", None)
-        return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+    if payload.get("type") != "access":
+        raise HTTPException(status_code=401, detail="Invalid token type")
+    user = await db.users.find_one({"id": payload["sub"]})
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    # Tokens issued before the last password change are revoked
+    if int(payload.get("iat") or 0) < _password_changed_ts(user):
+        raise HTTPException(status_code=401, detail="Password badla gaya hai – dobara login karein")
+    user.pop("_id", None)
+    user.pop("password_hash", None)
+    return user
 
 
 # --- Models ---
@@ -87,7 +104,7 @@ class UserOut(BaseModel):
 
 class ChangePasswordIn(BaseModel):
     current_password: str
-    new_password: Optional[str] = Field(default=None, min_length=4, max_length=128)
+    new_password: Optional[str] = Field(default=None, min_length=6, max_length=128)
     new_username: Optional[str] = Field(default=None, min_length=3, max_length=32)
 
 class LoginIn(BaseModel):
@@ -279,7 +296,8 @@ class SettingsIn(BaseModel):
 
 
 # --- App / Router ---
-app = FastAPI()
+_docs_on = os.environ.get("ENABLE_DOCS") == "1"  # interactive API docs off unless explicitly enabled
+app = FastAPI(docs_url="/docs" if _docs_on else None, redoc_url=None, openapi_url="/openapi.json" if _docs_on else None)
 api = APIRouter(prefix="/api")
 
 
@@ -297,26 +315,29 @@ def _norm_username(u: str) -> str:
 
 def _user_out(user: dict, access: Optional[str] = None) -> dict:
     out = {"id": user["id"], "username": user.get("username") or "", "name": user.get("name", ""),
-           "role": user.get("role", "user")}
+           "role": user.get("role", "user"), "must_change_password": bool(user.get("must_change_password"))}
     if access:
         out["access_token"] = access
     return out
 
 
 @api.post("/auth/change-password")
-async def change_password(body: ChangePasswordIn, current=Depends(get_current_user)):
-    """Change password and/or username (current password required)."""
+async def change_password(body: ChangePasswordIn, response: Response, current=Depends(get_current_user)):
+    """Change password and/or username (current password required). Issues fresh tokens (old ones get revoked)."""
     user = await db.users.find_one({"id": current["id"]})
     if not user or not verify_password(body.current_password, user["password_hash"]):
         raise HTTPException(status_code=400, detail="Purana password galat hai")
     if not body.new_password and not body.new_username:
         raise HTTPException(status_code=400, detail="Naya password ya naya username dein")
+    if user.get("must_change_password") and not body.new_password:
+        raise HTTPException(status_code=400, detail="Pehle naya password set karein")
     updates = {}
     if body.new_password:
-        if body.current_password == body.new_password:
-            raise HTTPException(status_code=400, detail="Naya password purane se alag hona chahiye")
+        if body.current_password == body.new_password or body.new_password == DEFAULT_ADMIN_PASSWORD:
+            raise HTTPException(status_code=400, detail="Naya password purane/default se alag hona chahiye")
         updates["password_hash"] = hash_password(body.new_password)
         updates["password_changed_at"] = now_iso()
+        updates["must_change_password"] = False
     if body.new_username:
         uname = _norm_username(body.new_username)
         if not USERNAME_RE.match(uname):
@@ -326,15 +347,25 @@ async def change_password(body: ChangePasswordIn, current=Depends(get_current_us
             raise HTTPException(status_code=400, detail="Yeh username pehle se hai")
         updates["username"] = uname
     await db.users.update_one({"id": current["id"]}, {"$set": updates})
-    return {"ok": True, "username": updates.get("username") or user.get("username")}
+    username = updates.get("username") or user.get("username")
+    access = create_access_token(user["id"], username)
+    set_auth_cookies(response, access, create_refresh_token(user["id"]))
+    return {"ok": True, "username": username, "access_token": access, "must_change_password": False}
 
 
 @api.post("/auth/login")
-async def login(body: LoginIn, response: Response):
+async def login(body: LoginIn, request: Request, response: Response):
     uname = _norm_username(body.username)
+    ip = client_ip(request.headers, request.client.host if request.client else "")
+    wait = login_throttle.locked_for(ip, uname)
+    if wait:
+        raise HTTPException(status_code=429, detail=f"Bahut baar galat password. {max(1, wait // 60)} minute baad try karein.")
     user = await db.users.find_one({"username": uname})
     if not user or not verify_password(body.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Username ya password galat hai")
+        left = login_throttle.failed(ip, uname)
+        hint = f" ({left} koshish baaki)" if 0 < left <= 2 else (" – 15 minute ke liye lock" if left == 0 else "")
+        raise HTTPException(status_code=401, detail=f"Username ya password galat hai{hint}")
+    login_throttle.succeeded(ip, uname)
     access = create_access_token(user["id"], uname)
     refresh = create_refresh_token(user["id"])
     set_auth_cookies(response, access, refresh)
@@ -380,8 +411,52 @@ async def update_party(pid: str, body: PartyIn, current=Depends(get_current_user
 
 @api.delete("/parties/{pid}")
 async def delete_party(pid: str, current=Depends(get_current_user)):
+    party = await db.parties.find_one({"id": pid}, {"_id": 0, "name": 1})
+    if not party:
+        raise HTTPException(404, "Party not found")
+    await _ensure_ledger_unused(pid, party["name"])
     await db.parties.delete_one({"id": pid})
     return {"ok": True}
+
+
+async def _ledger_usage(lid: str) -> dict:
+    """Where a ledger (party or account) is referenced: counts + a few sample entries."""
+    cash_or_party = {"$or": [{"cash_account_id": lid}, {"party_id": lid}]}
+    bills_q = {"$or": [{"party_id": lid}, {"agent_id": lid}, {"buyer_id": lid}]}
+    counts = {
+        "rokad": await db.rokad.count_documents(cash_or_party),
+        "bills": await db.bills.count_documents(bills_q),
+        "journal": await db.journal.count_documents({"lines.account_id": lid}),
+        "dos_journal": await db.dos_journal.count_documents({"$or": [{"party_id": lid}, {"counter_party_id": lid}]}),
+        "inward": await db.inward.count_documents({"cold_storage_id": lid}),
+    }
+    samples = []
+    async for r in db.rokad.find(cash_or_party, {"_id": 0}).sort("date", -1).limit(5):
+        role = "Cash A/C" if r.get("cash_account_id") == lid else "Party"
+        samples.append({"kind": "rokad", "date": r.get("date"), "amount": r.get("amount"),
+                        "text": f"{'Jama' if r.get('type') == 'jama' else 'Kharch'} · {role} · {r.get('party_name') or r.get('description') or ''}"
+                                + (f" · V.No {r['voucher_no']}" if r.get("voucher_no") else "")})
+    async for b in db.bills.find(bills_q, {"_id": 0}).sort("date", -1).limit(5):
+        samples.append({"kind": "bill", "date": b.get("date"), "amount": b.get("total"),
+                        "text": f"{'Sale' if b.get('bill_type') == 'sale' else 'Purchase'} Bill {b.get('bill_no')} · {b.get('party_name', '')}"})
+    async for j in db.journal.find({"lines.account_id": lid}, {"_id": 0}).sort("date", -1).limit(5):
+        samples.append({"kind": "journal", "date": j.get("date"), "amount": j.get("total"),
+                        "text": f"Journal {j.get('voucher_no', '')} · {j.get('narration', '')}"})
+    return {"total": sum(counts.values()), "counts": counts, "samples": samples[:8]}
+
+
+async def _ensure_ledger_unused(lid: str, name: str):
+    usage = await _ledger_usage(lid)
+    if usage["total"]:
+        raise HTTPException(409, {"message": f'"{name}" delete nahi ho sakta — {usage["total"]} entries isko use kar rahi hain. '
+                                             "Pehle woh entries hatayein ya kisi aur account par shift karein.",
+                                  "name": name, **usage})
+
+
+@api.get("/ledgers/{lid}/usage")
+async def ledger_usage(lid: str, current=Depends(get_current_user)):
+    return await _ledger_usage(lid)
+
 
 def _upto(as_on: Optional[str]) -> dict:
     return {"date": {"$lte": as_on}} if as_on else {}
@@ -405,6 +480,11 @@ async def _compute_party_balance(party_id: str, opening: float, as_on: Optional[
             bal -= r["amount"]  # party paid us
         else:
             bal += r["amount"]  # we paid party
+    # Cash/bank ledgers are parties too: receipts debit the cash a/c, payments credit it
+    async for r in db.rokad.find({"cash_account_id": party_id, **_upto(as_on)}, {"_id": 0, "type": 1, "amount": 1, "party_id": 1}):
+        if r.get("party_id") == party_id:
+            continue
+        bal += r["amount"] if r["type"] == "jama" else -r["amount"]
     # Journal vouchers can post directly to a party ledger (Dr = party owes more)
     async for j in db.journal.find({"lines.account_id": party_id, **_upto(as_on)}, {"_id": 0, "lines": 1}):
         for line in j.get("lines", []):
@@ -608,6 +688,45 @@ async def delete_rokad(rid: str, current=Depends(get_current_user)):
     return {"ok": True}
 
 
+async def _cash_ledgers() -> list:
+    """Cash/bank ledgers = parties in the CASH & BANK group + legacy accounts in cash/bank groups."""
+    groups = {g["id"]: g for g in await db.account_groups.find({}, {"_id": 0}).to_list(500)}
+    cash_gids = {gid for gid, g in groups.items() if re.search(r"cash|bank", g.get("name", ""), re.I)}
+    out = []
+    for p in await db.parties.find({"group_id": {"$in": list(cash_gids)}}, {"_id": 0}).sort("code", 1).to_list(500):
+        out.append({"id": p["id"], "name": p["name"], "code": p.get("code"), "kind": "party",
+                    "group_name": groups.get(p.get("group_id"), {}).get("name", ""), "opening_balance": float(p.get("opening_balance") or 0)})
+    for a in await db.accounts.find({"group_id": {"$in": list(cash_gids)}}, {"_id": 0}).sort("name", 1).to_list(500):
+        out.append({"id": a["id"], "name": a["name"], "code": a.get("code"), "kind": "account",
+                    "group_name": groups.get(a.get("group_id"), {}).get("name", ""), "opening_balance": float(a.get("opening_balance") or 0)})
+    return out
+
+
+@api.get("/rokad/accounts-summary")
+async def rokad_accounts_summary(date_from: str, date_to: str, current=Depends(get_current_user)):
+    """Opening (as on day before date_from) / Jama / Kharch / Closing (as on date_to) per cash & bank ledger —
+    same balance engine as the Balance Sheet so closing figures always match."""
+    for d in (date_from, date_to):
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", d):
+            raise HTTPException(400, "Date YYYY-MM-DD format me do")
+    day_before = (datetime.fromisoformat(date_from).date() - timedelta(days=1)).isoformat()
+    rows = []
+    for led in await _cash_ledgers():
+        calc = _compute_party_balance if led["kind"] == "party" else _compute_account_balance
+        opening = await calc(led["id"], led["opening_balance"], day_before)
+        closing = await calc(led["id"], led["opening_balance"], date_to)
+        jama = kharch = 0.0
+        async for r in db.rokad.find({"cash_account_id": led["id"], "date": {"$gte": date_from, "$lte": date_to}}, {"_id": 0, "type": 1, "amount": 1}):
+            if r["type"] == "jama":
+                jama += r["amount"]
+            else:
+                kharch += r["amount"]
+        other = round(closing - opening - jama + kharch, 2)  # journal / DOS entries touching this ledger
+        rows.append({**led, "opening": opening, "jama": round(jama, 2), "kharch": round(kharch, 2), "other": other, "closing": closing})
+    total = {k: round(sum(r[k] for r in rows), 2) for k in ("opening", "jama", "kharch", "other", "closing")}
+    return {"date_from": date_from, "date_to": date_to, "rows": rows, "total": total}
+
+
 # ---------- REPORTS / SUMMARY ----------
 @api.get("/summary/dashboard")
 async def dashboard_summary(current=Depends(get_current_user)):
@@ -667,15 +786,29 @@ async def dashboard_summary(current=Depends(get_current_user)):
 
 
 @api.get("/summary/party/{pid}")
-async def party_ledger(pid: str, current=Depends(get_current_user)):
+async def party_ledger(pid: str, as_on: Optional[str] = None, current=Depends(get_current_user)):
     party = await db.parties.find_one({"id": pid}, {"_id": 0})
     if not party:
         raise HTTPException(404, "Party not found")
-    bills = await db.bills.find({"party_id": pid}, {"_id": 0}).sort("date", 1).to_list(5000)
-    rokads = await db.rokad.find({"party_id": pid}, {"_id": 0}).sort("date", 1).to_list(5000)
+    if as_on and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", as_on):
+        raise HTTPException(400, "as_on date YYYY-MM-DD format me do")
+    upto = _upto(as_on)
+    bills = await db.bills.find({"party_id": pid, **upto}, {"_id": 0}).sort("date", 1).to_list(5000)
+    rokads = await db.rokad.find({"party_id": pid, **upto}, {"_id": 0}).sort("date", 1).to_list(5000)
+    # Entries where this ledger is the cash/bank account side (cash-group parties)
+    cash_rokad = [r for r in await db.rokad.find({"cash_account_id": pid, **upto}, {"_id": 0}).sort("date", 1).to_list(5000)
+                  if r.get("party_id") != pid]
+    journal = []
+    async for j in db.journal.find({"lines.account_id": pid, **upto}, {"_id": 0}).sort("date", 1):
+        for ln in j.get("lines", []):
+            if ln.get("account_id") == pid:
+                other = ", ".join(x.get("account_name", "") for x in j.get("lines", []) if x.get("account_id") != pid)
+                journal.append({"id": j["id"], "date": j.get("date"), "voucher_no": j.get("voucher_no", ""),
+                                "narration": j.get("narration", ""), "other": other,
+                                "debit": float(ln.get("debit") or 0), "credit": float(ln.get("credit") or 0)})
     # Imported DOS journal entries (AN.DBF) - match primary OR counter-party
     dos_raw = await db.dos_journal.find(
-        {"$or": [{"party_id": pid}, {"counter_party_id": pid}]},
+        {"$or": [{"party_id": pid}, {"counter_party_id": pid}], **upto},
         {"_id": 0}
     ).sort([("date", 1), ("ref_no", 1)]).to_list(5000)
     # Flip debit/credit for counter-party rows so the ledger displays correctly
@@ -692,8 +825,9 @@ async def party_ledger(pid: str, current=Depends(get_current_user)):
             entry["is_counter_side"] = False
             entry["other_party_name"] = j.get("counter_party_name") or ""
         dos_journal.append(entry)
-    party["balance"] = await _compute_party_balance(pid, party.get("opening_balance", 0.0))
-    return {"party": party, "bills": bills, "rokad": rokads, "dos_journal": dos_journal}
+    party["balance"] = await _compute_party_balance(pid, party.get("opening_balance", 0.0), as_on)
+    return {"party": party, "as_on": as_on, "bills": bills, "rokad": rokads, "cash_rokad": cash_rokad,
+            "journal": journal, "dos_journal": dos_journal}
 
 
 # ---------- ACCOUNT GROUPS ----------
@@ -762,6 +896,10 @@ async def update_account(aid: str, body: AccountIn, current=Depends(get_current_
 
 @api.delete("/accounts/{aid}")
 async def delete_account(aid: str, current=Depends(get_current_user)):
+    acc = await db.accounts.find_one({"id": aid}, {"_id": 0, "name": 1})
+    if not acc:
+        raise HTTPException(404, "Account not found")
+    await _ensure_ledger_unused(aid, acc["name"])
     await db.accounts.delete_one({"id": aid})
     return {"ok": True}
 
@@ -1963,7 +2101,15 @@ async def migrate_dos_data(payload: dict = None, current=Depends(get_current_use
     except ImportError:
         raise HTTPException(500, "dbfread not installed")
 
-    folder = (payload or {}).get("folder") or os.environ.get("DOS_BACKUP_DIR") or "/app/backend/dos_backup/FOXPRO2/WS2026"
+    dos_root = Path(os.environ.get("DOS_BACKUP_DIR") or (ROOT_DIR / "dos_backup")).resolve()
+    requested = (payload or {}).get("folder")
+    if requested:  # only sub-folders of the configured DOS backup folder are allowed
+        folder = Path(requested).resolve()
+        if dos_root not in (folder, *folder.parents):
+            raise HTTPException(400, f"Folder sirf DOS backup folder ke andar ho sakta hai: {dos_root}")
+    else:
+        folder = next((c for c in (dos_root / "FOXPRO2" / "WS2026", dos_root) if c.is_dir()), dos_root)
+    folder = str(folder)
     if not _os.path.isdir(folder):
         raise HTTPException(400, f"DOS folder not found: {folder}")
 
@@ -2069,6 +2215,18 @@ app.include_router(api)
 
 # CORS – cookies + credentials require explicit origins
 origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "")
+
+
+@app.middleware("http")
+async def csrf_guard(request: Request, call_next):
+    reason = csrf_block_reason(request.method, request.url.path, request.headers, request.cookies, origins, FRONTEND_URL)
+    if reason:
+        msg = "Request block hua: origin allowed nahi hai" if reason == "origin" else "Request block hua (CSRF check) – page refresh karke dobara try karein"
+        return JSONResponse(status_code=403, content={"detail": msg})
+    return await call_next(request)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins or ["*"],
@@ -2121,7 +2279,7 @@ async def on_start():
 
     # Seed admin only once – never overwrite a password the user changed in-app
     admin_username = _norm_username(os.environ.get("ADMIN_USERNAME", "admin"))
-    admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+    admin_password = os.environ.get("ADMIN_PASSWORD", DEFAULT_ADMIN_PASSWORD)
     legacy_email = os.environ.get("ADMIN_EMAIL", "admin@galla.com").lower()
     existing = await db.users.find_one({"username": admin_username})
     if not existing:
@@ -2129,6 +2287,7 @@ async def on_start():
         if legacy:  # migrate old email-based admin to username login
             await db.users.update_one({"id": legacy["id"]}, {"$set": {"username": admin_username}})
             logger.info(f"Migrated admin {legacy_email} -> username '{admin_username}'")
+            existing = await db.users.find_one({"username": admin_username})
         else:
             await db.users.insert_one({
                 "id": str(uuid.uuid4()),
@@ -2136,9 +2295,16 @@ async def on_start():
                 "name": "Admin",
                 "password_hash": hash_password(admin_password),
                 "role": "admin",
+                "must_change_password": admin_password == DEFAULT_ADMIN_PASSWORD,  # first run → force new password
                 "created_at": now_iso(),
             })
             logger.info(f"Seeded admin: {admin_username}")
+    # Existing installs: still on the well-known default password → force a change at next login
+    if existing and "must_change_password" not in existing:
+        weak = not existing.get("password_changed_at") and verify_password(DEFAULT_ADMIN_PASSWORD, existing["password_hash"])
+        await db.users.update_one({"id": existing["id"]}, {"$set": {"must_change_password": weak}})
+        if weak:
+            logger.warning("Admin is using the default password – password change will be required at login")
 
     # Seed sample galla items if empty
     if await db.items.count_documents({}) == 0:

@@ -34,17 +34,14 @@ export default function RokadPanna() {
     setEntries(data);
   };
 
-  // All rokad entries (for opening balance calc of every cash/bank account)
-  const [allEntries, setAllEntries] = useState([]);
-  const loadAll = () => api.get("/rokad").then((r) => setAllEntries(r.data)).catch(() => {});
-  useEffect(() => { loadAll(); }, []);
-  const allBankEntries = useMemo(
-    () => (bankFilter ? allEntries.filter((x) => x.cash_account_id === bankFilter) : []),
-    [allEntries, bankFilter]
-  );
+  // Opening / closing per cash-bank ledger from the backend (same engine as Balance Sheet → figures match)
+  const [summary, setSummary] = useState(null);
+  const loadSummary = () => api.get(`/rokad/accounts-summary?date_from=${dateFrom}&date_to=${dateTo}`)
+    .then((r) => setSummary(r.data)).catch(() => setSummary(null));
 
   useEffect(() => {
     load();
+    loadSummary();
     // eslint-disable-next-line
   }, [dateFrom, dateTo]);
 
@@ -101,24 +98,16 @@ export default function RokadPanna() {
 
   const bankSummary = useMemo(() => {
     if (!bankFilter) return null;
-    const openingBalance = (selectedBank?.opening_balance) || 0;
-    let preJama = 0, preKharch = 0;
-    for (const e of allBankEntries) {
-      const d = (e.date || "").slice(0, 10);
-      if (d && d < dateFrom) {
-        if (e.type === "jama") preJama += e.amount;
-        else preKharch += e.amount;
-      }
-    }
-    const opening = openingBalance + preJama - preKharch;
-    const closing = opening + totals.jama - totals.kharch;
+    const row = summary?.rows?.find((r) => r.id === bankFilter);
+    const opening = row ? row.opening : (selectedBank?.opening_balance) || 0;
+    const closing = row ? row.closing : opening + totals.jama - totals.kharch;
     const vouchers = visibleEntries
       .map((e) => parseInt(String(e.voucher_no || "").trim()))
       .filter((n) => !isNaN(n));
     const vMin = vouchers.length ? Math.min(...vouchers) : null;
     const vMax = vouchers.length ? Math.max(...vouchers) : null;
-    return { opening, closing, vMin, vMax, count: visibleEntries.length };
-  }, [bankFilter, selectedBank, allBankEntries, dateFrom, totals, visibleEntries]);
+    return { opening, closing, other: row?.other || 0, vMin, vMax, count: visibleEntries.length };
+  }, [bankFilter, selectedBank, summary, totals, visibleEntries]);
 
   // Default cash account (CASH IN HAND) – preselected when the form opens
   const defaultCash = useMemo(
@@ -133,25 +122,11 @@ export default function RokadPanna() {
     // eslint-disable-next-line
   }, [showAdd, accounts, bankFilter, defaultCash]);
 
-  // Per-account opening/closing for the "All" view
+  // Per-account opening/closing for the "All" view (backend figures)
   const allAccountsSummary = useMemo(() => {
-    if (bankFilter || accounts.length === 0) return null;
-    const rows = accounts.map((a) => {
-      let pre = 0, jama = 0, kharch = 0;
-      for (const e of allEntries) {
-        if (e.cash_account_id !== a.id) continue;
-        const d = (e.date || "").slice(0, 10);
-        const signed = e.type === "jama" ? e.amount : -e.amount;
-        if (d < dateFrom) pre += signed;
-        else if (d <= dateTo) { if (e.type === "jama") jama += e.amount; else kharch += e.amount; }
-      }
-      const opening = (a.opening_balance || 0) + pre;
-      return { ...a, opening, jama, kharch, closing: opening + jama - kharch };
-    });
-    const total = rows.reduce((t, r) => ({ opening: t.opening + r.opening, jama: t.jama + r.jama,
-      kharch: t.kharch + r.kharch, closing: t.closing + r.closing }), { opening: 0, jama: 0, kharch: 0, closing: 0 });
-    return { rows, total };
-  }, [bankFilter, accounts, allEntries, dateFrom, dateTo]);
+    if (bankFilter || !summary?.rows?.length) return null;
+    return { rows: summary.rows, total: summary.total, hasOther: summary.rows.some((r) => Math.abs(r.other || 0) >= 0.005) };
+  }, [bankFilter, summary]);
 
   const closeForm = () => { setShowAdd(false); setEditId(null); setForm({ ...emptyForm, date: dateTo }); };
 
@@ -183,7 +158,7 @@ export default function RokadPanna() {
       }
       closeForm();
       load();
-      loadAll();
+      loadSummary();
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
     }
@@ -194,7 +169,7 @@ export default function RokadPanna() {
     await api.delete(`/rokad/${id}`);
     toast.success("Entry delete ki gayi");
     load();
-    loadAll();
+    loadSummary();
   };
 
   const Side = ({ side, list, color, bg, label, icon: Icon }) => (
@@ -390,14 +365,18 @@ export default function RokadPanna() {
             </div>
             <div>
               <div className="text-[11px] uppercase tracking-wider text-muted2">Opening Balance</div>
-              <div className="font-mono-data text-xl font-medium" style={{ color: bankSummary.opening >= 0 ? "#1A1A1A" : "#B71C1C" }}>
+              <div className="font-mono-data text-xl font-medium" style={{ color: bankSummary.opening >= 0 ? "#1A1A1A" : "#B71C1C" }} data-testid="bank-opening">
                 ₹ {inr(Math.abs(bankSummary.opening))} {bankSummary.opening >= 0 ? "Dr" : "Cr"}
               </div>
+              <div className="text-[10px] text-muted2 font-mono-data">pehle {dateFrom}</div>
             </div>
             <div>
               <div className="text-[11px] uppercase tracking-wider text-muted2">Closing Balance</div>
-              <div className="font-mono-data text-xl font-medium" style={{ color: bankSummary.closing >= 0 ? "#1B5E20" : "#B71C1C" }}>
+              <div className="font-mono-data text-xl font-medium" style={{ color: bankSummary.closing >= 0 ? "#1B5E20" : "#B71C1C" }} data-testid="bank-closing">
                 ₹ {inr(Math.abs(bankSummary.closing))} {bankSummary.closing >= 0 ? "Dr" : "Cr"}
+              </div>
+              <div className="text-[10px] text-muted2 font-mono-data">
+                as on {dateTo}{Math.abs(bankSummary.other) >= 0.005 ? ` · journal/anya ${bankSummary.other > 0 ? "+" : "−"}₹${inr(Math.abs(bankSummary.other))}` : ""}
               </div>
             </div>
             <div>
@@ -418,7 +397,7 @@ export default function RokadPanna() {
         <div className="card-flat overflow-hidden" data-testid="all-accounts-summary">
           <div className="px-5 py-2.5 border-b border-khaki flex items-center justify-between">
             <div className="section-title">Sabhi Cash / Bank Accounts — Balance</div>
-            <div className="text-[11px] text-muted2 font-mono-data">{dateFrom === dateTo ? `As on ${dateFrom}` : `${dateFrom} → ${dateTo}`}</div>
+            <div className="text-[11px] text-muted2 font-mono-data">{dateFrom === dateTo ? `As on ${dateFrom}` : `${dateFrom} → ${dateTo}`} · Balance Sheet se match</div>
           </div>
           <table className="dense w-full text-sm">
             <thead>
@@ -427,6 +406,7 @@ export default function RokadPanna() {
                 <th className="num">Opening</th>
                 <th className="num">Jama</th>
                 <th className="num">Kharch</th>
+                {allAccountsSummary.hasOther && <th className="num" title="Journal / DOS entries jo is ledger ko chhoo rahi hain">Journal/Anya</th>}
                 <th className="num">Closing</th>
               </tr>
             </thead>
@@ -435,11 +415,14 @@ export default function RokadPanna() {
                 <tr key={r.id} className="cursor-pointer hover:bg-parchment/60" onClick={() => setBankFilter(r.id)}
                   title="Is account ka cash book kholein" data-testid={`acct-row-${r.id}`}>
                   <td className="font-medium">{r.code ? `${r.code} · ` : ""}{r.name}</td>
-                  <td className="num font-mono-data" style={{ color: r.opening < 0 ? "#B71C1C" : "#1A1A1A" }}>
+                  <td className="num font-mono-data" style={{ color: r.opening < 0 ? "#B71C1C" : "#1A1A1A" }} data-testid={`acct-opening-${r.id}`}>
                     ₹ {inr(Math.abs(r.opening))} {r.opening < 0 ? "Cr" : "Dr"}
                   </td>
                   <td className="num font-mono-data amount-jama">{r.jama ? `₹ ${inr(r.jama)}` : "—"}</td>
                   <td className="num font-mono-data amount-kharch">{r.kharch ? `₹ ${inr(r.kharch)}` : "—"}</td>
+                  {allAccountsSummary.hasOther && (
+                    <td className="num font-mono-data text-muted2">{Math.abs(r.other) >= 0.005 ? `${r.other > 0 ? "+" : "−"}₹ ${inr(Math.abs(r.other))}` : "—"}</td>
+                  )}
                   <td className="num font-mono-data font-medium" style={{ color: r.closing < 0 ? "#B71C1C" : "#1B5E20" }}
                     data-testid={`acct-closing-${r.id}`}>
                     ₹ {inr(Math.abs(r.closing))} {r.closing < 0 ? "Cr" : "Dr"}
@@ -451,6 +434,7 @@ export default function RokadPanna() {
                 <td className="num font-mono-data">₹ {inr(Math.abs(allAccountsSummary.total.opening))} {allAccountsSummary.total.opening < 0 ? "Cr" : "Dr"}</td>
                 <td className="num font-mono-data amount-jama">₹ {inr(allAccountsSummary.total.jama)}</td>
                 <td className="num font-mono-data amount-kharch">₹ {inr(allAccountsSummary.total.kharch)}</td>
+                {allAccountsSummary.hasOther && <td className="num font-mono-data text-muted2">{allAccountsSummary.total.other > 0 ? "+" : "−"}₹ {inr(Math.abs(allAccountsSummary.total.other))}</td>}
                 <td className="num font-mono-data" data-testid="acct-total-closing">₹ {inr(Math.abs(allAccountsSummary.total.closing))} {allAccountsSummary.total.closing < 0 ? "Cr" : "Dr"}</td>
               </tr>
             </tbody>

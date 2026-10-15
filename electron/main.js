@@ -60,7 +60,7 @@ async function showMain(url) {
     mainWin.show();
   });
   mainWin.webContents.setWindowOpenHandler(({ url: target }) => {
-    shell.openExternal(target);
+    if (/^https?:\/\//i.test(target) || /^(mailto|tel):/i.test(target)) shell.openExternal(target);
     return { action: "deny" };
   });
   mainWin.on("closed", () => { mainWin = null; });

@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import Layout from "@/components/Layout";
 import UpdateBanner from "@/components/UpdateBanner";
 import Login from "@/pages/Login";
+import SetPassword from "@/pages/SetPassword";
 import Dashboard from "@/pages/Dashboard";
 import RokadPanna from "@/pages/RokadPanna";
 import PartyKhata from "@/pages/PartyKhata";
@@ -36,6 +37,7 @@ function Protected({ children }) {
     );
   }
   if (!user) return <Navigate to="/login" replace />;
+  if (user.must_change_password) return <SetPassword />;
   return children;
 }
 

@@ -4,6 +4,7 @@ import { Plus, PencilSimple, Trash, X, MagnifyingGlass } from "@phosphor-icons/r
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { LedgerInUseDialog, inUseInfo } from "@/components/LedgerInUseDialog";
 
 const EMPTY = { name: "", group_id: "", opening_balance: 0, phone: "", address: "", notes: "" };
 
@@ -14,6 +15,7 @@ export default function Accounts() {
   const [filterGroup, setFilterGroup] = useState("");
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
+  const [inUse, setInUse] = useState(null);
 
   const load = async () => {
     const params = filterGroup ? `?group_id=${filterGroup}` : "";
@@ -39,8 +41,14 @@ export default function Accounts() {
 
   const del = async (id) => {
     if (!window.confirm("Delete this account?")) return;
-    await api.delete(`/accounts/${id}`);
-    toast.success("Deleted"); load();
+    try {
+      await api.delete(`/accounts/${id}`);
+      toast.success("Deleted"); load();
+    } catch (err) {
+      const info = inUseInfo(err);
+      if (info) setInUse(info);
+      else toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
+    }
   };
 
   const filtered = accounts.filter((a) =>
@@ -129,7 +137,7 @@ export default function Accounts() {
                     }); }}>
                       <PencilSimple size={14} />
                     </button>
-                    <button className="btn-ghost p-1.5" onClick={() => del(a.id)}>
+                    <button className="btn-ghost p-1.5" onClick={() => del(a.id)} data-testid={`btn-delete-account-${a.id}`}>
                       <Trash size={14} />
                     </button>
                   </div>
@@ -139,6 +147,8 @@ export default function Accounts() {
           </tbody>
         </table>
       </div>
+
+      <LedgerInUseDialog info={inUse} onClose={() => setInUse(null)} />
 
       {editing && (
         <div className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4" onClick={() => setEditing(null)}>

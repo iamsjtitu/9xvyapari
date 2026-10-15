@@ -63,13 +63,14 @@ function loadConfig(userData) {
   const file = path.join(userData, "config.json");
   let cfg = {};
   try { cfg = JSON.parse(fs.readFileSync(file, "utf8")); } catch { cfg = {}; }
+  // admin_password is never persisted: the backend seeds "admin123" once and forces a change at first login
   const next = {
     jwt_secret: cfg.jwt_secret || crypto.randomBytes(32).toString("hex"),
     admin_username: cfg.admin_username || "admin",
-    admin_password: cfg.admin_password || "admin123",
     db_name: cfg.db_name || "vyapari",
   };
-  fs.writeFileSync(file, JSON.stringify(next, null, 2));
+  fs.writeFileSync(file, JSON.stringify(next, null, 2), { mode: 0o600 });
+  try { fs.chmodSync(file, 0o600); } catch {}
   return next;
 }
 
@@ -121,7 +122,6 @@ async function startServices({ dataRoot, resourcesPath, isPackaged, onStatus }) 
     DB_NAME: cfg.db_name,
     JWT_SECRET: cfg.jwt_secret,
     ADMIN_USERNAME: cfg.admin_username,
-    ADMIN_PASSWORD: cfg.admin_password,
     PORT: String(apiPort),
     HOST: "127.0.0.1",
     CORS_ORIGINS: url,

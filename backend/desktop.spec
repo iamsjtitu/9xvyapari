@@ -8,7 +8,7 @@ hiddenimports = (
     + collect_submodules("motor")
     + collect_submodules("pymongo")
     + collect_submodules("bson")
-    + ["dbfread", "bcrypt", "jwt", "email_validator", "dotenv", "dns", "dns.resolver"]
+    + ["dbfread", "bcrypt", "jwt", "email_validator", "dotenv", "dns", "dns.resolver", "security"]
 )
 
 datas = collect_data_files("email_validator") + collect_data_files("dbfread")

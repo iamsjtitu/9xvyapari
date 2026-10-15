@@ -8,6 +8,8 @@ export const API_BASE = `${BACKEND_URL}/api`;
 const api = axios.create({
   baseURL: API_BASE,
   withCredentials: true,
+  // Custom header = CSRF guard (cross-site forms can't send it); backend requires it on cookie-auth writes
+  headers: { "X-Requested-With": "XMLHttpRequest" },
 });
 
 // Bearer fallback (works even if 3rd-party cookies are blocked)
@@ -25,6 +27,7 @@ export function formatApiErrorDetail(detail) {
   if (Array.isArray(detail))
     return detail.map((e) => (e && typeof e.msg === "string" ? e.msg : JSON.stringify(e))).filter(Boolean).join(" ");
   if (detail && typeof detail.msg === "string") return detail.msg;
+  if (detail && typeof detail.message === "string") return detail.message;
   return String(detail);
 }
 

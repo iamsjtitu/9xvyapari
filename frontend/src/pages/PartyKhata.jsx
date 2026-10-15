@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useTableNav } from "@/hooks/useTableNav";
+import { LedgerInUseDialog, inUseInfo } from "@/components/LedgerInUseDialog";
 
 const EMPTY = {
   code: "",
@@ -107,10 +108,17 @@ export default function PartyKhata() {
     });
   };
 
+  const [inUse, setInUse] = useState(null);
   const del = async (id) => {
     if (!window.confirm("Delete this ledger?")) return;
-    await api.delete(`/parties/${id}`);
-    toast.success("Deleted"); load();
+    try {
+      await api.delete(`/parties/${id}`);
+      toast.success("Deleted"); load();
+    } catch (err) {
+      const info = inUseInfo(err);
+      if (info) setInUse(info);
+      else toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
+    }
   };
 
   const filtered = parties.filter((p) => {
@@ -400,6 +408,7 @@ export default function PartyKhata() {
           </form>
         </div>
       )}
+      <LedgerInUseDialog info={inUse} onClose={() => setInUse(null)} />
     </div>
   );
 }
