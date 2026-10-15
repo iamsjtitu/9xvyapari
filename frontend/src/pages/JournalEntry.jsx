@@ -4,6 +4,7 @@ import { Plus, Trash, BookOpenText, X, PencilSimple } from "@phosphor-icons/reac
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 
 const blank = () => ({
   date: todayISO(),
@@ -230,6 +231,7 @@ export default function JournalEntry() {
                             <option key={o.id} value={o.id}>{o.name} ({o.group})</option>
                           ))}
                         </select>
+                        <LedgerBalanceHint ledgerId={l.account_id} compact className="mt-1" testId={`jline-balance-${idx}`} />
                       </td>
                       <td>
                         <input type="number" step="0.01" className="input-dense num" value={l.debit}

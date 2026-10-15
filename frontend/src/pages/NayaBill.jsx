@@ -5,6 +5,7 @@ import { Plus, Trash, Receipt, X, MagnifyingGlass, PencilSimple } from "@phospho
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import PartyAutocomplete from "@/components/PartyAutocomplete";
+import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useTableNav } from "@/hooks/useTableNav";
 
@@ -579,6 +580,7 @@ export default function NayaBill() {
                     testId="select-bill-party"
                     required
                   />
+                  <LedgerBalanceHint ledgerId={form.party_id} className="mt-1" testId="bill-party-balance" />
                 </div>
                 <div className="md:col-span-2">
                   <label className="lbl">Buyer Party (Final Customer)</label>
@@ -595,6 +597,7 @@ export default function NayaBill() {
                     placeholder="Optional — final customer ka naam"
                     testId="select-buyer"
                   />
+                  <LedgerBalanceHint ledgerId={form.buyer_id} className="mt-1" testId="bill-buyer-balance" />
                 </div>
                 <div className="md:col-span-2">
                   <label className="lbl">Agent / Dalal</label>

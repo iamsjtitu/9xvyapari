@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { TransferForm } from "@/components/rokad/TransferForm";
+import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 
 export default function RokadPanna() {
   const [dateFrom, setDateFrom] = useState(todayISO());
@@ -641,6 +642,7 @@ export default function RokadPanna() {
                       </option>
                     ))}
                   </select>
+                  <LedgerBalanceHint ledgerId={form.cash_account_id} compact className="mt-1" testId="rokad-cash-balance" />
                 </div>
                 <div>
                   <label className="lbl">Voucher No.</label>
@@ -684,6 +686,7 @@ export default function RokadPanna() {
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
+                <LedgerBalanceHint ledgerId={form.party_id} className="mt-1" testId="rokad-party-balance" />
               </div>
 
               <div>

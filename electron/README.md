@@ -54,6 +54,8 @@ Aapka repo **private** hai to installed app me "Update check nahi ho paya (404)"
 - Data Folder window me **Shuru Karein** → app khulega → Login: username `admin` / password `admin123`
 - **Pehli baar** login par app "Pehle naya password set karein" screen dikhayega — naya password (min 6) set kiye bina software nahi khulega. Password kahin file me save nahi hota (sirf hash DB me).
 - Single-user software hai (register option nahi). Password badalne ke liye: **Settings → Login Username / Password Badlein**. 5 baar galat password → 15 minute lock.
+- **Cash ↔ Bank transfer**: Cash Register → **Transfer** button (ek entry, dono account update). **Party ledger**: From/As-on date + "Statement (Print)" DOS layout. Dashboard par har cash/bank account ka aaj ka balance.
+- Agar kabhi kisi box me typing na ho (dialog/print preview band karne ke baad) — yeh fix is version me hai; purane build me window ko ek baar minimize/restore karein.
 - Pehli start par Database + Hisab engine start hone me 10–20 sec lag sakte hain (splash screen dikhega).
 
 ## 3. Aapka data kahan hai?

@@ -78,6 +78,15 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - Ledger as on: `/summary/party/{id}?as_on=` returns bills/rokad/**cash_rokad** (ledger used as cash a/c)/**journal** lines/dos_journal ≤ date + `party.balance` as on; `PartyLedger.jsx` has As-on date + chips + closing footer. `_compute_party_balance` now counts the cash-account side of rokad (cash/bank parties) → Balance Sheet/TB/year-end include cash movements.
 - Rokad Panna: `GET /rokad/accounts-summary?date_from&date_to` (opening = balance day before, closing = balance as on date_to, jama/kharch in range, `other` = journal/DOS delta) replaces client-side math → figures equal Balance Sheet (verified: a/c 307 closing −4,43,87,254 everywhere). Testing agent iteration_12: 19/19 backend + all frontend flows pass.
 
+### Jun 2026 – Transfer (contra), Ledger Statement, Dashboard balances, version, balance hint, typing-focus fix
+- **Cash/Bank Transfer**: `POST/GET/PUT /api/rokad/transfer[/{contra_id}]` → two linked rokad legs (kharch on FROM, jama on TO, shared `contra_id`, `counter_account_*`, party_id null); `DELETE /rokad/{leg}` removes both; normal PUT on a leg → 400. UI: Rokad "Transfer" button → `components/rokad/TransferForm.jsx`; legs show TRANSFER badge, pencil opens transfer form.
+- **Ledger statement**: `/summary/party/{id}?date_from=&as_on=` returns `opening` (balance day before From) + entries in range; `PartyLedger.jsx` has From/As-on/“Shuru se”, opening row + closing footer, toggle **Statement (Print)** → `components/PartyStatement.jsx` (DOS layout, also the print output; CSS `.dos-stmt-*`).
+- **Dashboard**: `components/CashBankBalances.jsx` (today's closing per cash/bank ledger via accounts-summary, rows → ledger).
+- **Version**: `lib/brand.js` `appVersion()` (desktop = app.getVersion(), web = `REACT_APP_VERSION` injected by CI, fallback 1.0.0) shown in footer + Help About; CI now sets version before frontend build.
+- **Balance hint**: `GET /api/ledgers/{id}/balance` + `components/LedgerBalanceHint.jsx` under Journal line account, Rokad party & cash a/c, Bill seller/buyer, Transfer from/to.
+- **Typing bug (desktop)**: Electron inputs going deaf after child window/dialog → `electron/lib/focus.js` `refocus()` on print-preview close, dialogs, ready-to-show, window focus; renderer `hooks/useRefocusOnWindowFocus.js` focuses first field of open modal. Needs a new desktop build to take effect.
+- Testing agent iteration_13: 14/14 backend + all UI flows pass (transfer, statement, dashboard card, version). Balance hint verified via screenshot.
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅

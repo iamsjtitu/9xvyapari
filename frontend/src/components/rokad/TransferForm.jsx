@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api, { formatApiErrorDetail, inr } from "@/lib/api";
 import { ArrowsLeftRight, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 
 const EMPTY = { date: "", from_account_id: "", to_account_id: "", amount: "", description: "", voucher_no: "", chq_no: "", mode: "Bank" };
 
@@ -70,6 +71,7 @@ export const TransferForm = ({ accounts, date, contraId, onClose, onSaved }) => 
               <option value="">— chunein —</option>
               {accounts.map((a) => <option key={a.id} value={a.id} disabled={a.id === form.to_account_id}>{a.code ? `${a.code} · ` : ""}{a.name}</option>)}
             </select>
+            <LedgerBalanceHint ledgerId={form.from_account_id} compact className="mt-1" testId="transfer-from-balance" />
           </div>
           <div>
             <label className="lbl">To (paisa aaya) — Jama</label>
@@ -77,6 +79,7 @@ export const TransferForm = ({ accounts, date, contraId, onClose, onSaved }) => 
               <option value="">— chunein —</option>
               {accounts.map((a) => <option key={a.id} value={a.id} disabled={a.id === form.from_account_id}>{a.code ? `${a.code} · ` : ""}{a.name}</option>)}
             </select>
+            <LedgerBalanceHint ledgerId={form.to_account_id} compact className="mt-1" testId="transfer-to-balance" />
           </div>
           <div>
             <label className="lbl">V.No. (optional)</label>

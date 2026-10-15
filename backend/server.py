@@ -458,6 +458,25 @@ async def ledger_usage(lid: str, current=Depends(get_current_user)):
     return await _ledger_usage(lid)
 
 
+@api.get("/ledgers/{lid}/balance")
+async def ledger_balance(lid: str, as_on: Optional[str] = None, current=Depends(get_current_user)):
+    """Quick current balance of a party or account (for 'party select karte hi balance dikhe')."""
+    if as_on and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", as_on):
+        raise HTTPException(400, "as_on date YYYY-MM-DD format me do")
+    p = await db.parties.find_one({"id": lid}, {"_id": 0, "id": 1, "name": 1, "code": 1, "opening_balance": 1, "group_name": 1})
+    if p:
+        bal = await _compute_party_balance(lid, float(p.get("opening_balance") or 0), as_on)
+        kind = "party"
+    else:
+        p = await db.accounts.find_one({"id": lid}, {"_id": 0, "id": 1, "name": 1, "code": 1, "opening_balance": 1, "group_name": 1})
+        if not p:
+            raise HTTPException(404, "Ledger nahi mila")
+        bal = await _compute_account_balance(lid, float(p.get("opening_balance") or 0), as_on)
+        kind = "account"
+    return {"id": lid, "name": p.get("name", ""), "code": p.get("code"), "kind": kind, "group_name": p.get("group_name", ""),
+            "balance": round(bal, 2), "dr_cr": "Dr" if bal > 0 else "Cr" if bal < 0 else "", "as_on": as_on}
+
+
 def _upto(as_on: Optional[str]) -> dict:
     return {"date": {"$lte": as_on}} if as_on else {}
 
