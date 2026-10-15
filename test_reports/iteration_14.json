@@ -1,0 +1,77 @@
+{
+  "summary": "Frontend-only verification of DAY BOOK (Print) on Rokad Panna, LedgerBalanceHint regression, and misc regression. All 6 requested flows PASS end-to-end.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "detailed_results": {
+    "day_book_all_accounts_range_01_05_to_05_05": {
+      "status": "PASS",
+      "notes": [
+        "btn-toggle-daybook toggles between 'Day Book (Print)' and 'List View' labels correctly",
+        "daybook-sheet visible, all-accounts-summary hidden on toggle, roles swap on toggle back",
+        "Header shows '9X VYAPARI', 'ROKAD PANNA · DAY BOOK (CASH / BANK)', '01-05-2026 TO 05-05-2026 · 7 ACCOUNTS'",
+        "Exactly 1 active block for 307 · SBICC-M M TRD. – OPENING BALANCE B/F (CR) 3,66,96,088.00 placed on RIGHT (kharch side) because opening is Cr/overdraft, CLOSING BALANCE C/F (CR) 4,43,87,254.00 on LEFT",
+        "4 jama rows (13,00,000 / 2,00,000 / 4,00,000 / 5,00,000) with parties and vch 116/126/136/136 on left; 4 kharch rows (30,920 / 54,00,000 / 24,08,440 / 22,51,806) on right",
+        "daybook-total-left-* == daybook-total-right-* == 4,67,87,254.00",
+        "daybook-idle lists 6 idle accounts (301, 302, 303, 304, 306, Cash IN Hand) with their closing balances matching all-accounts table",
+        "daybook-grand text: 'Sabhi Accounts · Opening 1,83,84,350.19 Cr + Jama 24,00,000.00 − Kharch 1,00,91,166.00 = Closing 2,60,75,516.19 Cr' – matches spec (case 'Cr' not 'CR', purely cosmetic)"
+      ]
+    },
+    "day_book_single_account": {
+      "status": "PASS",
+      "notes": [
+        "Filter 301 · CASH IN HAND → one block only, OPENING B/F 96,99,945.00 (LEFT, positive Dr), CLOSING C/F 96,99,945.00 (RIGHT); totals both 96,99,945.00; daybook-idle and daybook-grand not rendered",
+        "Filter 307 → single block with 4+4 rows as in all-accounts case"
+      ]
+    },
+    "day_book_with_new_entry_301": {
+      "status": "PASS",
+      "notes": [
+        "Created rokad entry (jama, 2026-05-03, 1,000, account 301, party AAKASH BARGARH)",
+        "301 appears as active block alongside 307 → 2 active blocks; idle shrinks to 5 entries (302/303/304/306/Cash IN Hand)",
+        "301: OPENING BALANCE B/F 96,99,945.00 on LEFT (jama side – positive opening), new 1,000.00 jama row on LEFT, CLOSING BALANCE C/F 97,00,945.00 on RIGHT; totals 97,00,945.00 == 97,00,945.00",
+        "After deleting entry via rokad-del-{id} + accept confirm, 301 returns to idle list; active blocks back to 1 (307 only)"
+      ]
+    },
+    "print_media": {
+      "status": "PASS",
+      "notes": [
+        "On list view with page.emulate_media(media='print'): daybook-sheet visible=True, all-accounts-summary visible=False",
+        "Returning to media='screen': daybook-sheet visible=False, all-accounts-summary visible=True"
+      ]
+    },
+    "ledger_balance_hint": {
+      "status": "PASS",
+      "notes": [
+        "/rokad Nayi Entry → select-party ⇒ rokad-party-balance-amount shows '₹ 670.00 Dr'; select-cash-account ⇒ rokad-cash-balance-amount shows '₹ 97,01,179.00 Dr'",
+        "/journal Nayi Journal → jline-account-0 ⇒ jline-balance-0-amount shows '₹ 52,90,000.00 Dr'",
+        "GET /api/ledgers/{id}/balance observed for each selection in network capture"
+      ]
+    },
+    "regression": {
+      "status": "PASS",
+      "notes": [
+        "btn-transfer opens a transfer modal (data-testid containing 'transfer' found in DOM)",
+        "Dashboard loads (contains '9x Vyapari' and 'Cash')",
+        "Opening Balance page loads at /opening-balance and renders DOS-style sheet with ledger rows"
+      ]
+    }
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Day Book side-placement logic (buildSides) is working: opening-on-right/closing-on-left when account's opening is Cr (overdraft), opening-on-left/closing-on-right otherwise. Totals balance in all cases observed.",
+    "LedgerBalanceHint fires /api/ledgers/{id}/balance correctly from both Rokad and Journal entry modals."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "test_credentials": "admin / Vyapari@2026",
+  "seed_data_creation": "Created and then deleted one Rokad jama entry (2026-05-03, 1000, account 301, party AAKASH BARGARH) during active-block regression. Cleanup verified – no residual data.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Login btn testid is btn-submit (not btn-login). Rokad Nayi Entry btn testid is btn-add-entry. /parties takes ~2-3s to populate select-party inside add-rokad modal — poll until options.length>2. Day Book sheet is always visible for print (print:block on sheet wrapper, print:hidden on list wrapper), confirmed via page.emulate_media('print').",
+  "rca of the issue": "N/A — no issues found."
+}

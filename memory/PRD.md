@@ -87,6 +87,9 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - **Typing bug (desktop)**: Electron inputs going deaf after child window/dialog → `electron/lib/focus.js` `refocus()` on print-preview close, dialogs, ready-to-show, window focus; renderer `hooks/useRefocusOnWindowFocus.js` focuses first field of open modal. Needs a new desktop build to take effect.
 - Testing agent iteration_13: 14/14 backend + all UI flows pass (transfer, statement, dashboard card, version). Balance hint verified via screenshot.
 
+### Jun 2026 – Day Book Print (Rokad Panna)
+- `components/rokad/DayBookSheet.jsx`: DOS T-format per cash/bank account for From→To — Jama (receipts) left / Kharch (payments) right, Opening B/F + Closing C/F placed by sign so both totals balance, "Journal/Anya" line when other≠0, idle accounts (no movement) compact list, grand Sabhi Accounts line. `RokadPanna.jsx` view toggle "Day Book (Print)"; print media always prints the Day Book (list hidden). CSS `.db-*`. Testing agent iteration_14: 100% pass.
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅
