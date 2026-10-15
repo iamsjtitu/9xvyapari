@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 12 covered the full security + safe-delete + ledger-as-on + rokad-summary feature set. Created /app/backend/tests/test_iteration12.py with 19 pytest cases — ALL PASS (19/19). Verified via curl/pytest: (1) login with admin/Vyapari@2026 returns access_token + must_change_password:false, httpOnly cookie set, (2) CSRF: cookie-authed POST without X-Requested-With → 403 'CSRF', with header → 200, cross-origin header → 403 'origin', bearer-token requests don't need the header, GETs never blocked, (3) /api/docs, /api/openapi.json, /api/redoc all 404, (4) rate-limit on throwaway user shows 'koshish baaki' at attempts 3-4, '15 minute lock' at 5, 429 at 6, (5) password change: 'abc' → 422, 'admin123' → 400/422, Temp#123456 → 200 new token B, old token A → 401 'Password badla gaya', new token B → 200; restored back to Vyapari@2026 and re-login OK, (6) DELETE /api/parties/<307> → 409 with total=15, counts.rokad=15, samples; usage endpoint matches; party still exists; throwaway party DELETE → 200; DELETE /api/accounts/<Cash IN Hand> → 409 total≥1; throwaway account DELETE → 200, (7) /api/summary/party/307?as_on=2026-05-05 balance=-44387254.0; as_on=2026-04-30 differs; /api/reports/opening-balances?as_on=2026-05-05 SBICC row balance=-44387254.0, (8) /api/rokad/accounts-summary 2026-05-01→2026-05-05: row 307 opening=-36696088, jama=2400000, kharch=10091166, closing=-44387254; total.closing=-26075516.19; bad date → 400. FRONTEND via Playwright: (a) Party ledger /parties/<307>?as_on=2026-05-05 shows ledger-asof-controls, input-ledger-as-on, chips (Aaj/FY Start/FY End), party-balance '₹ 4,43,87,254.00 Cr', ledger-entry-count '15 entries', ledger-closing-row 'CLOSING BALANCE AS ON 05-05-2026 ₹ 4,43,87,254.00 Cr'; FY End chip updates URL to ?as_on=2027-03-31. (b) /parties search → party-del-<307> → window.confirm accepted → ledger-in-use-dialog shows 'Rokad entries: 15' + samples table; party remains. (c) /accounts btn-delete-account-<CIH> → same ledger-in-use-dialog. (d) /rokad with From 05/01/2026 To 05/05/2026 → all-accounts-summary table with correct per-account figures; acct-total-closing '₹ 2,60,75,516.19 Cr' matching backend exactly. (e) First-run gate: Mongo flag flipped → login lands on set-password-page (NOT app-shell); weak password 'abc' keeps user on gate; valid current+new (Temp#123456) transitions to app-shell without re-login; Settings page accessible with 'Login Username / Password Badlein' and 'Software Update' cards. Admin password restored to Vyapari@2026 at end; must_change_password=false. No code changes.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PartyKhata (/parties)", "issues": ["React hydration warning in console: <span> injected inside <option> (dev-only ve-dynamic instrumentation). Not visible to user, no functional impact — only noise in dev console."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration12.py",
+    "/app/test_reports/pytest/iteration_12.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py now ~2240 lines — consider router splits (auth, parties, accounts, reports, rokad, backup) for maintainability.",
+    "Preview deployment serves cookies with SameSite=None;Secure (needed for cross-site preview host); the spec text said SameSite=Lax. Both are acceptable here — SameSite=None;Secure+httpOnly is required for a cross-origin preview URL, and CSRF guard (header+origin check) is what actually prevents cross-site writes. If the goal is Lax on same-site deployments, backend code already appears to adapt; this is informational, not a bug.",
+    "Non-/api paths /docs, /redoc, /openapi.json fall through to the frontend React SPA (returns index.html with 200). The actual backend equivalents under /api are correctly 404, so no OpenAPI schema leaks. Still fine with current ingress rule."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration12.py (new)"],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "100% (all simulated flows + regression)"},
+  "test_credentials": "admin / Vyapari@2026 (restored at end of run; must_change_password=false)",
+  "seed_data_creation": "Transient: 1 throwaway party + 1 throwaway account (prefixed TEST_) created+deleted inside pytest; 1 backup/auto file written during CSRF tests (standard app behavior, not test residue beyond file).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression file for iteration 12 features at /app/backend/tests/test_iteration12.py (19 tests). Order matters: TestPasswordChangeRevocation revokes all previous tokens, so admin_session fixture is FUNCTION-scoped and re-logins per test. Party code 307 (SBICC-M M TRD., id 5cc51379-e24a-4044-8a29-b9d7e0ce4b86) has 15 rokad entries; closing on 2026-05-05 = -44387254.0 (Cr). Account 'Cash IN Hand' (id ff518072-9f4d-43e3-8cfc-6b148e82280b) has 1 rokad entry. Rokad total.closing for 2026-05-01→05-05 = -26075516.19. Opening-balances report is nested as {sections:[{rows:[...]}]}. Admin password is Vyapari@2026; if changed, restore before finishing. Preview cookies are SameSite=None;Secure.",
+  "rca of the issue": "N/A — no bugs."
+}

@@ -68,7 +68,15 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - Auto-update UI: `electron/lib/update-status.js` (pure status builder, unit tests `scripts/test_update_status.js`), `updater.js` pushes `update:status` over IPC + `update:get-status` pull + `update:action` (check/install/openRelease); `preload.js` exposes `onUpdateStatus/getUpdateStatus/updateAction`. Frontend: `hooks/useDesktopUpdate.js` (also listens to window event `vyapari:update` for web simulation), `components/UpdateBanner.jsx` (bottom-right: available → downloading with MB/%/speed progress bar → "Update Taiyaar Hai" Restart/Baad Me; portable → Download page; manual error → retry + details), `components/SoftwareUpdateCard.jsx` on Settings (version, status, progress, "Update Check Karein"). `VYAPARI_SIMULATE_UPDATE=1` env runs a fake v9.9.9 flow. Verified in packaged Linux Electron via `scripts/e2e_update_banner.py` (pull + live push paths) + testing agent iteration_11.
 - Opening Balance Sheet: user chose "As on date" (default today) → `/api/reports/opening-balances?as_on=YYYY-MM-DD` = opening + all entries ≤ date (`_compute_party_balance/_compute_account_balance` got `as_on`); fy_id snapshot mode unchanged. UI: date input + chips Aaj / Working Date / FY Start / FY End (URL `?as_on=`). Far-future as_on == Trial Balance totals exactly.
 - Bug fixed: journal lines posted to a PARTY were ignored in party balance (ledger/TB/year-end). `todayISO()` now local date (was UTC → wrong before 05:30 IST).
-- Known data artifact in preview DB: 15 rokad rows reference a deleted bank account id (dangling `cash_account_id`) — consider blocking account delete when entries exist.
+- (Corrected) The 15 rokad rows' `cash_account_id` point to PARTY code 307 'SBICC-M M TRD.' — cash/bank accounts are parties in the CASH & BANK group; not dangling.
+
+### Jun 2026 – Security fixes + Safe delete + Ledger/Rokad as-on
+- `backend/security.py` (+ `tests/test_security.py`, 11 tests): CSRF guard middleware — mutating `/api` calls: Origin/Referer host must be allowed; cookie-auth (no Bearer) must send `X-Requested-With: XMLHttpRequest` (axios default header added). Cookies SameSite=Lax (env `COOKIE_SAMESITE`), Secure off only in desktop (http://127.0.0.1). Login throttle: 5 fails/ip+username → 15 min (429), 20/ip. JWT `iat`; tokens before `password_changed_at` → 401; change-password returns fresh tokens. `/docs|/redoc|/openapi.json` off unless `ENABLE_DOCS=1`. Min password 6, ≠ admin123.
+- First-run gate: seed sets `must_change_password` when password is default; startup flags existing admins still on `admin123`; `Protected` route renders `pages/SetPassword.jsx` (forced `ChangePasswordCard`) until changed. Electron `services.js` no longer persists `admin_password` in config.json (mode 600); `openExternal` limited to http(s)/mailto/tel; `migrate-dos-data` folder restricted to DOS_BACKUP_DIR; python-jose removed.
+- Preview admin password is now **Vyapari@2026** (see test_credentials.md). Note: preview proxy rewrites cookies to SameSite=None;Partitioned — backend itself emits Lax.
+- Safe delete: `DELETE /parties/{id}` & `/accounts/{id}` → 409 `{message,counts,samples}` when referenced (rokad as cash a/c or party, bills, journal, dos_journal, inward); `GET /ledgers/{id}/usage`; `components/LedgerInUseDialog.jsx` in PartyKhata + Accounts.
+- Ledger as on: `/summary/party/{id}?as_on=` returns bills/rokad/**cash_rokad** (ledger used as cash a/c)/**journal** lines/dos_journal ≤ date + `party.balance` as on; `PartyLedger.jsx` has As-on date + chips + closing footer. `_compute_party_balance` now counts the cash-account side of rokad (cash/bank parties) → Balance Sheet/TB/year-end include cash movements.
+- Rokad Panna: `GET /rokad/accounts-summary?date_from&date_to` (opening = balance day before, closing = balance as on date_to, jama/kharch in range, `other` = journal/DOS delta) replaces client-side math → figures equal Balance Sheet (verified: a/c 307 closing −4,43,87,254 everywhere). Testing agent iteration_12: 19/19 backend + all frontend flows pass.
 
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
@@ -76,11 +84,10 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - Windows .exe can only be produced by GitHub Actions (Windows runner) or on a Windows PC — see `/app/electron/README.md`
 
 ## Roadmap / Backlog
-- **P1**: Security fixes from audit (CSRF token/SameSite=Lax, first-run password change, login rate-limit, hide /docs) — pending user approval
 - **P1**: First real GitHub Actions run — verify Save to GitHub pushes `.github/workflows` (may need manual add if token lacks `workflow` scope)
 - ~~Multi-user RBAC~~ — dropped, user wants single-user
 - **P2**: Render `dos_journal` history in a dedicated register page
 - **P3**: SMS/WhatsApp reminders for overdue bills
 
 ## Test Credentials
-See `/app/memory/test_credentials.md` — username `admin` (password wahin dekhein)
+See `/app/memory/test_credentials.md` — username `admin` / password `Vyapari@2026` (changed via first-run gate; fresh installs start with admin123 + forced change)

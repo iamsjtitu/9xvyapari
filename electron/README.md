@@ -52,7 +52,8 @@ Aapka repo **private** hai to installed app me "Update check nahi ho paya (404)"
 
 - Installer / portable chalao → "Windows protected your PC" aaye to **More info → Run anyway** (app signed nahi hai, yeh normal hai).
 - Data Folder window me **Shuru Karein** → app khulega → Login: username `admin` / password `admin123`
-- Single-user software hai (register option nahi). Password badalne ke liye: **Settings → Login Password Badlein**.
+- **Pehli baar** login par app "Pehle naya password set karein" screen dikhayega — naya password (min 6) set kiye bina software nahi khulega. Password kahin file me save nahi hota (sirf hash DB me).
+- Single-user software hai (register option nahi). Password badalne ke liye: **Settings → Login Username / Password Badlein**. 5 baar galat password → 15 minute lock.
 - Pehli start par Database + Hisab engine start hone me 10–20 sec lag sakte hain (splash screen dikhega).
 
 ## 3. Aapka data kahan hai?
