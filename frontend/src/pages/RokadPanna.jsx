@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
-import { Plus, Trash, ArrowDown, ArrowUp, X, PencilSimple, ArrowsLeftRight } from "@phosphor-icons/react";
+import { Plus, Trash, ArrowDown, ArrowUp, X, PencilSimple, ArrowsLeftRight, Printer } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
+import { ExportBar } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { TransferForm } from "@/components/rokad/TransferForm";
+import { DayBookSheet } from "@/components/rokad/DayBookSheet";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 
 export default function RokadPanna() {
+  const { settings } = useOutletContext() || {};
+  const [view, setView] = useState("list");                // list | daybook (DOS print preview)
   const [dateFrom, setDateFrom] = useState(todayISO());
   const [dateTo, setDateTo] = useState(todayISO());
   const [bankFilter, setBankFilter] = useState("");        // "" = all
@@ -347,6 +351,14 @@ export default function RokadPanna() {
             Today
           </button>
           <button
+            className={view === "daybook" ? "btn-primary" : "btn-outline"}
+            onClick={() => setView(view === "daybook" ? "list" : "daybook")}
+            title="DOS-style Day Book (print layout)"
+            data-testid="btn-toggle-daybook"
+          >
+            <Printer size={16} /> {view === "daybook" ? "List View" : "Day Book (Print)"}
+          </button>
+          <button
             className="btn-outline"
             onClick={() => setTransfer({})}
             title="Cash ↔ Bank transfer (contra)"
@@ -372,8 +384,17 @@ export default function RokadPanna() {
           onClose={() => setTransfer(null)} onSaved={() => { load(); loadSummary(); }} />
       )}
 
-      <FoxProPrintHeader title="CASH BOOK / ROKAD PANNA"
-        subtitle={`${dateFrom === dateTo ? `Date: ${dateFrom}` : `From: ${dateFrom} · To: ${dateTo}`}${selectedBank ? ` · A/C: ${selectedBank.name}` : ""} · Jama: ${inr(totals.jama)} · Kharch: ${inr(totals.kharch)} · Baki: ${inr(totals.baki)}`} />
+      {/* Print output = DOS Day Book (always); on screen only when toggled */}
+      <div className={view === "daybook" ? "" : "hidden print:block"}>
+        {summary?.rows?.length ? (
+          <DayBookSheet firmName={settings?.firm_name} dateFrom={dateFrom} dateTo={dateTo}
+            accounts={bankFilter ? summary.rows.filter((r) => r.id === bankFilter) : summary.rows} entries={entries} />
+        ) : (
+          <div className="card-flat p-5 text-sm text-muted2" data-testid="daybook-empty">Day Book ke liye koi cash/bank account nahi mila.</div>
+        )}
+      </div>
+
+      <div className={view === "daybook" ? "hidden" : "space-y-5 print:hidden"}>
 
       {/* Bank-specific summary bar */}
       {bankSummary && selectedBank && (
@@ -516,6 +537,7 @@ export default function RokadPanna() {
           label="Payment / Kharch (खर्च) — Money Out"
           icon={ArrowUp}
         />
+      </div>
       </div>
 
       {/* Modal */}

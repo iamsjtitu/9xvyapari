@@ -388,6 +388,25 @@ label.lbl {
 .dos-grand { font-family: "IBM Plex Mono", "Courier New", monospace; border: 1px solid #000; padding: 6px 10px; margin-top: 14px; break-inside: avoid; }
 .dos-sign { display: flex; justify-content: space-between; margin-top: 36px; font-family: "IBM Plex Mono", monospace; font-size: 11px; break-inside: avoid; }
 .dos-sign div { border-top: 1px solid #000; padding-top: 4px; width: 28%; text-align: center; text-transform: uppercase; }
+/* ---- DOS-style Day Book (T-shaped cash book) ---- */
+.db-t { display: flex; gap: 14px; }
+.db-side { flex: 1; min-width: 0; }
+.db-side + .db-side { border-left: 1px dashed #777; padding-left: 14px; }
+.db-row .dt { width: 72px; }
+.db-row .rf { width: 56px; }
+.db-row .am { width: 112px; }
+.db-bold { font-weight: 700; background: #f6f2e8; }
+.db-closing { border-top: 1px solid #000; }
+.db-account { margin-top: 10px; break-inside: avoid; }
+.db-t.dos-total { margin-top: 2px; }
+@media print {
+  .db-row .dt { width: 50pt; }
+  .db-row .rf { width: 40pt; }
+  .db-row .am { width: 70pt; }
+  .db-bold { background: #eee !important; }
+  #daybook-printable { box-shadow: none !important; border: none !important; padding: 0 !important; }
+}
+
 /* ---- DOS-style Party Ledger Statement ---- */
 .dos-stmt-row { display: flex; gap: 8px; padding: 2px 0; border-bottom: 1px dotted #c9c3b5; break-inside: avoid; font-variant-numeric: tabular-nums; }
 .dos-stmt-row .dt { width: 78px; flex: none; }
