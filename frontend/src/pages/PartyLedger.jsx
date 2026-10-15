@@ -91,14 +91,14 @@ export default function PartyLedger() {
             <label className="lbl !mb-0 mr-1 whitespace-nowrap">From</label>
             <input type="date" className="input-dense h-9 text-sm !w-[150px]" value={dateFrom || ""} max={asOn}
               onChange={(e) => setRange({ from: e.target.value })} data-testid="input-ledger-from" />
-            <button type="button" className={`kbd !text-[11px] px-2 py-1 cursor-pointer whitespace-nowrap hover:bg-khaki/60 ${!dateFrom ? "bg-terracotta text-white border-terracotta" : ""}`}
+            <button type="button" className={`kbd !text-[11px] px-2 py-1 cursor-pointer whitespace-nowrap hover:bg-khaki/60 ${!dateFrom ? "!bg-terracotta !text-white !border-terracotta" : ""}`}
               onClick={() => setRange({ from: "" })} title="Shuru se (sab entries)" data-testid="ledger-from-all">Shuru se</button>
             <label className="lbl !mb-0 mx-1 whitespace-nowrap">As on</label>
             <input type="date" className="input-dense h-9 text-sm !w-[150px]" value={asOn} min={dateFrom || undefined}
               onChange={(e) => e.target.value && setRange({ as_on: e.target.value })} data-testid="input-ledger-as-on" />
             {quick.map((q) => (
               <button key={q.l} type="button" data-testid={q.tid} onClick={() => setRange({ as_on: q.d })}
-                className={`kbd !text-[11px] px-2 py-1 cursor-pointer whitespace-nowrap hover:bg-khaki/60 ${asOn === q.d ? "bg-terracotta text-white border-terracotta" : ""}`}>
+                className={`kbd !text-[11px] px-2 py-1 cursor-pointer whitespace-nowrap hover:bg-khaki/60 ${asOn === q.d ? "!bg-terracotta !text-white !border-terracotta" : ""}`}>
                 {q.l}
               </button>
             ))}

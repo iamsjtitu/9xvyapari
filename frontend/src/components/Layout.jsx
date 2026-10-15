@@ -9,7 +9,7 @@ import AppFooter from "@/components/AppFooter";
 import {
   House, Notebook, UsersThree, Package, Receipt, ChartBar, SignOut, Storefront,
   TreeStructure, IdentificationCard, BookOpenText, CloudArrowUp, Calendar, Power,
-  Truck, Scales, Database, Keyboard, CalendarCheck, BookOpen,
+  Truck, Scales, Database, Keyboard, CalendarCheck, BookOpen, HandCoins,
 } from "@phosphor-icons/react";
 
 const sections = [
@@ -25,6 +25,7 @@ const sections = [
       { to: "/reports", label: "Reports", key: "G", icon: ChartBar, tid: "nav-reports" },
       { to: "/trial-balance", label: "Trial Balance", key: "T", icon: Scales, tid: "nav-tb" },
       { to: "/opening-balance", label: "Opening Balance", key: "O", icon: BookOpen, tid: "nav-opening-balance" },
+      { to: "/outstanding", label: "Outstanding List", key: "L", icon: HandCoins, tid: "nav-outstanding" },
       { to: "/gst-returns", label: "GST Returns", key: "X", icon: Receipt, tid: "nav-gst" },
     ],
   },

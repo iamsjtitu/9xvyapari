@@ -42,7 +42,7 @@ function detectOrientation() {
       path.includes("/trial-balance") || path.includes("/reports") ||
       path.includes("/bills") || path.includes("/parties") ||
       path.includes("/inward") || path.includes("/journal") ||
-      path.includes("/opening-balance")) {
+      path.includes("/opening-balance") || path.includes("/outstanding")) {
     return "landscape";
   }
   return "portrait";

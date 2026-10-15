@@ -388,6 +388,26 @@ label.lbl {
 .dos-grand { font-family: "IBM Plex Mono", "Courier New", monospace; border: 1px solid #000; padding: 6px 10px; margin-top: 14px; break-inside: avoid; }
 .dos-sign { display: flex; justify-content: space-between; margin-top: 36px; font-family: "IBM Plex Mono", monospace; font-size: 11px; break-inside: avoid; }
 .dos-sign div { border-top: 1px solid #000; padding-top: 4px; width: 28%; text-align: center; text-transform: uppercase; }
+/* ---- DOS-style Outstanding (collection) list ---- */
+.os-row .c { width: 44px; flex: none; color: #555; }
+.os-row .n { flex: 1.6; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
+.os-row .pl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; color: #333; }
+.os-row .ph { width: 100px; flex: none; }
+.os-row .lt { width: 82px; flex: none; color: #555; }
+.os-row .dy { width: 40px; flex: none; text-align: right; color: #555; }
+.os-row .am { width: 118px; flex: none; text-align: right; }
+.os-row .tk { width: 120px; flex: none; border-left: 1px dotted #999; }
+.os-group { break-inside: auto; }
+@media print {
+  .os-row .ph { width: 70pt; }
+  .os-row .lt { width: 58pt; }
+  .os-row .dy { width: 28pt; }
+  .os-row .am { width: 78pt; }
+  .os-row .tk { width: 90pt; }
+  #os-printable { box-shadow: none !important; border: none !important; padding: 0 !important; }
+  .os-row.dos-head { position: static; }
+}
+
 /* ---- DOS-style Day Book (T-shaped cash book) ---- */
 .db-t { display: flex; gap: 14px; }
 .db-side { flex: 1; min-width: 0; }

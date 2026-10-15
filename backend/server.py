@@ -1443,6 +1443,68 @@ async def delete_inward(iid: str, current=Depends(get_current_user)):
 
 
 # ---------- TRIAL BALANCE ----------
+@api.get("/reports/outstanding")
+async def outstanding_report(as_on: Optional[str] = None, side: str = "all", min_amount: float = 0.0,
+                             sort: str = "amount", current=Depends(get_current_user)):
+    """Collection-round list: every party with a pending Dr/Cr balance as on a date, grouped by account group.
+    side = dr (lena hai) | cr (dena hai) | all. Cash/bank ledgers excluded."""
+    s = await get_settings(current)
+    if as_on and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", as_on):
+        raise HTTPException(400, "as_on date YYYY-MM-DD format me do")
+    as_on = as_on or datetime.now().date().isoformat()
+    if side not in ("dr", "cr", "all"):
+        raise HTTPException(400, "side dr | cr | all")
+    groups = {g["id"]: g for g in await db.account_groups.find({}, {"_id": 0}).to_list(500)}
+    cash_gids = {gid for gid, g in groups.items() if re.search(r"cash|bank", g.get("name", ""), re.I)}
+
+    # last transaction date per party (one aggregate per collection, not per party)
+    last_txn: dict = {}
+    def _note(pid, d):
+        if pid and d and d <= as_on and d > last_txn.get(pid, ""):
+            last_txn[pid] = d
+    for coll in (db.bills, db.rokad):
+        async for r in coll.aggregate([{"$match": {"date": {"$lte": as_on}}}, {"$group": {"_id": "$party_id", "d": {"$max": "$date"}}}]):
+            _note(r["_id"], r["d"])
+    async for r in db.journal.aggregate([{"$match": {"date": {"$lte": as_on}}}, {"$unwind": "$lines"},
+                                         {"$group": {"_id": "$lines.account_id", "d": {"$max": "$date"}}}]):
+        _note(r["_id"], r["d"])
+    for fld in ("$party_id", "$counter_party_id"):
+        async for r in db.dos_journal.aggregate([{"$match": {"date": {"$lte": as_on}}}, {"$group": {"_id": fld, "d": {"$max": "$date"}}}]):
+            _note(r["_id"], r["d"])
+
+    as_on_date = datetime.fromisoformat(as_on).date()
+    by_group: dict = {}
+    for p in await db.parties.find({}, {"_id": 0}).to_list(20000):
+        if p.get("group_id") in cash_gids:
+            continue
+        bal = await _compute_party_balance(p["id"], float(p.get("opening_balance") or 0), as_on)
+        if abs(bal) < 0.005 or abs(bal) < min_amount:
+            continue
+        if (side == "dr" and bal <= 0) or (side == "cr" and bal >= 0):
+            continue
+        lt = last_txn.get(p["id"])
+        days = (as_on_date - datetime.fromisoformat(lt).date()).days if lt else None
+        g = groups.get(p.get("group_id"), {})
+        key = p.get("group_id") or "_none"
+        sec = by_group.setdefault(key, {"group_id": key, "group_name": g.get("name") or p.get("group_name") or "OTHER / BINA GROUP",
+                                         "fcode": g.get("fcode") or 9999, "rows": [], "dr_total": 0.0, "cr_total": 0.0})
+        sec["rows"].append({"id": p["id"], "code": p.get("code") or 0, "name": p.get("name", ""), "place": p.get("place", ""),
+                            "phone": p.get("phone", ""), "balance": round(bal, 2), "dr_cr": "Dr" if bal > 0 else "Cr",
+                            "last_txn": lt, "days": days})
+        if bal > 0:
+            sec["dr_total"] += bal
+        else:
+            sec["cr_total"] += -bal
+
+    sections = sorted(by_group.values(), key=lambda x: (x["fcode"], x["group_name"]))
+    for sec in sections:
+        sec["rows"].sort(key=(lambda r: -abs(r["balance"])) if sort == "amount" else (lambda r: (r["name"].upper(), r["code"])))
+        sec["dr_total"], sec["cr_total"] = round(sec["dr_total"], 2), round(sec["cr_total"], 2)
+    return {"firm_name": s.get("firm_name") or "9x Vyapari", "as_on": as_on, "side": side, "min_amount": min_amount, "sort": sort,
+            "sections": sections, "count": sum(len(x["rows"]) for x in sections),
+            "grand_dr": round(sum(x["dr_total"] for x in sections), 2), "grand_cr": round(sum(x["cr_total"] for x in sections), 2)}
+
+
 @api.get("/reports/trial-balance")
 async def trial_balance(current=Depends(get_current_user)):
     """Trial Balance grouped by Account Group, with Dr / Cr columns.

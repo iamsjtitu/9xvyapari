@@ -78,7 +78,7 @@ export default function OpeningBalance() {
                 onChange={(e) => setAsOn(e.target.value)} data-testid="input-ob-as-on" />
               {quick.map((q) => (
                 <button key={q.l} type="button" data-testid={q.tid}
-                  className={`kbd !text-[11px] px-2 py-1 cursor-pointer whitespace-nowrap hover:bg-khaki/60 ${asOn === q.d ? "bg-terracotta text-white border-terracotta" : ""}`}
+                  className={`kbd !text-[11px] px-2 py-1 cursor-pointer whitespace-nowrap hover:bg-khaki/60 ${asOn === q.d ? "!bg-terracotta !text-white !border-terracotta" : ""}`}
                   onClick={() => setAsOn(q.d)}>{q.l}</button>
               ))}
             </div>
