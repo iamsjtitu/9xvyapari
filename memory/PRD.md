@@ -90,6 +90,9 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 ### Jun 2026 – Day Book Print (Rokad Panna)
 - `components/rokad/DayBookSheet.jsx`: DOS T-format per cash/bank account for From→To — Jama (receipts) left / Kharch (payments) right, Opening B/F + Closing C/F placed by sign so both totals balance, "Journal/Anya" line when other≠0, idle accounts (no movement) compact list, grand Sabhi Accounts line. `RokadPanna.jsx` view toggle "Day Book (Print)"; print media always prints the Day Book (list hidden). CSS `.db-*`. Testing agent iteration_14: 100% pass.
 
+### Jun 2026 – Outstanding List Print
+- `GET /api/reports/outstanding?as_on&side=dr|cr|all&min_amount&sort=amount|name` — parties with pending balance grouped by account group (cash/bank excluded), last_txn (aggregates over bills/rokad/journal/dos_journal) + days, sub/grand totals. Page `/outstanding` (nav "Outstanding List", Alt+L) → `pages/Outstanding.jsx` + `components/OutstandingSheet.jsx` (DOS layout: Code/Party/Place/Phone/Last Txn/Days/Dr/Cr/Vasooli-remark column), landscape print, Excel export. Chip highlight fix (`!bg-terracotta`) across OB/Ledger/Outstanding. Testing agent iteration_15: 10/10 backend + 100% frontend.
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅

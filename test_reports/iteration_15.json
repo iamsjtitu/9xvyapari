@@ -1,0 +1,22 @@
+{
+  "summary": "Iteration 15: End-to-end testing of Outstanding List feature (backend + frontend + regressions). All 10 pytest backend tests pass; all requested frontend flows verified via Playwright, including default chip highlighting, side toggles (dr/cr/all), min_amount, sort=name, as_on date change, export bar, Excel download, print media hiding of controls/cards, Alt+L shortcut, and Opening Balance chip regression.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_outstanding.py",
+    "/app/test_reports/pytest/outstanding.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Backend outstanding endpoint takes ~1-2s per request (acceptable for 500+ parties but can be slowed by _compute_party_balance per party); consider batched aggregation if dataset grows.",
+    "Most migrated DOS parties have empty place/phone fields — this is pre-existing data, not a bug."
+  ],
+  "updated_files": ["/app/backend/tests/test_outstanding.py"],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100%"},
+  "test_credentials": "admin / Vyapari@2026 (Bearer login)",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "GET /api/reports/outstanding verified for as_on=2026-05-05 side=dr → count 218, grand_dr=1,030,038,787, grand_cr=0; cr side has all balances < 0; all=dr+cr; min_amount filters |balance|; sort=name alphabetical within sections; 400s on invalid side/date; missing as_on defaults to today. Cross-check with /api/ledgers/{id}/balance within tolerance 1.0. Frontend: default chips Aaj + os-side-dr are highlighted with !bg-terracotta !text-white classes; 8 groups rendered; URL params as_on/side/sort/min update on interaction; print emulation correctly hides os-controls and summary cards; Excel download produces outstanding-all-2026-05-05.xlsx. Alt+L hotkey works. ob-quick-today in Opening Balance uses same active class pattern.",
+  "rca of the issue": "no issues found"
+}
