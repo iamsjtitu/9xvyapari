@@ -1,5 +1,6 @@
-import { X, Keyboard } from "@phosphor-icons/react";
+import { X, Keyboard, Info } from "@phosphor-icons/react";
 import { fmtKey } from "@/hooks/useKeyboardShortcuts";
+import { BRAND, copyrightText } from "@/lib/brand";
 
 /**
  * Floating overlay showing all available shortcuts for the current page.
@@ -71,6 +72,32 @@ export default function ShortcutHelp({ open, onClose, shortcuts, navShortcuts })
             <div className="flex justify-between"><span>Close dialog / modal</span><span className="kbd">Esc</span></div>
             <div className="flex justify-between"><span>Print</span><span className="kbd">Ctrl + P</span></div>
             <div className="flex justify-between"><span>Save (in form)</span><span className="kbd">Ctrl + S</span></div>
+          </div>
+        </div>
+
+        <div className="mt-5 pt-4 border-t border-khaki" data-testid="help-about-section">
+          <div className="flex items-start gap-3">
+            <div className="h-9 w-9 grid place-items-center rounded-sm flex-shrink-0" style={{ background: "#8B2520" }}>
+              <Info size={18} weight="bold" color="#fff" />
+            </div>
+            <div className="text-sm flex-1">
+              <div className="font-heading font-semibold text-ink">
+                About {BRAND.app}
+                {window.vyapari?.version ? <span className="text-muted2 font-normal"> · Desktop v{window.vyapari.version}</span> : null}
+              </div>
+              <div className="text-xs text-muted2 mt-0.5">Galla / Kaccha Arhat Hisab Kitab – Offline Desktop Software</div>
+              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs font-mono-data">
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted2">Design and Developed by</span>
+                  <span className="font-semibold text-ink" data-testid="about-developer">{BRAND.developer}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted2">Contact</span>
+                  <a href={`tel:${BRAND.contact}`} className="font-semibold text-ink hover:underline" data-testid="about-contact">{BRAND.contact}</a>
+                </div>
+              </div>
+              <div className="mt-2 text-[11px] text-muted2 font-mono-data" data-testid="about-copyright">{copyrightText()}</div>
+            </div>
           </div>
         </div>
       </div>

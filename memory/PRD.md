@@ -56,16 +56,25 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - Journal: pencil edit → same modal ("Journal Edit — J0000x", "Update Journal"); `PUT /api/journal/{id}` validates double entry, keeps voucher_no (iteration_9 passed).
 - Auto-update: user's repo `iamsjtitu/9xvyapari` is PRIVATE → releases.atom 404. `lib/update-messages.js` (pure) gives Hinglish guidance (make public OR `UPDATE_TOKEN` fine-grained PAT secret), token used whenever present; CI writes `repoPrivate` + ::warning. README updated. (iteration_10 passed). **User must either make repo public or add UPDATE_TOKEN secret, then rebuild + install new Setup.**
 
+### Jun 2026 – Branding footer / About / Copyright
+- `frontend/src/lib/brand.js` (single source: developer 9x.design, contact 7587922222, © 2026 9x Vyapari) + `components/AppFooter.jsx`.
+- Footer shown under main content (Layout, print:hidden) and on Login page; Help (?) overlay has "About 9x Vyapari" section; Electron Help → About dialog shows same lines; `electron/package.json` `build.copyright` + author set (exe metadata).
+- Verified via screenshot (login footer, app footer, help-about section all render correct text).
+
+### Jun 2026 – Security audit (read-only)
+- Findings: SEC-001 HIGH CSRF (SameSite=None cookies, no CSRF token — web deployment only); SEC-002 MEDIUM default `admin123` + plaintext `config.json` in desktop. Hardening: login rate-limit, hide /docs in prod, honor `password_changed_at`, openExternal scheme allowlist, restrict migrate-dos-data folder, remove unused python-jose. **Not yet fixed — awaiting user decision.**
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅
 - Windows .exe can only be produced by GitHub Actions (Windows runner) or on a Windows PC — see `/app/electron/README.md`
 
 ## Roadmap / Backlog
+- **P1**: Security fixes from audit (CSRF token/SameSite=Lax, first-run password change, login rate-limit, hide /docs) — pending user approval
 - **P1**: First real GitHub Actions run — verify Save to GitHub pushes `.github/workflows` (may need manual add if token lacks `workflow` scope)
 - ~~Multi-user RBAC~~ — dropped, user wants single-user
 - **P2**: Render `dos_journal` history in a dedicated register page
 - **P3**: SMS/WhatsApp reminders for overdue bills
 
 ## Test Credentials
-See `/app/memory/test_credentials.md` — admin@galla.com / admin123
+See `/app/memory/test_credentials.md` — username `admin` (password wahin dekhein)

@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "9x Vyapari – Galla / Kaccha Arhat Hisab Kitab (offline desktop)",
   "main": "main.js",
-  "author": "9x Vyapari",
+  "author": "9x.design <7587922222>",
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
@@ -23,6 +23,7 @@
   "build": {
     "appId": "com.ninex.vyapari",
     "productName": "9x Vyapari",
+    "copyright": "© 2026 9x Vyapari. Design and Developed by 9x.design · Contact: 7587922222",
     "artifactName": "9x-Vyapari-${version}-win-portable-folder.${ext}",
     "directories": {
       "output": "dist",

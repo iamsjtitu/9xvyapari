@@ -1,5 +1,11 @@
 const { Menu, shell, app, dialog } = require("electron");
 
+const BRAND = {
+  developer: "9x.design",
+  contact: "7587922222",
+  copyright: "© 2026 9x Vyapari. All Rights Reserved.",
+};
+
 function buildMenu({ getWin, services, checkUpdates, changeFolder }) {
   const template = [
     {
@@ -45,7 +51,17 @@ function buildMenu({ getWin, services, checkUpdates, changeFolder }) {
               type: "info",
               title: "9x Vyapari",
               message: `9x Vyapari v${app.getVersion()}${services.portable ? " (Portable)" : ""}`,
-              detail: `Galla / Kaccha Arhat Hisab Kitab – Offline Desktop\n\nData: ${services.dataDir}\nServer: ${services.url}`,
+              detail: [
+                "Galla / Kaccha Arhat Hisab Kitab – Offline Desktop",
+                "",
+                `Design and Developed by : ${BRAND.developer}`,
+                `Contact: ${BRAND.contact}`,
+                "",
+                BRAND.copyright,
+                "",
+                `Data: ${services.dataDir}`,
+                `Server: ${services.url}`,
+              ].join("\n"),
             }),
         },
       ],

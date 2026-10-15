@@ -5,6 +5,7 @@ import api, { formatApiErrorDetail } from "@/lib/api";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import ShortcutHelp from "@/components/ShortcutHelp";
+import AppFooter from "@/components/AppFooter";
 import {
   House, Notebook, UsersThree, Package, Receipt, ChartBar, SignOut, Storefront,
   TreeStructure, IdentificationCard, BookOpenText, CloudArrowUp, Calendar, Power,
@@ -185,10 +186,11 @@ export default function Layout() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">
-        <div className="px-6 py-5 max-w-[1500px] mx-auto animate-fade-in">
+      <main className="flex-1 overflow-auto flex flex-col">
+        <div className="px-6 py-5 max-w-[1500px] mx-auto animate-fade-in w-full flex-1">
           <Outlet context={{ settings, openShortcutHelp: () => setHelpOpen(true) }} />
         </div>
+        <AppFooter className="px-6 py-3 border-t border-khaki/60 mt-4" />
 
         {/* Floating "?" help button */}
         <button

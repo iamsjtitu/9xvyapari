@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { formatApiErrorDetail } from "@/lib/api";
 import { Storefront, Eye, EyeSlash } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import AppFooter from "@/components/AppFooter";
 
 const LOGIN_BG =
   "https://static.prod-images.emergentagent.com/jobs/5310cfb1-247e-4bde-89f4-53c2779393b0/images/3a7d9f0a75e96c1d8e8a4a3bd61df26ccfd6fcfc9a9bcd8a4c653ad039d30bc7.png";
@@ -134,6 +135,7 @@ export default function Login() {
           <div className="mt-8 text-[11px] text-muted2/70 text-center font-mono-data">
             Single-user software · Username/Password badalne ke liye Settings me jayein
           </div>
+          <AppFooter className="mt-6 pt-4 border-t border-khaki/60" />
         </div>
       </div>
     </div>
