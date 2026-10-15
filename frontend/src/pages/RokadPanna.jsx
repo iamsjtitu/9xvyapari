@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
-import { Plus, Trash, ArrowDown, ArrowUp, X, PencilSimple } from "@phosphor-icons/react";
+import { Plus, Trash, ArrowDown, ArrowUp, X, PencilSimple, ArrowsLeftRight } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { TransferForm } from "@/components/rokad/TransferForm";
 
 export default function RokadPanna() {
   const [dateFrom, setDateFrom] = useState(todayISO());
@@ -14,6 +15,7 @@ export default function RokadPanna() {
   const [accounts, setAccounts] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [transfer, setTransfer] = useState(null);          // null | { contraId?: string }
   const emptyForm = {
     date: todayISO(),
     type: "jama",
@@ -165,9 +167,11 @@ export default function RokadPanna() {
   };
 
   const del = async (id) => {
-    if (!window.confirm("Delete this entry?")) return;
+    const entry = entries.find((x) => x.id === id);
+    const msg = entry?.contra_id ? "Yeh Transfer entry hai — dono accounts se hat jayegi. Delete karein?" : "Delete this entry?";
+    if (!window.confirm(msg)) return;
     await api.delete(`/rokad/${id}`);
-    toast.success("Entry delete ki gayi");
+    toast.success(entry?.contra_id ? "Transfer (dono legs) delete hua" : "Entry delete ki gayi");
     load();
     loadSummary();
   };
@@ -213,7 +217,14 @@ export default function RokadPanna() {
                   {e.voucher_no || "—"}
                 </td>
                 <td>
-                  <div className="font-medium">{e.party_name || "—"}</div>
+                  <div className="font-medium flex items-center gap-1.5">
+                    {e.contra_id && (
+                      <span className="kbd !text-[9px] !px-1 !py-0 text-jama border-jama/40" title="Cash/Bank transfer (contra)" data-testid={`rokad-contra-badge-${e.id}`}>
+                        <ArrowsLeftRight size={9} weight="bold" className="inline mr-0.5" />TRANSFER
+                      </span>
+                    )}
+                    <span>{e.party_name || "—"}</span>
+                  </div>
                   {(e.description || e.cash_account_name) && (
                     <div className="text-[10px] text-muted2 mt-0.5">
                       {e.cash_account_name ? `[${e.cash_account_name}] ` : ""}{e.description || ""}
@@ -229,8 +240,8 @@ export default function RokadPanna() {
                 <td className="print:hidden whitespace-nowrap">
                   <button
                     className="btn-ghost p-1.5"
-                    onClick={() => startEdit(e)}
-                    title="Edit"
+                    onClick={() => (e.contra_id ? setTransfer({ contraId: e.contra_id }) : startEdit(e))}
+                    title={e.contra_id ? "Transfer edit" : "Edit"}
                     data-testid={`rokad-edit-${e.id}`}
                   >
                     <PencilSimple size={14} />
@@ -335,6 +346,14 @@ export default function RokadPanna() {
             Today
           </button>
           <button
+            className="btn-outline"
+            onClick={() => setTransfer({})}
+            title="Cash ↔ Bank transfer (contra)"
+            data-testid="btn-transfer"
+          >
+            <ArrowsLeftRight size={16} weight="bold" /> Transfer
+          </button>
+          <button
             className="btn-primary"
             onClick={() => {
               setForm((f) => ({ ...f, date: dateTo }));
@@ -346,6 +365,11 @@ export default function RokadPanna() {
           </button>
         </div>
       </div>
+
+      {transfer && (
+        <TransferForm accounts={accounts} date={dateTo} contraId={transfer.contraId}
+          onClose={() => setTransfer(null)} onSaved={() => { load(); loadSummary(); }} />
+      )}
 
       <FoxProPrintHeader title="CASH BOOK / ROKAD PANNA"
         subtitle={`${dateFrom === dateTo ? `Date: ${dateFrom}` : `From: ${dateFrom} · To: ${dateTo}`}${selectedBank ? ` · A/C: ${selectedBank.name}` : ""} · Jama: ${inr(totals.jama)} · Kharch: ${inr(totals.kharch)} · Baki: ${inr(totals.baki)}`} />

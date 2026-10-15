@@ -5,6 +5,7 @@ const path = require("path");
 const log = require("electron-log");
 const { friendlyUpdateError, resolveFeed } = require("./update-messages");
 const { makeStatus, progressStatus, simulateSequence } = require("./update-status");
+const { refocus } = require("./focus");
 
 // Single status hub: renderer gets live pushes ("update:status") + can pull the last one ("update:get-status")
 const hub = { status: makeStatus("idle"), actions: {}, getWin: () => null };
@@ -37,7 +38,8 @@ function reportError(err, cfg, manual) {
   const detail = friendlyUpdateError(err, cfg);
   emit(makeStatus("error", { manual, message: detail.split("\n")[0], detail }));
   if (manual) {
-    dialog.showMessageBox(hub.getWin(), { type: "warning", title: "Update", message: "Update check nahi ho paya", detail });
+    dialog.showMessageBox(hub.getWin(), { type: "warning", title: "Update", message: "Update check nahi ho paya", detail })
+      .then(() => refocus(hub.getWin()));
   }
 }
 
@@ -74,7 +76,8 @@ function setupSimulated() {
   const run = (manual) => simulateSequence(emit, { manual });
   hub.actions = {
     check: () => run(true),
-    install: () => dialog.showMessageBox(hub.getWin(), { type: "info", title: "Update (simulation)", message: "Yahan app restart hokar naya version install hota." }),
+    install: () => dialog.showMessageBox(hub.getWin(), { type: "info", title: "Update (simulation)", message: "Yahan app restart hokar naya version install hota." })
+      .then(() => refocus(hub.getWin())),
   };
   setTimeout(() => run(false), 3000);
   return { check: () => run(true) };

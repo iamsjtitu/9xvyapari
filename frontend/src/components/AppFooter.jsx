@@ -1,4 +1,4 @@
-import { BRAND, copyrightText } from "@/lib/brand";
+import { BRAND, appVersionLabel, copyrightText } from "@/lib/brand";
 
 export const AppFooter = ({ dark = false, className = "" }) => {
   const base = dark ? "text-white/45" : "text-muted2/80";
@@ -9,6 +9,10 @@ export const AppFooter = ({ dark = false, className = "" }) => {
       data-testid="app-footer"
     >
       <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center">
+        <span data-testid="footer-version">
+          {BRAND.app} <span className={`font-semibold ${strong}`}>{appVersionLabel()}</span>
+        </span>
+        <span aria-hidden>·</span>
         <span data-testid="footer-developer">
           Design and Developed by : <span className={`font-semibold ${strong}`}>{BRAND.developer}</span>
         </span>

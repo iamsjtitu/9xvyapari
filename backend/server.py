@@ -671,6 +671,8 @@ async def update_rokad(rid: str, body: RokadIn, current=Depends(get_current_user
     existing = await db.rokad.find_one({"id": rid}, {"_id": 0})
     if not existing:
         raise HTTPException(404, "Entry nahi mili")
+    if existing.get("contra_id"):
+        raise HTTPException(400, "Yeh Transfer (contra) entry hai – ise Transfer form se edit karein")
     doc = body.model_dump()
     if not doc.get("cash_account_id"):
         cash = await _default_cash_account()
@@ -684,8 +686,85 @@ async def update_rokad(rid: str, body: RokadIn, current=Depends(get_current_user
 
 @api.delete("/rokad/{rid}")
 async def delete_rokad(rid: str, current=Depends(get_current_user)):
-    await db.rokad.delete_one({"id": rid})
+    existing = await db.rokad.find_one({"id": rid}, {"_id": 0, "contra_id": 1})
+    if existing and existing.get("contra_id"):
+        await db.rokad.delete_many({"contra_id": existing["contra_id"]})  # both legs go together
+    else:
+        await db.rokad.delete_one({"id": rid})
     return {"ok": True}
+
+
+# ---- Cash/Bank transfer (contra): two linked rokad legs — kharch on FROM, jama on TO ----
+class TransferIn(BaseModel):
+    date: str
+    from_account_id: str
+    to_account_id: str
+    amount: float = Field(gt=0)
+    description: str = ""
+    voucher_no: Optional[str] = ""
+    chq_no: Optional[str] = ""
+    mode: str = "Bank"
+
+
+async def _transfer_legs(body: TransferIn, contra_id: str) -> list:
+    if body.from_account_id == body.to_account_id:
+        raise HTTPException(400, "From aur To account alag hone chahiye")
+    ledgers = {l["id"]: l for l in await _cash_ledgers()}
+    src, dst = ledgers.get(body.from_account_id), ledgers.get(body.to_account_id)
+    if not src or not dst:
+        raise HTTPException(400, "Sirf Cash/Bank group ke accounts ke beech transfer ho sakta hai")
+    common = {"contra_id": contra_id, "date": body.date, "amount": body.amount, "description": body.description,
+              "voucher_no": body.voucher_no or "", "chq_no": body.chq_no or "", "mode": body.mode,
+              "party_id": None, "ref_bill_id": None}
+    return [
+        {**common, "type": "kharch", "cash_account_id": src["id"], "cash_account_name": src["name"],
+         "counter_account_id": dst["id"], "counter_account_name": dst["name"], "party_name": f"Transfer → {dst['name']}"},
+        {**common, "type": "jama", "cash_account_id": dst["id"], "cash_account_name": dst["name"],
+         "counter_account_id": src["id"], "counter_account_name": src["name"], "party_name": f"Transfer ← {src['name']}"},
+    ]
+
+
+def _transfer_out(legs: list) -> dict:
+    out_leg = next(l for l in legs if l["type"] == "kharch")
+    in_leg = next(l for l in legs if l["type"] == "jama")
+    return {"contra_id": out_leg["contra_id"], "date": out_leg["date"], "amount": out_leg["amount"],
+            "from_account_id": out_leg["cash_account_id"], "from_account_name": out_leg["cash_account_name"],
+            "to_account_id": in_leg["cash_account_id"], "to_account_name": in_leg["cash_account_name"],
+            "description": out_leg.get("description", ""), "voucher_no": out_leg.get("voucher_no", ""),
+            "chq_no": out_leg.get("chq_no", ""), "mode": out_leg.get("mode", "Bank"),
+            "legs": [{"id": l["id"], "type": l["type"], "cash_account_id": l["cash_account_id"]} for l in legs]}
+
+
+@api.post("/rokad/transfer")
+async def create_transfer(body: TransferIn, current=Depends(get_current_user)):
+    contra_id = str(uuid.uuid4())
+    legs = await _transfer_legs(body, contra_id)
+    ts = now_iso()
+    for leg in legs:
+        leg.update({"id": str(uuid.uuid4()), "created_at": ts})
+    await db.rokad.insert_many([l.copy() for l in legs])
+    return _transfer_out(legs)
+
+
+@api.get("/rokad/transfer/{contra_id}")
+async def get_transfer(contra_id: str, current=Depends(get_current_user)):
+    legs = await db.rokad.find({"contra_id": contra_id}, {"_id": 0}).to_list(2)
+    if len(legs) != 2:
+        raise HTTPException(404, "Transfer entry nahi mili")
+    return _transfer_out(legs)
+
+
+@api.put("/rokad/transfer/{contra_id}")
+async def update_transfer(contra_id: str, body: TransferIn, current=Depends(get_current_user)):
+    old = await db.rokad.find({"contra_id": contra_id}, {"_id": 0}).to_list(2)
+    if len(old) != 2:
+        raise HTTPException(404, "Transfer entry nahi mili")
+    legs = await _transfer_legs(body, contra_id)
+    ts = now_iso()
+    for leg, prev in zip(legs, sorted(old, key=lambda l: l["type"] != "kharch")):  # keep leg ids: kharch first
+        leg.update({"id": prev["id"], "created_at": prev.get("created_at", ts), "updated_at": ts})
+        await db.rokad.replace_one({"id": prev["id"]}, leg.copy())
+    return _transfer_out(legs)
 
 
 async def _cash_ledgers() -> list:
@@ -786,13 +865,16 @@ async def dashboard_summary(current=Depends(get_current_user)):
 
 
 @api.get("/summary/party/{pid}")
-async def party_ledger(pid: str, as_on: Optional[str] = None, current=Depends(get_current_user)):
+async def party_ledger(pid: str, as_on: Optional[str] = None, date_from: Optional[str] = None, current=Depends(get_current_user)):
     party = await db.parties.find_one({"id": pid}, {"_id": 0})
     if not party:
         raise HTTPException(404, "Party not found")
-    if as_on and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", as_on):
-        raise HTTPException(400, "as_on date YYYY-MM-DD format me do")
+    for d in (as_on, date_from):
+        if d and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", d):
+            raise HTTPException(400, "Date YYYY-MM-DD format me do")
     upto = _upto(as_on)
+    if date_from:  # statement range: entries from date_from, opening = balance the day before
+        upto = {"date": {**upto.get("date", {}), "$gte": date_from}}
     bills = await db.bills.find({"party_id": pid, **upto}, {"_id": 0}).sort("date", 1).to_list(5000)
     rokads = await db.rokad.find({"party_id": pid, **upto}, {"_id": 0}).sort("date", 1).to_list(5000)
     # Entries where this ledger is the cash/bank account side (cash-group parties)
@@ -826,8 +908,12 @@ async def party_ledger(pid: str, as_on: Optional[str] = None, current=Depends(ge
             entry["other_party_name"] = j.get("counter_party_name") or ""
         dos_journal.append(entry)
     party["balance"] = await _compute_party_balance(pid, party.get("opening_balance", 0.0), as_on)
-    return {"party": party, "as_on": as_on, "bills": bills, "rokad": rokads, "cash_rokad": cash_rokad,
-            "journal": journal, "dos_journal": dos_journal}
+    opening = float(party.get("opening_balance") or 0)
+    if date_from:
+        day_before = (datetime.fromisoformat(date_from).date() - timedelta(days=1)).isoformat()
+        opening = await _compute_party_balance(pid, opening, day_before)
+    return {"party": party, "as_on": as_on, "date_from": date_from, "opening": opening, "bills": bills, "rokad": rokads,
+            "cash_rokad": cash_rokad, "journal": journal, "dos_journal": dos_journal}
 
 
 # ---------- ACCOUNT GROUPS ----------

@@ -1,6 +1,6 @@
 import { X, Keyboard, Info } from "@phosphor-icons/react";
 import { fmtKey } from "@/hooks/useKeyboardShortcuts";
-import { BRAND, copyrightText } from "@/lib/brand";
+import { BRAND, appVersionLabel, copyrightText } from "@/lib/brand";
 
 /**
  * Floating overlay showing all available shortcuts for the current page.
@@ -83,7 +83,7 @@ export default function ShortcutHelp({ open, onClose, shortcuts, navShortcuts })
             <div className="text-sm flex-1">
               <div className="font-heading font-semibold text-ink">
                 About {BRAND.app}
-                {window.vyapari?.version ? <span className="text-muted2 font-normal"> · Desktop v{window.vyapari.version}</span> : null}
+                <span className="text-muted2 font-normal" data-testid="about-version"> · Version {appVersionLabel()}</span>
               </div>
               <div className="text-xs text-muted2 mt-0.5">Galla / Kaccha Arhat Hisab Kitab – Offline Desktop Software</div>
               <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs font-mono-data">

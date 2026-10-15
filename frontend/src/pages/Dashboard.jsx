@@ -5,6 +5,7 @@ import {
   ArrowDown, ArrowUp, UsersThree, Package, Receipt, CurrencyInr, Wallet, Plus,
   Bell, WarningCircle, Clock, CalendarCheck,
 } from "@phosphor-icons/react";
+import { CashBankBalances } from "@/components/CashBankBalances";
 
 const Stat = ({ icon: Icon, label, value, accent, testid }) => (
   <div className="card-flat p-4" data-testid={testid}>
@@ -107,6 +108,9 @@ export default function Dashboard() {
         <DueBillsNotifier data={dueData} />
       )}
 
+
+      {/* Kis account me kitna paisa */}
+      <CashBankBalances />
 
       {/* Month */}
       <div className="card-flat p-5">

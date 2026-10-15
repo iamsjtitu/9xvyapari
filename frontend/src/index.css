@@ -388,6 +388,25 @@ label.lbl {
 .dos-grand { font-family: "IBM Plex Mono", "Courier New", monospace; border: 1px solid #000; padding: 6px 10px; margin-top: 14px; break-inside: avoid; }
 .dos-sign { display: flex; justify-content: space-between; margin-top: 36px; font-family: "IBM Plex Mono", monospace; font-size: 11px; break-inside: avoid; }
 .dos-sign div { border-top: 1px solid #000; padding-top: 4px; width: 28%; text-align: center; text-transform: uppercase; }
+/* ---- DOS-style Party Ledger Statement ---- */
+.dos-stmt-row { display: flex; gap: 8px; padding: 2px 0; border-bottom: 1px dotted #c9c3b5; break-inside: avoid; font-variant-numeric: tabular-nums; }
+.dos-stmt-row .dt { width: 78px; flex: none; }
+.dos-stmt-row .pt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
+.dos-stmt-row .rf { width: 70px; flex: none; color: #555; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dos-stmt-row .am { width: 118px; flex: none; text-align: right; }
+.dos-stmt-row .bl { width: 140px; flex: none; text-align: right; font-weight: 600; }
+.dos-stmt .dos-open { background: #f6f2e8; font-weight: 600; }
+.dos-stmt .dos-close { font-weight: 700; border-bottom: 3px double #000; }
+@media print {
+  .dos-stmt-row { font-size: 8pt; border-bottom-color: #999; }
+  .dos-stmt-row .dt { width: 58pt; }
+  .dos-stmt-row .rf { width: 48pt; }
+  .dos-stmt-row .am { width: 80pt; }
+  .dos-stmt-row .bl { width: 96pt; }
+  #ledger-printable { box-shadow: none !important; border: none !important; padding: 0 !important; }
+  .dos-stmt .dos-open { background: #eee !important; }
+}
+
 @media print {
   [data-sonner-toaster] { display: none !important; }
   .dos-sheet { font-size: 7.5pt; }

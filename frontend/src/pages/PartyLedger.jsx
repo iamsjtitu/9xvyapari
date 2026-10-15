@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useSearchParams, useOutletContext } from "react-router-dom";
 import api, { inr, todayISO } from "@/lib/api";
-import { ArrowLeft, Receipt, Notebook, BookOpen, BookOpenText, Wallet } from "@phosphor-icons/react";
-import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
+import { ArrowLeft, Receipt, Notebook, BookOpen, BookOpenText, Wallet, Printer } from "@phosphor-icons/react";
+import { ExportBar } from "@/components/ExportBar";
+import { PartyStatement } from "@/components/PartyStatement";
 
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
 
@@ -55,17 +56,23 @@ export default function PartyLedger() {
   const { settings } = useOutletContext() || {};
   const [params, setParams] = useSearchParams();
   const asOn = params.get("as_on") || todayISO();
+  const hasFromParam = params.has("from");
+  const dateFrom = hasFromParam ? params.get("from") : (settings?.fy_start && settings.fy_start <= asOn ? settings.fy_start : "");
   const [data, setData] = useState(null);
+  const [view, setView] = useState("ledger"); // ledger | statement (DOS print preview)
 
   useEffect(() => {
     setData(null);
-    api.get(`/summary/party/${id}`, { params: { as_on: asOn } }).then((r) => setData(r.data));
-  }, [id, asOn]);
+    api.get(`/summary/party/${id}`, { params: { as_on: asOn, ...(dateFrom ? { date_from: dateFrom } : {}) } }).then((r) => setData(r.data));
+  }, [id, asOn, dateFrom]);
+
+  const setRange = (next) => setParams({ as_on: next.as_on ?? asOn, from: next.from ?? dateFrom ?? "" });
 
   if (!data) return <div className="text-muted2 font-heading" data-testid="ledger-loading">Loading...</div>;
   const { party, dos_journal = [], journal = [], cash_rokad = [] } = data;
+  const opening = data.opening ?? (party.opening_balance || 0);
   const rows = buildRows(data);
-  let running = party.opening_balance || 0;
+  let running = opening;
   const enriched = rows.map((r) => { running = running + r.debit - r.credit; return { ...r, balance: running }; });
   const quick = [
     { l: "Aaj", d: todayISO(), tid: "ledger-quick-today" },
@@ -73,6 +80,7 @@ export default function PartyLedger() {
     { l: "FY End", d: settings?.fy_end, tid: "ledger-quick-fyend" },
   ].filter((q) => q.d);
   const balColor = party.balance > 0 ? "#B71C1C" : party.balance < 0 ? "#1B5E20" : "#595959";
+  const periodText = dateFrom ? `${fmtDate(dateFrom)} → ${fmtDate(asOn)}` : `upto ${fmtDate(asOn)}`;
 
   return (
     <div className="space-y-5" data-testid="page-party-ledger">
@@ -80,17 +88,26 @@ export default function PartyLedger() {
         <Link to="/parties" className="btn-ghost"><ArrowLeft size={14} /> Wapas</Link>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1" data-testid="ledger-asof-controls">
-            <label className="lbl !mb-0 mr-1 whitespace-nowrap">As on</label>
-            <input type="date" className="input-dense h-9 text-sm !w-[150px]" value={asOn}
-              onChange={(e) => e.target.value && setParams({ as_on: e.target.value })} data-testid="input-ledger-as-on" />
+            <label className="lbl !mb-0 mr-1 whitespace-nowrap">From</label>
+            <input type="date" className="input-dense h-9 text-sm !w-[150px]" value={dateFrom || ""} max={asOn}
+              onChange={(e) => setRange({ from: e.target.value })} data-testid="input-ledger-from" />
+            <button type="button" className={`kbd !text-[11px] px-2 py-1 cursor-pointer whitespace-nowrap hover:bg-khaki/60 ${!dateFrom ? "bg-terracotta text-white border-terracotta" : ""}`}
+              onClick={() => setRange({ from: "" })} title="Shuru se (sab entries)" data-testid="ledger-from-all">Shuru se</button>
+            <label className="lbl !mb-0 mx-1 whitespace-nowrap">As on</label>
+            <input type="date" className="input-dense h-9 text-sm !w-[150px]" value={asOn} min={dateFrom || undefined}
+              onChange={(e) => e.target.value && setRange({ as_on: e.target.value })} data-testid="input-ledger-as-on" />
             {quick.map((q) => (
-              <button key={q.l} type="button" data-testid={q.tid} onClick={() => setParams({ as_on: q.d })}
+              <button key={q.l} type="button" data-testid={q.tid} onClick={() => setRange({ as_on: q.d })}
                 className={`kbd !text-[11px] px-2 py-1 cursor-pointer whitespace-nowrap hover:bg-khaki/60 ${asOn === q.d ? "bg-terracotta text-white border-terracotta" : ""}`}>
                 {q.l}
               </button>
             ))}
           </div>
-          <ExportBar filename={`ledger-${party.name.replace(/[^a-z0-9]/gi, "_")}-${asOn}`} sheets={[{
+          <button type="button" className={view === "statement" ? "btn-primary" : "btn-outline"} onClick={() => setView(view === "statement" ? "ledger" : "statement")}
+            title="DOS-style statement (print layout)" data-testid="btn-toggle-statement">
+            <Printer size={14} /> {view === "statement" ? "Ledger View" : "Statement (Print)"}
+          </button>
+          <ExportBar filename={`ledger-${party.name.replace(/[^a-z0-9]/gi, "_")}-${dateFrom || "start"}-${asOn}`} sheets={[{
             name: `Ledger of ${party.name}`,
             columns: [
               { key: "date", label: "Date", width: 12 },
@@ -99,14 +116,18 @@ export default function PartyLedger() {
               { key: "credit", label: "Credit", width: 14, num: true },
               { key: "balance", label: "Balance", width: 14, num: true },
             ],
-            rows: enriched,
+            rows: [{ date: dateFrom || "", label: "OPENING BALANCE", debit: 0, credit: 0, balance: opening }, ...enriched],
           }]} />
         </div>
       </div>
 
-      <FoxProPrintHeader title={`PARTY LEDGER: ${party.name.toUpperCase()}`}
-        subtitle={`Code: ${party.code || "—"} · ${party.place || ""} · As on ${fmtDate(asOn)} · Closing: ₹${inr(Math.abs(party.balance))} ${party.balance > 0 ? "DR" : party.balance < 0 ? "CR" : ""}`} />
+      {/* Print output = DOS statement (always); on screen only when toggled */}
+      <div className={view === "statement" ? "" : "hidden print:block"}>
+        <PartyStatement firmName={settings?.firm_name} party={party} rows={enriched} opening={opening}
+          closing={party.balance} dateFrom={dateFrom} asOn={asOn} />
+      </div>
 
+      <div className={view === "statement" ? "hidden" : "space-y-5 print:hidden"}>
       <div className="card-flat p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -132,9 +153,9 @@ export default function PartyLedger() {
 
       <div className="card-flat overflow-hidden">
         <div className="px-4 py-3 border-b border-khaki flex items-center justify-between flex-wrap gap-2">
-          <div className="section-title">Transaction History (upto {fmtDate(asOn)})</div>
+          <div className="section-title">Transaction History ({periodText})</div>
           <div className="flex items-center gap-3 text-xs text-muted2 font-mono-data">
-            <span>Opening: ₹ {inr(party.opening_balance || 0)}</span>
+            <span data-testid="ledger-opening">Opening{dateFrom ? ` (${fmtDate(dateFrom)} se pehle)` : ""}: ₹ {inr(Math.abs(opening))} {opening < 0 ? "Cr" : "Dr"}</span>
             <span>·</span>
             <span data-testid="ledger-entry-count">{enriched.length} entries</span>
             {cash_rokad.length > 0 && <span className="text-jama">· {cash_rokad.length} cash a/c</span>}
@@ -153,8 +174,16 @@ export default function PartyLedger() {
             </tr>
           </thead>
           <tbody>
+            <tr className="bg-parchment/40" data-testid="ledger-opening-row">
+              <td className="font-mono-data text-muted2 whitespace-nowrap">{dateFrom ? fmtDate(dateFrom) : ""}</td>
+              <td className="font-semibold uppercase text-xs tracking-wider">Opening Balance{dateFrom ? " (B/F)" : ""}</td>
+              <td className="num">—</td><td className="num">—</td>
+              <td className="num font-medium whitespace-nowrap" style={{ color: opening >= 0 ? "#1A1A1A" : "#1B5E20" }}>
+                ₹ {inr(Math.abs(opening))} {opening < 0 && <span className="text-[10px] ml-1 text-jama">CR</span>}
+              </td>
+            </tr>
             {enriched.length === 0 ? (
-              <tr><td colSpan={5} className="py-10 text-center text-muted2">Koi transaction nahi.</td></tr>
+              <tr><td colSpan={5} className="py-10 text-center text-muted2">Is period me koi transaction nahi.</td></tr>
             ) : (
               enriched.map((r) => (
                 <tr key={`${r.kind}-${r.id}`}>
@@ -195,6 +224,7 @@ export default function PartyLedger() {
             </tfoot>
           )}
         </table>
+      </div>
       </div>
     </div>
   );

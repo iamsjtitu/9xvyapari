@@ -33,11 +33,20 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Set version 1.0.${{ github.run_number }}
+        working-directory: electron
+        shell: pwsh
+        run: |
+          $v = "1.0.${{ github.run_number }}"
+          npm version $v --no-git-tag-version --allow-same-version
+          "APP_VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append
+
       - name: Build frontend (desktop mode)
         working-directory: frontend
         env:
           CI: "false"
           REACT_APP_DESKTOP: "1"
+          REACT_APP_VERSION: ${{ env.APP_VERSION }}
           DISABLE_ESLINT_PLUGIN: "true"
           GENERATE_SOURCEMAP: "false"
         run: |
@@ -87,14 +96,6 @@ jobs:
           if ("${{ github.event.repository.private }}" -eq "true" -and -not $env:UPDATE_TOKEN) {
             Write-Host "::warning title=Auto-update::Repo PRIVATE hai aur UPDATE_TOKEN secret set nahi hai - installed app me auto-update 404 dega. Repo public karo ya UPDATE_TOKEN (fine-grained PAT, Contents: read-only) secret add karo. Dekhein electron/README.md"
           }
-
-      - name: Set version 1.0.${{ github.run_number }}
-        working-directory: electron
-        shell: pwsh
-        run: |
-          $v = "1.0.${{ github.run_number }}"
-          npm version $v --no-git-tag-version --allow-same-version
-          "APP_VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Build installer & publish GitHub Release
         working-directory: electron

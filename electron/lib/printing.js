@@ -2,6 +2,7 @@ const { BrowserWindow, app, ipcMain } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const log = require("electron-log");
+const { refocus } = require("./focus");
 
 // Electron has no built-in print preview: render the page to PDF and show it in Chromium's PDF viewer
 async function openPrintPreview(webContents, { landscape = false, title = "Print" } = {}) {
@@ -23,7 +24,10 @@ async function openPrintPreview(webContents, { landscape = false, title = "Print
     webPreferences: { plugins: true, contextIsolation: true, nodeIntegration: false },
   });
   win.setMenuBarVisibility(false);
-  win.on("closed", () => fs.unlink(file, () => {}));
+  win.on("closed", () => {
+    fs.unlink(file, () => {});
+    refocus(parent);  // give keyboard focus back to the app page
+  });
   await win.loadURL(`file://${file}#toolbar=1&view=FitH`);
   log.info(`Print preview opened (${landscape ? "landscape" : "portrait"}): ${file}`);
   return { ok: true };

@@ -7,6 +7,7 @@ const { setupAutoUpdate, registerUpdateIpc } = require("./lib/updater");
 const { loadAppConfig, saveAppConfig } = require("./lib/config");
 const { chooseDataRoot } = require("./lib/chooser");
 const { registerPrintIpc } = require("./lib/printing");
+const { refocus } = require("./lib/focus");
 
 log.transports.file.level = "info";
 Object.assign(console, log.functions);
@@ -58,7 +59,10 @@ async function showMain(url) {
     closeSplash();
     mainWin.maximize();
     mainWin.show();
+    refocus(mainWin);
   });
+  // Native dialogs / child windows can leave inputs deaf on Windows → re-arm page focus whenever the window is focused
+  mainWin.on("focus", () => { if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.focus(); });
   mainWin.webContents.setWindowOpenHandler(({ url: target }) => {
     if (/^https?:\/\//i.test(target) || /^(mailto|tel):/i.test(target)) shell.openExternal(target);
     return { action: "deny" };

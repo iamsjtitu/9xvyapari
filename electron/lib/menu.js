@@ -1,4 +1,5 @@
 const { Menu, shell, app, dialog } = require("electron");
+const { refocus } = require("./focus");
 
 const BRAND = {
   developer: "9x.design",
@@ -62,7 +63,7 @@ function buildMenu({ getWin, services, checkUpdates, changeFolder }) {
                 `Data: ${services.dataDir}`,
                 `Server: ${services.url}`,
               ].join("\n"),
-            }),
+            }).then(() => refocus(getWin())),
         },
       ],
     },
