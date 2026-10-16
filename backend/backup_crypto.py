@@ -63,11 +63,16 @@ def parse_header(blob: bytes) -> dict:
 
 def unpack(blob: bytes, password: str) -> dict:
     h = parse_header(blob)
+    if len(blob) < h["header_len"] + 16:
+        raise NotVbk("Backup file adhuri / kharab hai")
     key = derive_key(password, h["salt"])
     try:
         raw = AESGCM(key).decrypt(h["nonce"], blob[h["header_len"]:], blob[: h["header_len"]])
     except InvalidTag:
         raise WrongPassword("Backup password galat hai (ya file kharab hai)")
-    if h["flags"] & FLAG_ZLIB:
-        raw = zlib.decompress(raw)
-    return json.loads(raw.decode("utf-8"))
+    try:
+        if h["flags"] & FLAG_ZLIB:
+            raw = zlib.decompress(raw)
+        return json.loads(raw.decode("utf-8"))
+    except Exception:
+        raise NotVbk("Backup file adhuri / kharab hai")

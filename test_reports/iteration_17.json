@@ -1,0 +1,39 @@
+{
+  "summary": "Tested encrypted backups (.vbk) with a required Backup Password, on both backend and frontend. Backend: 11 pytest cases in a new suite, 10 pass. Covered: the must_set_backup_password flags on login and /auth/me; /backup/security; /backup/auto (file starts with 9XVBK and has no readable JSON); GET /backup (octet-stream, *_download.vbk); restore-file errors (wrong password, missing password, path traversal and bad names give 404) and success with data unchanged; multipart restore (wrong, missing and correct password, plain text file, {foo:1} JSON); /backup/password checks (422, missing, wrong current, wrong login); change to a temporary password, then revert through the forgot flow (an old .vbk still opens with the old password, a new one needs the new password); file list sorting and flags; 401 without auth. The unit tests (test_backup_crypto + test_security) pass 14/14. One bug: a truncated .vbk upload causes a 500 error. Frontend: every requested flow passes. Covered: login goes to the dashboard with no gate; the Backup page header and BackupPasswordCard status; form fields, the forgot toggle and both validation toasts; Backup Now toast and the 'Encrypted · test hint' lock column; the restore dialog (button disabled until a password is typed, wrong-password toast keeps the dialog open, cancel, correct password restores and reloads with counts unchanged); download event with the right filename and 9XVBK file start; upload restore with the downloaded file (wrong, then correct password); Settings shows the card under ChangePasswordCard; Year-end page loads; sidebar logout makes the 'Auto backup ban gaya: ...logout.vbk' backup and goes to /login. Gate test: I deleted db.backup_key. After that the API returns 409 for backup/auto and GET /backup, /auth/me returns must_set_backup_password=true, and setting 'admin123' is rejected. In the UI the gate page appears after login, has no current-password field, and also blocks going straight to /backup. Logout from the gate works. Setting Backup@2026 / 'test hint' lands on the dashboard and survives a reload. FINAL STATE: the backup key exists with password Backup@2026 and hint 'test hint' (checked by the pytest revert step and in Mongo). Login password is unchanged.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/restore (and /api/backup/restore-file)", "issue": "A file that starts with the 5-byte magic '9XVBK' but is shorter than the 36-byte header (truncated or corrupt .vbk) returns 500 Internal Server Error. Cause: bkc.unpack -> parse_header raises bkc.NotVbk, and _decode_backup only catches bkc.WrongPassword. Fix: in _decode_backup catch bkc.NotVbk (and zlib.error / ValueError) and raise HTTPException(400, '<name> 9x Vyapari backup nahi hai / file kharab hai')."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Settings", "issues": ["BackupPasswordCard is full width while the Settings and ChangePasswordCard cards above it are narrower, so the column looks uneven", "Settings and Year-end still use the browser's native date inputs (existing issue)"]},
+      {"screen": "Backup restore toast", "issues": ["The 'Restored: ...' toast lists all 18 collections, including archive_*:0, which is long and noisy. Consider showing only non-zero counts or a short summary."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_backup_encryption_v17.py", "/app/backend/tests/gate_helper.py", "/app/backend/tests/test_backup_crypto.py", "/app/test_reports/pytest/pytest_v17.xml"],
+  "action_items": [
+    "Catch bkc.NotVbk (and zlib/json decode errors) in _decode_backup so a truncated or corrupt .vbk returns 400 instead of 500.",
+    "Run the scrypt calls (derive_key, key_matches, unpack, pack) in a threadpool (fastapi.concurrency.run_in_threadpool). They use about 32MB and 100ms of CPU each and currently block the async event loop."
+  ],
+  "critical_code_review_comments": [
+    "Security design: db.backup_key stores the actual derived AES key (hex), and every .vbk uses that same salt (the docstring says 'per-file salt', but pack() always gets k['salt']). Anyone who can read the local MongoDB, which has no auth, can decrypt every backup without the password. Only a stolen backup file on its own is protected. Options: store only a verifier and wrap a random data key, or use a public-key scheme so auto-backups can be encrypted without the password while decrypting still needs it.",
+    "APP_SECRET is built from plain strings in the source (backup_crypto._PARTS), so it is obfuscation, not a real secret. Anyone who has the code or reverse-engineers the Electron build gets it. The real protection is the user's password plus scrypt, which is fine, but avoid overstating the 'only this software' claim.",
+    "Old plain JSON files are still accepted by /api/restore and /api/backup/restore-file. A hand-made JSON with a 'data' key can overwrite the whole DB with no schema check. Consider rejecting JSON once a backup password is set, or at least checking the expected keys.",
+    "_restore_all is not transactional (delete_many then insert_many for each collection). If an insert fails partway, data is lost. Make an automatic safety backup ('pre-restore') before any restore.",
+    "Test and manual backups count toward BACKUP_KEEP=30, so repeated test runs push out real logout and year-end backups. The folder is at 30 files now.",
+    "The backup-password gate is frontend-only. All data APIs still work while must_set_backup_password=true; only backup creation returns 409. Acceptable, but note it.",
+    "server.py is 2720 lines. The backup and year-end sections could move to their own modules."
+  ],
+  "updated_files": ["/app/backend/tests/test_backup_encryption_v17.py", "/app/backend/tests/gate_helper.py"],
+  "success_rate": {"backend": "95% (10/11 suite tests + 14/14 unit tests; 1 minor 500)", "frontend": "100%"},
+  "test_credentials": "admin / Vyapari@2026; backup password Backup@2026 (hint 'test hint') - verified and left as is",
+  "seed_data_creation": "Created about 10 encrypted backup files in /app/backend/backups (reasons test, test-old, test-new (hint tmp, password Backup@TEMP1), test-revert, manual, logout). Restores only used files made in this session, so data is unchanged (parties 527, rokad 17, bills 4). db.backup_key was regenerated: same password and hint, new salt; old .vbk files still open with Backup@2026 because each file stores its salt in its header.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest tests/test_backup_encryption_v17.py; it reverts the backup password to Backup@2026/'test hint' in a finally block. Only test_upload_restore should fail, on the truncated .vbk check, until _decode_backup catches NotVbk. For the gate test use 'python tests/gate_helper.py delete|show|restore'; delete saves the doc to /tmp/backup_key_saved.json. Never restore backups older than the current session.",
+  "rca of the issue": "Truncated .vbk gives 500. Repro: curl -F file=@<(printf 9XVBK);filename=t.vbk -F password=Backup@2026 /api/restore -> 500. is_vbk() passes on the magic bytes, then parse_header raises NotVbk because len < _FIXED_LEN, and _decode_backup only catches WrongPassword. Fix: add 'except bkc.NotVbk as e: raise HTTPException(400, str(e))'."
+}

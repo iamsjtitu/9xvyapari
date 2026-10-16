@@ -1303,7 +1303,7 @@ def _decode_backup(blob: bytes, password: str, name: str = "") -> dict:
             raise HTTPException(400, "Backup password dein")
         try:
             return bkc.unpack(blob, password)
-        except bkc.WrongPassword as e:
+        except (bkc.WrongPassword, bkc.NotVbk) as e:
             raise HTTPException(400, str(e))
     try:
         return json.loads(blob.decode("utf-8"))
