@@ -1178,7 +1178,57 @@ BACKUP_COLLECTIONS = ["account_groups", "accounts", "parties", "items", "bills",
                       "fiscal_years", "archive_bills", "archive_rokad", "archive_journal",
                       "archive_dos_journal", "archive_inward", "archive_gst_returns"]
 BACKUP_DIR = Path(os.environ.get("BACKUP_DIR") or (ROOT_DIR / "backups"))
-BACKUP_KEEP = 30
+BACKUP_KEEP = 30  # default retention (files) — user can change via /backup/retention
+
+RETENTION_FILE_CHOICES = (0, 10, 20, 30, 60, 100)   # 0 = kabhi delete na karo
+RETENTION_DAY_CHOICES = (0, 7, 15, 30, 60, 90, 180, 365)  # 0 = off
+
+
+async def _retention() -> dict:
+    s = await db.settings.find_one({"id": "default"}, {"_id": 0, "backup_keep_files": 1, "backup_keep_days": 1}) or {}
+    kf, kd = s.get("backup_keep_files"), s.get("backup_keep_days")
+    return {"keep_files": BACKUP_KEEP if kf is None else int(kf), "keep_days": 0 if kd is None else int(kd)}
+
+
+def _prune_backups(policy: dict, protect: Optional[Path] = None) -> list:
+    """Auto-delete old backups: beyond keep_files (newest kept) and/or older than keep_days. Newest file always survives."""
+    files = sorted(_all_backup_files(), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not files:
+        return []
+    keep_files, keep_days = int(policy.get("keep_files") or 0), int(policy.get("keep_days") or 0)
+    cutoff = datetime.now().timestamp() - keep_days * 86400 if keep_days > 0 else None
+    doomed = []
+    for idx, p in enumerate(files):
+        if idx == 0 or p == protect:
+            continue
+        if (keep_files > 0 and idx >= keep_files) or (cutoff is not None and p.stat().st_mtime < cutoff):
+            doomed.append(p)
+    for p in doomed:
+        p.unlink(missing_ok=True)
+    if doomed:
+        logger.info(f"Backup auto-delete: removed {len(doomed)} old file(s)")
+    return [p.name for p in doomed]
+
+
+class RetentionIn(BaseModel):
+    keep_files: int = Field(ge=0, le=1000)
+    keep_days: int = Field(ge=0, le=3650)
+
+
+@api.get("/backup/retention")
+async def backup_retention(current=Depends(get_current_user)):
+    files = _all_backup_files()
+    oldest = min((p.stat().st_mtime for p in files), default=None)
+    return {**(await _retention()), "file_choices": RETENTION_FILE_CHOICES, "day_choices": RETENTION_DAY_CHOICES,
+            "count": len(files), "total_size": sum(p.stat().st_size for p in files),
+            "oldest_at": datetime.fromtimestamp(oldest, tz=timezone.utc).isoformat() if oldest else None}
+
+
+@api.put("/backup/retention")
+async def set_backup_retention(body: RetentionIn, current=Depends(get_current_user)):
+    await db.settings.update_one({"id": "default"}, {"$set": {"backup_keep_files": body.keep_files, "backup_keep_days": body.keep_days}}, upsert=True)
+    deleted = _prune_backups(body.model_dump())
+    return {"ok": True, "deleted": deleted, **(await backup_retention(current))}
 
 
 async def _dump_all() -> dict:
@@ -1334,11 +1384,9 @@ async def _write_backup(reason: str) -> dict:
     stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     target = BACKUP_DIR / f"vyapari-backup_{stamp}_{reason}.vbk"
     target.write_bytes(blob)
-    files = sorted(_all_backup_files(), key=lambda p: p.stat().st_mtime, reverse=True)
-    for old in files[BACKUP_KEEP:]:
-        old.unlink(missing_ok=True)
+    deleted = _prune_backups(await _retention(), protect=target)
     counts = {c: await db[c].count_documents({}) for c in BACKUP_COLLECTIONS}
-    return {"ok": True, "folder": str(BACKUP_DIR), **_backup_file_info(target), "counts": counts}
+    return {"ok": True, "folder": str(BACKUP_DIR), **_backup_file_info(target), "counts": counts, "deleted": deleted}
 
 
 def _all_backup_files() -> list:

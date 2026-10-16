@@ -14,7 +14,7 @@ export function ExportBar({ filename, sheets, title, hidePrint, className = "" }
         title="Save as PDF (Print → Destination: Save as PDF)">
         <FilePdf size={15} weight="bold" color="#B71C1C" /> PDF
       </button>
-      <button className="btn-outline" onClick={() => exportToExcel(filename, sheets)}
+      <button className="btn-outline" onClick={() => exportToExcel(filename, sheets, { title })}
         data-testid="btn-excel" title="Export to Excel (.xlsx)">
         <FileXls size={15} weight="bold" color="#1B5E20" /> Excel
       </button>

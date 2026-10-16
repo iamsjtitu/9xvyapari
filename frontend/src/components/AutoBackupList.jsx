@@ -3,6 +3,7 @@ import api, { formatApiErrorDetail } from "@/lib/api";
 import { ClockCounterClockwise, FloppyDisk, ArrowCounterClockwise, LockKey, Warning } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { RestorePasswordDialog } from "@/components/RestorePasswordDialog";
+import { BackupRetention } from "@/components/BackupRetention";
 
 const fmtSize = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
@@ -55,7 +56,7 @@ export const AutoBackupList = () => {
             <div className="font-heading font-semibold text-lg">Auto Backups</div>
           </div>
           <div className="text-sm text-muted2 mt-1">
-            Har logout par automatic encrypted backup banta hai (last 30 rakhe jaate hain).
+            Har logout par automatic encrypted backup banta hai; purani files neeche di gayi setting se apne aap delete hoti hain.
           </div>
           <div className="text-[11px] font-mono-data text-muted2 mt-1 break-all" data-testid="backup-folder">
             Folder: {info.folder}
@@ -113,6 +114,7 @@ export const AutoBackupList = () => {
       )}
 
       <RestorePasswordDialog file={pending} busy={busy} onCancel={() => setPending(null)} onConfirm={doRestore} />
+      <BackupRetention onChanged={load} />
     </div>
   );
 };

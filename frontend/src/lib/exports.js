@@ -1,4 +1,6 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
+import api from "@/lib/api";
+import { BRAND, appVersionLabel } from "@/lib/brand";
 
 export function inrPlain(n) {
   return new Intl.NumberFormat("en-IN", {
@@ -6,22 +8,183 @@ export function inrPlain(n) {
   }).format(Number(n || 0));
 }
 
-/* ---- Excel Export ---- */
-export function exportToExcel(filename, sheets) {
-  const wb = XLSX.utils.book_new();
-  for (const sh of sheets) {
-    const data = [
-      sh.columns.map((c) => c.label),
-      ...sh.rows.map((r) => sh.columns.map((c) => {
-        const v = typeof c.value === "function" ? c.value(r) : r[c.key];
-        return v ?? "";
-      })),
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    ws["!cols"] = sh.columns.map((c) => ({ wch: c.width || 15 }));
-    XLSX.utils.book_append_sheet(wb, ws, sh.name.slice(0, 31));
+/* ---- Excel Export (ExcelJS): firm band, styled header, Indian ₹ format, zebra rows, SUM totals, print setup ---- */
+const X = {
+  ink: "FF1A1A1A", sidebar: "FF2C2A29", terracotta: "FF8B2520", parchment: "FFF4F1EA", bone: "FFFBF9F4",
+  khaki: "FFD6D1C4", white: "FFFFFFFF", muted: "FF595959", jama: "FF1B5E20", kharch: "FFB71C1C", band: "FFEFE9DC",
+};
+const INR = '[>=10000000]##\\,##\\,##\\,##0.00;[>=100000]##\\,##\\,##0.00;##,##0.00'; // 1,23,45,678.00 style
+const INT = "#,##0";
+const SUM_LABEL = /amount|amt|debit|credit|\bdr\b|\bcr\b|jama|kharch|lena|dena|receipt|payment|qty|bags|weight|\bwt\b|taxable|cgst|sgst|igst|^total|net amt|nag/i;
+const NO_SUM_LABEL = /balance|rate|bhav|days|%|phone|code|v\.?no|bill no|sr|s\.no|year|pin/i;
+const thin = { style: "thin", color: { argb: X.khaki } };
+const BORDER = { top: thin, left: thin, bottom: thin, right: thin };
+const isISODate = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v);
+const toDate = (v) => { const [y, m, d] = v.slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d); };
+const isNumLike = (v) => typeof v === "number" || (typeof v === "string" && v.trim() !== "" && /^-?[\d,]+(\.\d+)?$/.test(v.trim()));
+const toNum = (v) => (typeof v === "number" ? v : Number(String(v).replace(/,/g, "")));
+
+let settingsCache = null;
+async function firmInfo() {
+  if (!settingsCache) {
+    try { settingsCache = (await api.get("/settings")).data || {}; } catch { settingsCache = {}; }
   }
-  XLSX.writeFile(wb, filename.replace(/\.xlsx$/i, "") + ".xlsx");
+  return settingsCache;
+}
+
+const fmtD = (iso) => (iso ? iso.slice(0, 10).split("-").reverse().join("-") : "");
+
+function cellValue(col, row) {
+  const v = typeof col.value === "function" ? col.value(row) : row[col.key];
+  return v ?? "";
+}
+
+const CODE_LABEL = /code|phone|mobile|v\.?no|bill no|chq|pin|gstin|hsn|a\/c$|no\.?$/i;
+
+// Column kind: money / int / code (number, no grouping, never summed) / date / text — explicit flags win, else sniffed
+function columnKind(col, values) {
+  if (CODE_LABEL.test(col.label)) return col.num ? "code" : "text";
+  if (col.num || col.money) return "money";
+  if (col.date) return "date";
+  const filled = values.filter((v) => v !== "" && v != null);
+  if (!filled.length) return "text";
+  if (filled.every(isISODate) && /date|dt|txn|dinank|tarikh/i.test(col.label)) return "date";
+  if (filled.every(isNumLike)) {
+    return filled.every((v) => Number.isInteger(toNum(v))) && /days|qty|bags|nag|count|sr/i.test(col.label) ? "int" : "money";
+  }
+  return "text";
+}
+
+function buildSheet(wb, sh, firm, meta) {
+  const ws = wb.addWorksheet(sh.name.slice(0, 31).replace(/[\\/?*[\]:]/g, "-"), {
+    views: [{ state: "frozen", ySplit: 5, showGridLines: false }],
+    pageSetup: { orientation: sh.columns.length > 6 ? "landscape" : "portrait", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+      margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 }, printTitlesRow: "5:5" },
+    properties: { tabColor: { argb: X.terracotta } },
+  });
+  const nCols = sh.columns.length;
+  const last = ws.getColumn(nCols).letter;
+  const matrix = sh.rows.map((r) => sh.columns.map((c) => cellValue(c, r)));
+  const kinds = sh.columns.map((c, i) => columnKind(c, matrix.map((row) => row[i])));
+
+  // Rows 1-4: firm band
+  ws.mergeCells(`A1:${last}1`);
+  const t1 = ws.getCell("A1");
+  t1.value = (firm.firm_name || BRAND.app).toUpperCase();
+  t1.font = { name: "Calibri", size: 18, bold: true, color: { argb: X.white } };
+  t1.fill = { type: "pattern", pattern: "solid", fgColor: { argb: X.sidebar } };
+  t1.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+  ws.getRow(1).height = 30;
+
+  ws.mergeCells(`A2:${last}2`);
+  const t2 = ws.getCell("A2");
+  t2.value = sh.title || meta.title || sh.name;
+  t2.font = { name: "Calibri", size: 13, bold: true, color: { argb: X.white } };
+  t2.fill = { type: "pattern", pattern: "solid", fgColor: { argb: X.terracotta } };
+  t2.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+  ws.getRow(2).height = 22;
+
+  ws.mergeCells(`A3:${last}3`);
+  const fy = firm.fy_start ? `FY ${fmtD(firm.fy_start)} – ${fmtD(firm.fy_end)}` : "";
+  const t3 = ws.getCell("A3");
+  t3.value = [sh.subtitle || meta.subtitle, fy, `${sh.rows.length} rows`].filter(Boolean).join("   ·   ");
+  t3.font = { name: "Calibri", size: 10, italic: true, color: { argb: X.muted } };
+  t3.fill = { type: "pattern", pattern: "solid", fgColor: { argb: X.band } };
+  t3.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+  ws.getRow(3).height = 18;
+  ws.getRow(4).height = 6;
+
+  // Row 5: header
+  const header = ws.getRow(5);
+  sh.columns.forEach((c, i) => {
+    const cell = header.getCell(i + 1);
+    cell.value = c.label;
+    cell.font = { name: "Calibri", size: 11, bold: true, color: { argb: X.white } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: X.ink } };
+    cell.alignment = { vertical: "middle", horizontal: ["money", "int", "code"].includes(kinds[i]) ? "right" : "left", wrapText: true };
+    cell.border = BORDER;
+  });
+  header.height = 24;
+
+  // Data rows
+  matrix.forEach((vals, r) => {
+    const row = ws.getRow(6 + r);
+    vals.forEach((v, i) => {
+      const cell = row.getCell(i + 1);
+      const kind = kinds[i];
+      if (kind === "money" || kind === "int" || kind === "code") {
+        cell.value = v === "" || v == null ? null : isNumLike(v) ? toNum(v) : v;
+        cell.numFmt = kind === "money" ? INR : kind === "int" ? INT : "0";
+        cell.alignment = { horizontal: "right", vertical: "middle" };
+        if (typeof cell.value === "number" && cell.value < 0) cell.font = { name: "Calibri", size: 10.5, color: { argb: X.kharch } };
+      } else if (kind === "date" && isISODate(v)) {
+        cell.value = toDate(v);
+        cell.numFmt = "dd-mm-yyyy";
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+      } else {
+        cell.value = v === null ? "" : v;
+        cell.alignment = { horizontal: "left", vertical: "middle", wrapText: false };
+      }
+      if (!cell.font) cell.font = { name: "Calibri", size: 10.5, color: { argb: X.ink } };
+      cell.border = BORDER;
+      if (r % 2 === 1) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: X.bone } };
+    });
+    row.height = 18;
+  });
+
+  // Totals row (SUM formulas on amount-like columns)
+  const sumCols = sh.columns.map((c, i) => c.sum === true || (c.sum !== false && (kinds[i] === "money" || kinds[i] === "int")
+    && (SUM_LABEL.test(c.label) || c.num) && !NO_SUM_LABEL.test(c.label)));
+  const firstData = 6, lastData = 5 + matrix.length;
+  if (matrix.length && sumCols.some(Boolean)) {
+    const tr = ws.getRow(lastData + 1);
+    const labelAt = sumCols.findIndex(Boolean);
+    sh.columns.forEach((c, i) => {
+      const cell = tr.getCell(i + 1);
+      const L = ws.getColumn(i + 1).letter;
+      if (sumCols[i]) {
+        cell.value = { formula: `SUM(${L}${firstData}:${L}${lastData})` };
+        cell.numFmt = kinds[i] === "int" ? INT : INR;
+        cell.alignment = { horizontal: "right", vertical: "middle" };
+      } else if (i === Math.max(0, labelAt - 1) || (labelAt === 0 && i === 0)) {
+        cell.value = i === 0 && labelAt === 0 ? undefined : "TOTAL";
+        cell.alignment = { horizontal: "right", vertical: "middle" };
+      }
+      cell.font = { name: "Calibri", size: 11, bold: true, color: { argb: X.ink } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: X.parchment } };
+      cell.border = { ...BORDER, top: { style: "medium", color: { argb: X.ink } }, bottom: { style: "double", color: { argb: X.ink } } };
+    });
+    tr.height = 22;
+  }
+
+  // Footer note
+  const fr = ws.getRow(lastData + 3);
+  ws.mergeCells(`A${lastData + 3}:${last}${lastData + 3}`);
+  fr.getCell(1).value = `Generated by ${BRAND.app} ${appVersionLabel()} · ${new Date().toLocaleString("en-IN")} · ${BRAND.developer}`;
+  fr.getCell(1).font = { name: "Calibri", size: 9, italic: true, color: { argb: X.muted } };
+
+  // Widths: definition or sniffed from content
+  sh.columns.forEach((c, i) => {
+    const longest = Math.max(String(c.label).length, ...matrix.map((row) => String(row[i] ?? "").length));
+    ws.getColumn(i + 1).width = c.width || Math.min(48, Math.max(8, longest + 2));
+  });
+  ws.autoFilter = { from: { row: 5, column: 1 }, to: { row: Math.max(5, lastData), column: nCols } };
+  ws.headerFooter = { oddFooter: `&L&8${firm.firm_name || BRAND.app}&C&8Page &P / &N&R&8${BRAND.app}` };
+}
+
+export async function exportToExcel(filename, sheets, meta = {}) {
+  const firm = await firmInfo();
+  const wb = new ExcelJS.Workbook();
+  wb.creator = BRAND.app;
+  wb.created = new Date();
+  for (const sh of sheets) buildSheet(wb, sh, firm, meta);
+  const buf = await wb.xlsx.writeBuffer();
+  const url = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename.replace(/\.xlsx$/i, "") + ".xlsx";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 /* ---- Print / PDF — auto landscape detection for cash book / wide reports ---- */
