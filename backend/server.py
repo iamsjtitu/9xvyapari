@@ -883,22 +883,7 @@ async def dashboard_summary(current=Depends(get_current_user)):
     }
 
 
-@api.get("/summary/party/{pid}")
-async def party_ledger(pid: str, as_on: Optional[str] = None, date_from: Optional[str] = None, current=Depends(get_current_user)):
-    party = await db.parties.find_one({"id": pid}, {"_id": 0})
-    if not party:
-        raise HTTPException(404, "Party not found")
-    for d in (as_on, date_from):
-        if d and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", d):
-            raise HTTPException(400, "Date YYYY-MM-DD format me do")
-    upto = _upto(as_on)
-    if date_from:  # statement range: entries from date_from, opening = balance the day before
-        upto = {"date": {**upto.get("date", {}), "$gte": date_from}}
-    bills = await db.bills.find({"party_id": pid, **upto}, {"_id": 0}).sort("date", 1).to_list(5000)
-    rokads = await db.rokad.find({"party_id": pid, **upto}, {"_id": 0}).sort("date", 1).to_list(5000)
-    # Entries where this ledger is the cash/bank account side (cash-group parties)
-    cash_rokad = [r for r in await db.rokad.find({"cash_account_id": pid, **upto}, {"_id": 0}).sort("date", 1).to_list(5000)
-                  if r.get("party_id") != pid]
+async def _journal_rows(pid: str, upto: dict) -> list:
     journal = []
     async for j in db.journal.find({"lines.account_id": pid, **upto}, {"_id": 0}).sort("date", 1):
         for ln in j.get("lines", []):
@@ -907,6 +892,44 @@ async def party_ledger(pid: str, as_on: Optional[str] = None, date_from: Optiona
                 journal.append({"id": j["id"], "date": j.get("date"), "voucher_no": j.get("voucher_no", ""),
                                 "narration": j.get("narration", ""), "other": other,
                                 "debit": float(ln.get("debit") or 0), "credit": float(ln.get("credit") or 0)})
+    return journal
+
+
+async def _account_ledger(acc: dict, as_on: Optional[str], date_from: Optional[str], upto: dict) -> dict:
+    """Ledger view for a Chart-of-Accounts ledger (cash/bank a/c made in Accounts page, not a party)."""
+    grp = await db.account_groups.find_one({"id": acc.get("group_id")}, {"_id": 0, "name": 1})
+    acc["group_name"] = (grp or {}).get("name", acc.get("group_name", ""))
+    acc.setdefault("type", "account")
+    opening = float(acc.get("opening_balance") or 0)
+    acc["balance"] = await _compute_account_balance(acc["id"], opening, as_on)
+    cash_rokad = await db.rokad.find({"cash_account_id": acc["id"], **upto}, {"_id": 0}).sort("date", 1).to_list(5000)
+    if date_from:
+        day_before = (datetime.fromisoformat(date_from).date() - timedelta(days=1)).isoformat()
+        opening = await _compute_account_balance(acc["id"], opening, day_before)
+    return {"party": acc, "kind": "account", "as_on": as_on, "date_from": date_from, "opening": opening, "bills": [], "rokad": [],
+            "cash_rokad": cash_rokad, "journal": await _journal_rows(acc["id"], upto), "dos_journal": []}
+
+
+@api.get("/summary/party/{pid}")
+async def party_ledger(pid: str, as_on: Optional[str] = None, date_from: Optional[str] = None, current=Depends(get_current_user)):
+    for d in (as_on, date_from):
+        if d and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", d):
+            raise HTTPException(400, "Date YYYY-MM-DD format me do")
+    upto = _upto(as_on)
+    if date_from:  # statement range: entries from date_from, opening = balance the day before
+        upto = {"date": {**upto.get("date", {}), "$gte": date_from}}
+    party = await db.parties.find_one({"id": pid}, {"_id": 0})
+    if not party:
+        acc = await db.accounts.find_one({"id": pid}, {"_id": 0})
+        if not acc:
+            raise HTTPException(404, "Party / account nahi mila")
+        return await _account_ledger(acc, as_on, date_from, upto)
+    bills = await db.bills.find({"party_id": pid, **upto}, {"_id": 0}).sort("date", 1).to_list(5000)
+    rokads = await db.rokad.find({"party_id": pid, **upto}, {"_id": 0}).sort("date", 1).to_list(5000)
+    # Entries where this ledger is the cash/bank account side (cash-group parties)
+    cash_rokad = [r for r in await db.rokad.find({"cash_account_id": pid, **upto}, {"_id": 0}).sort("date", 1).to_list(5000)
+                  if r.get("party_id") != pid]
+    journal = await _journal_rows(pid, upto)
     # Imported DOS journal entries (AN.DBF) - match primary OR counter-party
     dos_raw = await db.dos_journal.find(
         {"$or": [{"party_id": pid}, {"counter_party_id": pid}], **upto},

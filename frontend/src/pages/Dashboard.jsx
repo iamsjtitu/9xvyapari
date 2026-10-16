@@ -6,6 +6,7 @@ import {
   Bell, WarningCircle, Clock, CalendarCheck,
 } from "@phosphor-icons/react";
 import { CashBankBalances } from "@/components/CashBankBalances";
+import { LoadState } from "@/components/LoadState";
 
 const Stat = ({ icon: Icon, label, value, accent, testid }) => (
   <div className="card-flat p-4" data-testid={testid}>
@@ -26,22 +27,32 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [bills, setBills] = useState([]);
   const [dueData, setDueData] = useState(null);
+  const [error, setError] = useState(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    let alive = true;
+    setError(null);
     (async () => {
-      const [s, b, due] = await Promise.all([
-        api.get("/summary/dashboard"),
-        api.get("/bills"),
-        api.get("/summary/due-bills"),
-      ]);
-      setData(s.data);
-      setBills(b.data.slice(0, 6));
-      setDueData(due.data);
+      try {
+        const [s, b, due] = await Promise.all([
+          api.get("/summary/dashboard"),
+          api.get("/bills"),
+          api.get("/summary/due-bills"),
+        ]);
+        if (!alive) return;
+        setData(s.data);
+        setBills(b.data.slice(0, 6));
+        setDueData(due.data);
+      } catch (err) {
+        if (alive) setError(err);
+      }
     })();
-  }, []);
+    return () => { alive = false; };
+  }, [attempt]);
 
   if (!data)
-    return <div className="text-muted2 font-heading">Loading...</div>;
+    return <LoadState error={error} onRetry={() => setAttempt((a) => a + 1)} backTo="/rokad" backLabel="Rokad Panna kholein" testid="dashboard" />;
 
   return (
     <div className="space-y-6" data-testid="page-dashboard">

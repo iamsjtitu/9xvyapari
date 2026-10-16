@@ -4,12 +4,14 @@ import { FloppyDisk, Calendar } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ChangePasswordCard } from "@/components/ChangePasswordCard";
 import { SoftwareUpdateCard } from "@/components/SoftwareUpdateCard";
+import { LoadState } from "@/components/LoadState";
 
 export default function Settings() {
   const [form, setForm] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    api.get("/settings").then((r) => setForm(r.data));
+    api.get("/settings").then((r) => setForm(r.data)).catch(setError);
   }, []);
 
   const save = async () => {
@@ -22,7 +24,7 @@ export default function Settings() {
     }
   };
 
-  if (!form) return <div className="text-muted2 font-heading">Loading...</div>;
+  if (!form) return <LoadState error={error} testid="settings" />;
 
   // Helpful FY presets
   const year = parseInt(form.fy_start?.slice(0, 4) || new Date().getFullYear());

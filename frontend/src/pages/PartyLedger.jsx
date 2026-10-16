@@ -4,6 +4,7 @@ import api, { inr, todayISO } from "@/lib/api";
 import { ArrowLeft, Receipt, Notebook, BookOpen, BookOpenText, Wallet, Printer } from "@phosphor-icons/react";
 import { ExportBar } from "@/components/ExportBar";
 import { PartyStatement } from "@/components/PartyStatement";
+import { LoadState } from "@/components/LoadState";
 
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
 
@@ -59,17 +60,25 @@ export default function PartyLedger() {
   const hasFromParam = params.has("from");
   const dateFrom = hasFromParam ? params.get("from") : (settings?.fy_start && settings.fy_start <= asOn ? settings.fy_start : "");
   const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const [attempt, setAttempt] = useState(0);
   const [view, setView] = useState("ledger"); // ledger | statement (DOS print preview)
 
   useEffect(() => {
+    let alive = true;
     setData(null);
-    api.get(`/summary/party/${id}`, { params: { as_on: asOn, ...(dateFrom ? { date_from: dateFrom } : {}) } }).then((r) => setData(r.data));
-  }, [id, asOn, dateFrom]);
+    setError(null);
+    api.get(`/summary/party/${id}`, { params: { as_on: asOn, ...(dateFrom ? { date_from: dateFrom } : {}) } })
+      .then((r) => { if (alive) setData(r.data); })
+      .catch((err) => { if (alive) setError(err); });
+    return () => { alive = false; };
+  }, [id, asOn, dateFrom, attempt]);
 
   const setRange = (next) => setParams({ as_on: next.as_on ?? asOn, from: next.from ?? dateFrom ?? "" });
 
-  if (!data) return <div className="text-muted2 font-heading" data-testid="ledger-loading">Loading...</div>;
+  if (!data) return <LoadState error={error} onRetry={() => setAttempt((a) => a + 1)} backTo="/parties" backLabel="Party Khata par wapas" testid="ledger" />;
   const { party, dos_journal = [], journal = [], cash_rokad = [] } = data;
+  const isAccount = data.kind === "account";
   const opening = data.opening ?? (party.opening_balance || 0);
   const rows = buildRows(data);
   let running = opening;
@@ -85,7 +94,7 @@ export default function PartyLedger() {
   return (
     <div className="space-y-5" data-testid="page-party-ledger">
       <div className="flex items-center justify-between flex-wrap gap-2 print:hidden">
-        <Link to="/parties" className="btn-ghost"><ArrowLeft size={14} /> Wapas</Link>
+        <Link to={isAccount ? "/accounts" : "/parties"} className="btn-ghost" data-testid="ledger-back-link"><ArrowLeft size={14} /> Wapas</Link>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1" data-testid="ledger-asof-controls">
             <label className="lbl !mb-0 mr-1 whitespace-nowrap">From</label>
@@ -131,7 +140,7 @@ export default function PartyLedger() {
       <div className="card-flat p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="section-title">Party Khata · Ledger</div>
+            <div className="section-title">{isAccount ? "Account Ledger" : "Party Khata · Ledger"}{party.group_name ? ` · ${party.group_name}` : ""}</div>
             <h1 className="font-heading font-semibold text-3xl tracking-tight mt-1">{party.name}</h1>
             <div className="text-muted2 text-sm mt-1">
               {party.code ? <span className="font-mono-data mr-3">Code: {party.code}</span> : null}
@@ -145,7 +154,9 @@ export default function PartyLedger() {
               ₹ {inr(Math.abs(party.balance))} <span className="text-base">{party.balance > 0 ? "Dr" : party.balance < 0 ? "Cr" : ""}</span>
             </div>
             <div className="text-[11px] uppercase tracking-wider text-muted2 mt-1">
-              {party.balance > 0 ? "Party Owes Us (Udhaar)" : party.balance < 0 ? "We Owe Party" : "Settled"}
+              {isAccount || cash_rokad.length > 0
+                ? (party.balance >= 0 ? "Balance (Cash / Bank me)" : "Overdrawn")
+                : party.balance > 0 ? "Party Owes Us (Udhaar)" : party.balance < 0 ? "We Owe Party" : "Settled"}
             </div>
           </div>
         </div>

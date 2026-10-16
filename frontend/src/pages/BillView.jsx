@@ -3,16 +3,19 @@ import { useParams, Link } from "react-router-dom";
 import api, { inr } from "@/lib/api";
 import { ArrowLeft, Storefront, PencilSimple } from "@phosphor-icons/react";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
+import { LoadState } from "@/components/LoadState";
 
 export default function BillView() {
   const { id } = useParams();
   const [bill, setBill] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    api.get(`/bills/${id}`).then((r) => setBill(r.data));
+    setError(null);
+    api.get(`/bills/${id}`).then((r) => setBill(r.data)).catch(setError);
   }, [id]);
 
-  if (!bill) return <div className="text-muted2 font-heading">Loading...</div>;
+  if (!bill) return <LoadState error={error} backTo="/bills" backLabel="Bills par wapas" testid="bill-view" />;
 
   return (
     <div className="space-y-4" data-testid="page-bill-view">
