@@ -12,12 +12,13 @@ import jwt
 from datetime import datetime, timezone, timedelta, date
 from typing import List, Optional, Literal
 
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 
+import backup_crypto as bkc
 from security import LoginThrottle, client_ip, cookie_policy, csrf_block_reason
 
 # --- Mongo ---
@@ -313,9 +314,11 @@ def _norm_username(u: str) -> str:
     return (u or "").strip().lower()
 
 
-def _user_out(user: dict, access: Optional[str] = None) -> dict:
+def _user_out(user: dict, access: Optional[str] = None, backup_key: Optional[dict] = None) -> dict:
     out = {"id": user["id"], "username": user.get("username") or "", "name": user.get("name", ""),
-           "role": user.get("role", "user"), "must_change_password": bool(user.get("must_change_password"))}
+           "role": user.get("role", "user"), "must_change_password": bool(user.get("must_change_password")),
+           # backups are password-locked → the gate opens right after the login password is set
+           "must_set_backup_password": not user.get("must_change_password") and backup_key is None}
     if access:
         out["access_token"] = access
     return out
@@ -350,7 +353,8 @@ async def change_password(body: ChangePasswordIn, response: Response, current=De
     username = updates.get("username") or user.get("username")
     access = create_access_token(user["id"], username)
     set_auth_cookies(response, access, create_refresh_token(user["id"]))
-    return {"ok": True, "username": username, "access_token": access, "must_change_password": False}
+    return {"ok": True, "username": username, "access_token": access, "must_change_password": False,
+            "must_set_backup_password": (await _backup_key()) is None}
 
 
 @api.post("/auth/login")
@@ -369,7 +373,7 @@ async def login(body: LoginIn, request: Request, response: Response):
     access = create_access_token(user["id"], uname)
     refresh = create_refresh_token(user["id"])
     set_auth_cookies(response, access, refresh)
-    return _user_out(user, access)
+    return _user_out(user, access, await _backup_key())
 
 @api.post("/auth/logout")
 async def logout(response: Response):
@@ -379,7 +383,7 @@ async def logout(response: Response):
 
 @api.get("/auth/me")
 async def me(current=Depends(get_current_user)):
-    return _user_out(current)
+    return _user_out(current, None, await _backup_key())
 
 
 # ---------- PARTIES ----------
@@ -1199,60 +1203,170 @@ async def _restore_all(data: dict) -> dict:
 
 def _backup_file_info(p: Path) -> dict:
     st = p.stat()
-    return {"name": p.name, "size": st.st_size,
+    info = {"name": p.name, "size": st.st_size, "encrypted": p.suffix == ".vbk", "hint": "",
             "created_at": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat()}
+    if info["encrypted"]:
+        try:
+            with p.open("rb") as fh:
+                info["hint"] = bkc.parse_header(fh.read(320))["hint"]
+        except Exception:
+            pass
+    return info
+
+
+# ---------- BACKUP PASSWORD (every .vbk needs this software + this password) ----------
+async def _backup_key() -> Optional[dict]:
+    return await db.backup_key.find_one({"id": "backup"}, {"_id": 0})
+
+
+def _backup_key_out(k: Optional[dict]) -> dict:
+    return {"configured": bool(k), "hint": (k or {}).get("hint", ""),
+            "set_at": (k or {}).get("set_at"), "changed_at": (k or {}).get("changed_at")}
+
+
+def _plain_backup_files() -> list:
+    return sorted(BACKUP_DIR.glob("vyapari-backup_*.json")) if BACKUP_DIR.is_dir() else []
+
+
+def _encrypt_plain_backups(k: dict) -> int:
+    """One-time migration: old plain JSON backups → .vbk (same timestamp), JSON deleted."""
+    import json
+    done = 0
+    for p in _plain_backup_files():
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            st = p.stat()
+            target = p.with_suffix(".vbk")
+            target.write_bytes(bkc.pack(data, bytes.fromhex(k["key"]), bytes.fromhex(k["salt"]), k.get("hint", "")))
+            os.utime(target, (st.st_atime, st.st_mtime))
+            p.unlink()
+            done += 1
+        except Exception as e:  # keep the plain file rather than lose a backup
+            logger.warning(f"Backup encrypt failed for {p.name}: {e}")
+    if done:
+        logger.info(f"Encrypted {done} plain backup file(s) → .vbk")
+    return done
+
+
+class BackupPasswordIn(BaseModel):
+    new_password: str = Field(min_length=6, max_length=128)
+    current_password: Optional[str] = ""   # when changing
+    login_password: Optional[str] = ""     # forgot flow: prove identity with the login password instead
+    hint: Optional[str] = Field(default="", max_length=120)
+
+
+@api.get("/backup/security")
+async def backup_security(current=Depends(get_current_user)):
+    return {**_backup_key_out(await _backup_key()), "plain_files": len(_plain_backup_files()), "folder": str(BACKUP_DIR)}
+
+
+@api.post("/backup/password")
+async def set_backup_password(body: BackupPasswordIn, current=Depends(get_current_user)):
+    k = await _backup_key()
+    if k:
+        if body.current_password:
+            if not bkc.key_matches(body.current_password, bytes.fromhex(k["salt"]), bytes.fromhex(k["key"])):
+                raise HTTPException(400, "Purana backup password galat hai")
+        elif body.login_password:
+            user = await db.users.find_one({"id": current["id"]})
+            if not user or not verify_password(body.login_password, user["password_hash"]):
+                raise HTTPException(400, "Login password galat hai")
+        else:
+            raise HTTPException(400, "Purana backup password (ya login password) dein")
+    if body.new_password == DEFAULT_ADMIN_PASSWORD:
+        raise HTTPException(400, "Default password backup ke liye allowed nahi hai")
+    salt = os.urandom(16)
+    doc = {"id": "backup", "salt": salt.hex(), "key": bkc.derive_key(body.new_password, salt).hex(),
+           "hint": (body.hint or "").strip(), "set_at": (k or {}).get("set_at") or now_iso(), "changed_at": now_iso()}
+    await db.backup_key.replace_one({"id": "backup"}, doc, upsert=True)
+    migrated = _encrypt_plain_backups(doc)
+    return {"ok": True, **_backup_key_out(doc), "migrated": migrated, "changed": bool(k)}
+
+
+async def _require_backup_key() -> dict:
+    k = await _backup_key()
+    if not k:
+        raise HTTPException(409, "Pehle Backup Password set karein (Settings → Backup Password). Bina iske backup nahi ban sakta.")
+    return k
+
+
+async def _encrypted_dump() -> bytes:
+    k = await _require_backup_key()
+    return bkc.pack(await _dump_all(), bytes.fromhex(k["key"]), bytes.fromhex(k["salt"]), k.get("hint", ""))
+
+
+def _decode_backup(blob: bytes, password: str, name: str = "") -> dict:
+    """.vbk → needs password; legacy plain .json still restorable."""
+    import json
+    if bkc.is_vbk(blob):
+        if not password:
+            raise HTTPException(400, "Backup password dein")
+        try:
+            return bkc.unpack(blob, password)
+        except bkc.WrongPassword as e:
+            raise HTTPException(400, str(e))
+    try:
+        return json.loads(blob.decode("utf-8"))
+    except Exception:
+        raise HTTPException(400, f"{name or 'File'} 9x Vyapari backup nahi hai")
 
 
 @api.get("/backup")
 async def backup(current=Depends(get_current_user)):
-    """Export full database (except users) as JSON."""
-    return await _dump_all()
+    """Download full database (except users) as an encrypted .vbk file."""
+    blob = await _encrypted_dump()
+    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return Response(content=blob, media_type="application/octet-stream",
+                    headers={"Content-Disposition": f'attachment; filename="vyapari-backup_{stamp}_download.vbk"'})
 
 
 @api.post("/restore")
-async def restore(payload: dict, current=Depends(get_current_user)):
-    """Restore from backup JSON. Wipes existing app data (not users)."""
-    summary = await _restore_all(payload.get("data") or {})
-    return {"ok": True, "restored": summary}
+async def restore(file: UploadFile = File(...), password: str = Form(""), current=Depends(get_current_user)):
+    """Restore from an uploaded .vbk (password) or legacy .json backup. Wipes existing app data (not users)."""
+    data = _decode_backup(await file.read(), password, file.filename or "")
+    summary = await _restore_all(data.get("data") or {})
+    return {"ok": True, "restored": summary, "name": file.filename}
 
 
 async def _write_backup(reason: str) -> dict:
-    import json
+    blob = await _encrypted_dump()
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    target = BACKUP_DIR / f"vyapari-backup_{stamp}_{reason}.json"
-    data = await _dump_all()
-    target.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-    files = sorted(BACKUP_DIR.glob("vyapari-backup_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    target = BACKUP_DIR / f"vyapari-backup_{stamp}_{reason}.vbk"
+    target.write_bytes(blob)
+    files = sorted(_all_backup_files(), key=lambda p: p.stat().st_mtime, reverse=True)
     for old in files[BACKUP_KEEP:]:
         old.unlink(missing_ok=True)
-    return {"ok": True, "folder": str(BACKUP_DIR), **_backup_file_info(target),
-            "counts": {k: len(v) for k, v in data["data"].items()}}
+    counts = {c: await db[c].count_documents({}) for c in BACKUP_COLLECTIONS}
+    return {"ok": True, "folder": str(BACKUP_DIR), **_backup_file_info(target), "counts": counts}
+
+
+def _all_backup_files() -> list:
+    if not BACKUP_DIR.is_dir():
+        return []
+    return [p for p in BACKUP_DIR.iterdir() if p.name.startswith("vyapari-backup_") and p.suffix in (".vbk", ".json")]
 
 
 @api.post("/backup/auto")
 async def backup_auto(payload: Optional[dict] = None, current=Depends(get_current_user)):
-    """Write a timestamped JSON backup to BACKUP_DIR (used on logout). Keeps last BACKUP_KEEP files."""
+    """Write a timestamped encrypted backup to BACKUP_DIR (used on logout). Keeps last BACKUP_KEEP files."""
     reason = "".join(ch for ch in str((payload or {}).get("reason") or "manual") if ch.isalnum() or ch in "-_")[:40]
     return await _write_backup(reason or "manual")
 
 
 @api.get("/backup/files")
 async def backup_files(current=Depends(get_current_user)):
-    if not BACKUP_DIR.is_dir():
-        return {"folder": str(BACKUP_DIR), "files": []}
-    files = sorted(BACKUP_DIR.glob("vyapari-backup_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    files = sorted(_all_backup_files(), key=lambda p: p.stat().st_mtime, reverse=True)
     return {"folder": str(BACKUP_DIR), "files": [_backup_file_info(p) for p in files]}
 
 
 @api.post("/backup/restore-file")
 async def backup_restore_file(payload: dict, current=Depends(get_current_user)):
-    import json
     name = Path(str(payload.get("name") or "")).name
     target = BACKUP_DIR / name
-    if not name.startswith("vyapari-backup_") or not target.is_file():
+    if not name.startswith("vyapari-backup_") or target.suffix not in (".vbk", ".json") or not target.is_file():
         raise HTTPException(404, "Backup file nahi mili")
-    data = json.loads(target.read_text(encoding="utf-8"))
+    data = _decode_backup(target.read_bytes(), str(payload.get("password") or ""), name)
     summary = await _restore_all(data.get("data") or {})
     return {"ok": True, "restored": summary, "name": name}
 
@@ -2491,6 +2605,13 @@ async def on_start():
     await db.inward.create_index("id", unique=True)
     await db.gst_returns.create_index("id", unique=True)
     await db.dos_journal.create_index("id", unique=True)
+
+    # Plain JSON backups left by older versions → encrypt as soon as a backup password exists
+    bk = await _backup_key()
+    if bk:
+        _encrypt_plain_backups(bk)
+    elif _plain_backup_files():
+        logger.warning("Plain JSON backups found – they will be encrypted once a Backup Password is set")
 
     # Seed admin only once – never overwrite a password the user changed in-app
     admin_username = _norm_username(os.environ.get("ADMIN_USERNAME", "admin"))

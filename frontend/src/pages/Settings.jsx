@@ -4,6 +4,7 @@ import { FloppyDisk, Calendar } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ChangePasswordCard } from "@/components/ChangePasswordCard";
 import { SoftwareUpdateCard } from "@/components/SoftwareUpdateCard";
+import { BackupPasswordCard } from "@/components/BackupPasswordCard";
 import { LoadState } from "@/components/LoadState";
 
 export default function Settings() {
@@ -96,6 +97,7 @@ export default function Settings() {
       </div>
 
       <ChangePasswordCard />
+      <BackupPasswordCard />
       <SoftwareUpdateCard />
     </div>
   );

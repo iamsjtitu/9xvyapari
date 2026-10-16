@@ -7,6 +7,7 @@ import UpdateBanner from "@/components/UpdateBanner";
 import { useRefocusOnWindowFocus } from "@/hooks/useRefocusOnWindowFocus";
 import Login from "@/pages/Login";
 import SetPassword from "@/pages/SetPassword";
+import SetBackupPassword from "@/pages/SetBackupPassword";
 import Dashboard from "@/pages/Dashboard";
 import RokadPanna from "@/pages/RokadPanna";
 import PartyKhata from "@/pages/PartyKhata";
@@ -40,6 +41,7 @@ function Protected({ children }) {
   }
   if (!user) return <Navigate to="/login" replace />;
   if (user.must_change_password) return <SetPassword />;
+  if (user.must_set_backup_password) return <SetBackupPassword />;
   return children;
 }
 
