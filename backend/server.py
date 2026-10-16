@@ -9,7 +9,7 @@ import logging
 import uuid
 import bcrypt
 import jwt
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from typing import List, Optional, Literal
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
@@ -461,7 +461,7 @@ async def ledger_usage(lid: str, current=Depends(get_current_user)):
 @api.get("/ledgers/{lid}/balance")
 async def ledger_balance(lid: str, as_on: Optional[str] = None, current=Depends(get_current_user)):
     """Quick current balance of a party or account (for 'party select karte hi balance dikhe')."""
-    if as_on and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", as_on):
+    if as_on and not _is_date(as_on):
         raise HTTPException(400, "as_on date YYYY-MM-DD format me do")
     p = await db.parties.find_one({"id": lid}, {"_id": 0, "id": 1, "name": 1, "code": 1, "opening_balance": 1, "group_name": 1})
     if p:
@@ -475,6 +475,13 @@ async def ledger_balance(lid: str, as_on: Optional[str] = None, current=Depends(
         kind = "account"
     return {"id": lid, "name": p.get("name", ""), "code": p.get("code"), "kind": kind, "group_name": p.get("group_name", ""),
             "balance": round(bal, 2), "dr_cr": "Dr" if bal > 0 else "Cr" if bal < 0 else "", "as_on": as_on}
+
+
+def _is_date(s: str) -> bool:
+    try:
+        return bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", s)) and date.fromisoformat(s) is not None
+    except ValueError:
+        return False
 
 
 def _upto(as_on: Optional[str]) -> dict:
@@ -805,7 +812,7 @@ async def rokad_accounts_summary(date_from: str, date_to: str, current=Depends(g
     """Opening (as on day before date_from) / Jama / Kharch / Closing (as on date_to) per cash & bank ledger —
     same balance engine as the Balance Sheet so closing figures always match."""
     for d in (date_from, date_to):
-        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", d):
+        if not _is_date(d):
             raise HTTPException(400, "Date YYYY-MM-DD format me do")
     day_before = (datetime.fromisoformat(date_from).date() - timedelta(days=1)).isoformat()
     rows = []
@@ -913,7 +920,7 @@ async def _account_ledger(acc: dict, as_on: Optional[str], date_from: Optional[s
 @api.get("/summary/party/{pid}")
 async def party_ledger(pid: str, as_on: Optional[str] = None, date_from: Optional[str] = None, current=Depends(get_current_user)):
     for d in (as_on, date_from):
-        if d and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", d):
+        if d and not _is_date(d):
             raise HTTPException(400, "Date YYYY-MM-DD format me do")
     upto = _upto(as_on)
     if date_from:  # statement range: entries from date_from, opening = balance the day before
@@ -1392,7 +1399,7 @@ async def opening_balances(fy_id: Optional[str] = None, as_on: Optional[str] = N
             ledgers.append({"code": r.get("code") or 0, "name": r.get("name", ""), "group_id": acc_group.get(r["id"]),
                             "balance": float(r.get("new_opening") or 0), "kind": "account"})
     else:
-        if as_on and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", as_on):
+        if as_on and not _is_date(as_on):
             raise HTTPException(400, "as_on date YYYY-MM-DD format me do")
         as_on = as_on or datetime.now().date().isoformat()  # local date of the machine running the app
         fy_text = f"{s.get('fy_start')} to {s.get('fy_end')}"
@@ -1472,7 +1479,7 @@ async def outstanding_report(as_on: Optional[str] = None, side: str = "all", min
     """Collection-round list: every party with a pending Dr/Cr balance as on a date, grouped by account group.
     side = dr (lena hai) | cr (dena hai) | all. Cash/bank ledgers excluded."""
     s = await get_settings(current)
-    if as_on and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", as_on):
+    if as_on and not _is_date(as_on):
         raise HTTPException(400, "as_on date YYYY-MM-DD format me do")
     as_on = as_on or datetime.now().date().isoformat()
     if side not in ("dr", "cr", "all"):

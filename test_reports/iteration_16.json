@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 16 tested the fix for the Dashboard Cash & Bank row that stayed on Loading forever. Backend: /summary/party/{id} now falls back to the accounts collection and returns kind=account, group CASH & BANK BALANCE and bills/rokad/dos_journal as []. Its balance matches the accounts-summary closing and /ledgers/{id}/balance, and the opening with date_from matches the accounts-summary opening. The rows add up to the closing, entries stay inside the date range, the party-kind regression passes, unknown ids return 404 'Party / account nahi mila' and unauthenticated calls return 401. Frontend: clicking the account row opens the ledger header 'Account Ledger · CASH & BANK BALANCE' with balance 52,90,000 Dr and the back link pointing to /accounts. The party row opens 'Party Khata · Ledger' with the back link pointing to /parties. The date controls, Statement toggle, error card + retry, bill-view error, Party Khata list -> ledger and Settings all work, with no page errors. Failures: validation for impossible dates only checks the pattern, so the requested as_on=2026-13-99 -> 400 check fails (returns 200), and date_from=2026-13-99 returns 500.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/summary/party/{id}?as_on=2026-13-99", "issue": "Returns 200 instead of 400. The regex \\d{4}-\\d{2}-\\d{2} accepts dates that do not exist, and the bad string is used as-is in the date comparison. The review request expected 400."},
+      {"endpoint": "GET /api/summary/party/{id}?date_from=2026-13-99", "issue": "500 Internal Server Error: datetime.fromisoformat raises ValueError (in party_ledger / _account_ledger)."},
+      {"endpoint": "GET /api/rokad/accounts-summary?date_from=2026-13-99", "issue": "500, same cause (fromisoformat)."},
+      {"endpoint": "GET /api/ledgers/{id}/balance?as_on=2026-13-99", "issue": "Returns 200 because it uses the same regex-only validation."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "LoadState.errorText", "issue": "Every 404 shows 'Yeh khata nahi mila — shayad delete ho gaya hai.', so the /bills/does-not-exist page says 'khata' (ledger) instead of 'bill'. The 404 message should be a prop, e.g. notFoundText.", "selector": "[data-testid='bill-view-error-message']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Party/Account Ledger table", "issues": ["Transaction rows show dates in ISO format (2026-10-14) while the opening/closing rows and the statement use DD-MM-YYYY. This is older behaviour, not part of this fix."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_account_ledger_v16.py", "/app/test_reports/pytest/pytest_v16.xml"],
+  "action_items": [
+    "Add a shared date validator that parses with datetime.date.fromisoformat inside try/except and raises HTTPException(400). Use it in party_ledger, ledger_balance, rokad_accounts_summary and the other endpoints that only check the pattern, so impossible dates return 400 and never 500.",
+    "Optional: give LoadState a notFoundText prop so BillView/Settings 404s don't say 'khata nahi mila'.",
+    "Optional: BillView LoadState has no onRetry, so a network error has no retry button (only the back link)."
+  ],
+  "critical_code_review_comments": [
+    "server.py is >2500 lines and should be split into routers (ledger/summary, rokad, accounts).",
+    "party_ledger and _account_ledger repeat the date_from -> day_before opening logic; this could move into a small helper.",
+    "PartyLedger 'Shuru se' sets from='' in the URL, which works correctly (dateFrom=''), but the URL keeps an empty param."
+  ],
+  "updated_files": ["/app/backend/tests/test_account_ledger_v16.py"],
+  "success_rate": {"backend": "83% (10/12; the 2 failures are date validation)", "frontend": "100%"},
+  "seed_data_creation": "None. All tests were read-only GET calls.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Account id ff518072-... (Cash IN Hand, accounts collection): opening 53,00,000 Dr, one cash_rokad payment of 10,000 on 2026-10-14, closing 52,90,000 Dr. Party id 3811380b-... (CASH IN HAND code 301): balance 97,01,179 Dr. Preview 'today' is 2026-10-16. Run pytest /app/backend/tests/test_account_ledger_v16.py with REACT_APP_BACKEND_URL exported."
+}
