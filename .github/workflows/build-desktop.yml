@@ -60,6 +60,13 @@ jobs:
           pip install -r requirements-desktop.txt
           pyinstaller --noconfirm --clean desktop.spec
 
+      - name: Self-test frozen backend (imports, crypto, routes)
+        working-directory: backend
+        shell: pwsh
+        run: |
+          & "dist/vyapari-backend/vyapari-backend.exe" --selftest
+          if ($LASTEXITCODE -ne 0) { throw "Frozen backend self-test FAILED (exit $LASTEXITCODE) - missing module in requirements-desktop.txt / desktop.spec?" }
+
       - name: Download MongoDB ${{ env.MONGODB_VERSION }}
         shell: pwsh
         run: |

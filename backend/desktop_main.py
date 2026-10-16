@@ -51,7 +51,39 @@ def _watch_parent():
     threading.Thread(target=loop, daemon=True).start()
 
 
+def selftest() -> int:
+    """`vyapari-backend --selftest`: proves the frozen build can import everything (run in CI before release)."""
+    import json
+    import os as _os
+    import tempfile
+
+    tmp = tempfile.mkdtemp(prefix="vyapari-selftest-")
+    _os.environ.update({
+        "MONGO_URL": _os.environ.get("MONGO_URL", "mongodb://127.0.0.1:1"),
+        "DB_NAME": _os.environ.get("DB_NAME", "selftest"),
+        "JWT_SECRET": _os.environ.get("JWT_SECRET", "selftest"),
+        "CORS_ORIGINS": "http://127.0.0.1",
+        "BACKUP_DIR": tmp,
+        "DOS_BACKUP_DIR": tmp,
+        "VYAPARI_LOG_DIR": tmp,
+    })
+    import uvicorn  # noqa: F401
+    import backup_crypto as bkc
+    import server
+
+    salt = _os.urandom(16)
+    blob = bkc.pack({"data": {}}, bkc.derive_key("pw", salt), salt, "selftest")
+    assert bkc.unpack(blob, "pw") == {"data": {}}
+    routes = {r.path for r in server.app.routes}
+    for must in ("/api/auth/login", "/api/backup", "/api/restore", "/api/rokad/by-voucher"):
+        assert must in routes, f"route missing: {must}"
+    print(json.dumps({"ok": True, "routes": len(routes), "crypto": "aes-256-gcm/scrypt"}))
+    return 0
+
+
 def main():
+    if "--selftest" in sys.argv:
+        sys.exit(selftest())
     _ensure_streams()
     _watch_parent()
     import uvicorn

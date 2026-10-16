@@ -9,6 +9,7 @@ hiddenimports = (
     + collect_submodules("pymongo")
     + collect_submodules("bson")
     + ["dbfread", "bcrypt", "jwt", "email_validator", "dotenv", "dns", "dns.resolver", "security", "backup_crypto",
+       "python_multipart", "multipart",
        "cryptography.hazmat.primitives.ciphers.aead", "cryptography.hazmat.primitives.kdf.scrypt"]
 )
 

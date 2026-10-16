@@ -22,6 +22,7 @@ let splash = null;
 let services = null;
 let updater = null;
 let quitting = false;
+let lastLogDir = "";
 
 function showSplash() {
   splash = new BrowserWindow({
@@ -95,6 +96,7 @@ app.whenReady().then(async () => {
     const { dataRoot, appCfg } = await resolveDataRoot();
     if (!dataRoot) { quitting = true; app.quit(); return; }
     saveAppConfig(dataRoot, appCfg);
+    lastLogDir = path.join(dataRoot, "logs");
 
     showSplash();
     services = await startServices({
@@ -121,12 +123,28 @@ app.whenReady().then(async () => {
     closeSplash();
     dialog.showErrorBox(
       "9x Vyapari start nahi ho paya",
-      `${err?.message || err}\n\nLog file: ${log.transports.file.getFile().path}`
+      `${err?.message || err}\n\n${logTail(services?.logDir || lastLogDir)}Log file: ${log.transports.file.getFile().path}`
     );
     quitting = true;
     stopServices(services).finally(() => app.exit(1));
   }
 });
+
+// Last lines of backend.log / backend-stdio.log so the real reason (eg. missing module) is visible in the dialog
+function logTail(logDir) {
+  if (!logDir) return "";
+  const fs = require("fs");
+  for (const name of ["backend-stdio.log", "backend.log", "mongod-stdout.log"]) {
+    try {
+      const file = path.join(logDir, name);
+      if (!fs.existsSync(file)) continue;
+      const lines = fs.readFileSync(file, "utf8").trim().split(/\r?\n/).filter(Boolean);
+      const tail = lines.slice(-8).map((l) => l.slice(0, 220));
+      if (tail.length) return `Backend log (${name}):\n${tail.join("\n")}\n\n`;
+    } catch {}
+  }
+  return "";
+}
 
 app.on("second-instance", () => {
   if (mainWin) {
