@@ -661,6 +661,32 @@ async def list_rokad(date_from: Optional[str] = None, date_to: Optional[str] = N
     entries = await db.rokad.find(q, {"_id": 0}).sort("date", -1).to_list(5000)
     return entries
 
+
+@api.get("/rokad/by-voucher")
+async def rokad_by_voucher(voucher_no: str, cash_account_id: Optional[str] = None, current=Depends(get_current_user)):
+    """Voucher lookup: entries carrying this V.No. (per-account numbering → may hit several accounts)."""
+    v = voucher_no.strip()
+    if not v:
+        raise HTTPException(400, "Voucher number daalein")
+    variants = {v, v.lstrip("0") or "0"}
+    q = {"voucher_no": {"$in": list(variants)}}
+    if cash_account_id:
+        q["cash_account_id"] = cash_account_id
+    rows = await db.rokad.find(q, {"_id": 0}).sort([("date", -1), ("created_at", -1)]).to_list(50)
+    return {"voucher_no": v, "entries": rows}
+
+
+async def _next_voucher(cash_account_id: str) -> str:
+    """FoxPro-style per-cash-account running voucher number (max numeric V.No. + 1)."""
+    max_num = 0
+    async for r in db.rokad.find({"cash_account_id": cash_account_id, "voucher_no": {"$exists": True, "$ne": ""}},
+                                 {"_id": 0, "voucher_no": 1}):
+        try:
+            max_num = max(max_num, int(str(r.get("voucher_no", "")).strip()))
+        except ValueError:
+            pass
+    return str(max_num + 1)
+
 async def _default_cash_account() -> Optional[dict]:
     """Primary CASH IN HAND ledger: party code 301 → cash-named party in cash group → accounts collection."""
     p = await db.parties.find_one({"code": 301}, {"_id": 0, "id": 1, "name": 1})
@@ -686,6 +712,8 @@ async def create_rokad(body: RokadIn, current=Depends(get_current_user)):
         if cash:
             doc["cash_account_id"] = cash["id"]
             doc["cash_account_name"] = doc.get("cash_account_name") or cash["name"]
+    if not (doc.get("voucher_no") or "").strip() and doc.get("cash_account_id"):
+        doc["voucher_no"] = await _next_voucher(doc["cash_account_id"])  # auto V.No. per cash a/c
     doc["id"] = str(uuid.uuid4())
     doc["created_at"] = now_iso()
     await db.rokad.insert_one(doc.copy())
@@ -768,6 +796,8 @@ async def create_transfer(body: TransferIn, current=Depends(get_current_user)):
     ts = now_iso()
     for leg in legs:
         leg.update({"id": str(uuid.uuid4()), "created_at": ts})
+        if not (leg.get("voucher_no") or "").strip():
+            leg["voucher_no"] = await _next_voucher(leg["cash_account_id"])
     await db.rokad.insert_many([l.copy() for l in legs])
     return _transfer_out(legs)
 
@@ -789,6 +819,8 @@ async def update_transfer(contra_id: str, body: TransferIn, current=Depends(get_
     ts = now_iso()
     for leg, prev in zip(legs, sorted(old, key=lambda l: l["type"] != "kharch")):  # keep leg ids: kharch first
         leg.update({"id": prev["id"], "created_at": prev.get("created_at", ts), "updated_at": ts})
+        if not (leg.get("voucher_no") or "").strip():
+            leg["voucher_no"] = prev.get("voucher_no", "") if prev.get("cash_account_id") == leg["cash_account_id"] else await _next_voucher(leg["cash_account_id"])
         await db.rokad.replace_one({"id": prev["id"]}, leg.copy())
     return _transfer_out(legs)
 
@@ -1740,22 +1772,8 @@ async def import_dbf_upload(payload: dict, current=Depends(get_current_user)):
 # ---------- PER-CASH-ACCOUNT VOUCHER NUMBERING ----------
 @api.get("/cash-accounts/{pid}/next-voucher")
 async def next_cash_voucher(pid: str, current=Depends(get_current_user)):
-    """Returns next voucher number for a cash/bank ledger (party).
-    FoxPro per-account voucher numbering (every cash a/c has own seq).
-    """
-    rows = await db.rokad.find(
-        {"cash_account_id": pid, "voucher_no": {"$exists": True, "$ne": ""}},
-        {"_id": 0, "voucher_no": 1}
-    ).to_list(10000)
-    max_num = 0
-    for r in rows:
-        try:
-            n = int(str(r.get("voucher_no", "")).strip())
-            if n > max_num:
-                max_num = n
-        except Exception:
-            pass
-    return {"next_voucher": str(max_num + 1)}
+    """Next voucher number for a cash/bank ledger — FoxPro per-account numbering (every cash a/c has its own seq)."""
+    return {"next_voucher": await _next_voucher(pid)}
 
 
 # ---------- DUE BILLS NOTIFICATIONS ----------

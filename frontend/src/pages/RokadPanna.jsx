@@ -7,7 +7,14 @@ import { ExportBar } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { TransferForm } from "@/components/rokad/TransferForm";
 import { DayBookSheet } from "@/components/rokad/DayBookSheet";
+import { VoucherSearch } from "@/components/rokad/VoucherSearch";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
+
+// Mode follows the ACCOUNT name only (group "CASH & BANK BALANCE" must not force "Bank" on CASH IN HAND)
+const modeForAccount = (a) =>
+  /cash|rokad|nakad/i.test(a?.name || "") ? "Cash"
+    : /bank|sbi|hdfc|icici|axis|pnb|bob|canara|union|kotak|idbi|yes|indusind|federal|s\/a|c\/a|cc|od/i.test(a?.name || "") ? "Bank"
+    : "Cash";
 
 export default function RokadPanna() {
   const { settings } = useOutletContext() || {};
@@ -124,8 +131,12 @@ export default function RokadPanna() {
   useEffect(() => {
     if (!showAdd || editId || form.cash_account_id) return;
     const a = accounts.find((x) => x.id === bankFilter) || defaultCash;
-    if (a) setForm((f) => ({ ...f, cash_account_id: a.id, cash_account_name: a.name,
-      mode: /bank/i.test(a.group_name || a.name || "") ? "Bank" : "Cash" }));
+    if (!a) return;
+    setForm((f) => ({ ...f, cash_account_id: a.id, cash_account_name: a.name, mode: modeForAccount(a) }));
+    // Auto V.No. (per cash a/c running number) as soon as the form opens
+    api.get(`/cash-accounts/${a.id}/next-voucher`)
+      .then(({ data }) => setForm((f) => (f.voucher_no || f.cash_account_id !== a.id ? f : { ...f, voucher_no: data.next_voucher || "" })))
+      .catch(() => {});
     // eslint-disable-next-line
   }, [showAdd, accounts, bankFilter, defaultCash]);
 
@@ -306,6 +317,8 @@ export default function RokadPanna() {
               rows: kharchList,
             },
           ]} />
+          <VoucherSearch accountId={bankFilter} accountName={selectedBank?.name}
+            onEdit={startEdit} onTransfer={(contraId) => setTransfer({ contraId })} />
           <div>
             <label className="lbl">Cash / Bank A/C</label>
             <select
@@ -641,7 +654,7 @@ export default function RokadPanna() {
                     onChange={async (e) => {
                       const a = accounts.find((x) => x.id === e.target.value);
                       let voucher_no = "";
-                      if (a && !a._isAccount) {
+                      if (a) {
                         try {
                           const { data } = await api.get(`/cash-accounts/${a.id}/next-voucher`);
                           voucher_no = data.next_voucher || "";
@@ -651,7 +664,7 @@ export default function RokadPanna() {
                         ...form,
                         cash_account_id: e.target.value,
                         cash_account_name: a ? a.name : "",
-                        mode: a ? (/bank/i.test(a.group_name || "") ? "Bank" : "Cash") : form.mode,
+                        mode: a ? modeForAccount(a) : form.mode,
                         voucher_no,
                       });
                     }}
@@ -672,9 +685,10 @@ export default function RokadPanna() {
                     className="input-dense num"
                     value={form.voucher_no}
                     onChange={(e) => setForm({ ...form, voucher_no: e.target.value })}
-                    placeholder="Auto from cash a/c"
+                    placeholder="Auto (per cash a/c)"
                     data-testid="input-voucher-no"
                   />
+                  <div className="text-[10px] text-muted2 mt-1">Khali chhodo to save par apne aap number lagega</div>
                 </div>
               </div>
 

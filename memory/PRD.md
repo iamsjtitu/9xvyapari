@@ -96,6 +96,11 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 ### Jun 2026 – "Stuck on Loading" fix (Dashboard → Cash/Bank row)
 - Root cause (user video): Cash & Bank card rows link to `/parties/{id}`; ledgers from the `accounts` collection (Chart of Accounts, not parties) got 404 from `/summary/party/{id}` and `PartyLedger.jsx` had no error handling → endless "Loading...". Fix: `/summary/party/{pid}` falls back to `db.accounts` (`_account_ledger`: kind=account, cash_rokad + journal, opening/closing via `_compute_account_balance`); `_is_date()` real-date validation (2026-13-99 → 400, not 500). New `components/LoadState.jsx` (spinner / "Data load nahi ho paya" card + Dobara Try Karein + back link) used by PartyLedger, Dashboard, BillView, Settings. Testing agent iteration_16: all pass.
 
+### Jun 2026 – Rokad form: default Mode = Cash, auto Voucher No., Voucher search
+- Mode bug: group name "CASH & BANK BALANCE" matched `/bank/` so CASH IN HAND opened with Mode=Bank → `modeForAccount()` now looks at the account NAME only (cash/rokad → Cash; HDFC/SBI/… → Bank).
+- Auto V.No.: form open par default account ka `next-voucher` fetch (accounts-collection ledgers bhi); backend `_next_voucher()` helper — `POST /rokad` and transfer legs auto-assign per-cash-a/c running number when blank.
+- `GET /api/rokad/by-voucher?voucher_no&cash_account_id?` + `components/rokad/VoucherSearch.jsx` (toolbar "Voucher Khojein": debounce, dropdown with date/type/account/party/amount, "Kholein" → edit form / transfer form). Self-tested via curl + screenshots.
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅
