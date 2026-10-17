@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, Trash, ArrowDown, ArrowUp, X, PencilSimple, ArrowsLeftRight, Printer } from "@phosphor-icons/react";
@@ -146,6 +146,8 @@ export default function RokadPanna() {
     return { rows: summary.rows, total: summary.total, hasOther: summary.rows.some((r) => Math.abs(r.other || 0) >= 0.005) };
   }, [bankFilter, summary]);
 
+  const modeTouched = useRef(false); // user picked a Mode by hand → account change must not overwrite it
+  useEffect(() => { if (!showAdd) modeTouched.current = false; }, [showAdd]);
   const closeForm = () => { setShowAdd(false); setEditId(null); setForm({ ...emptyForm, date: dateTo }); };
 
   const startEdit = (e) => {
@@ -635,7 +637,7 @@ export default function RokadPanna() {
                   <select
                     className="input-dense"
                     value={form.mode}
-                    onChange={(e) => setForm({ ...form, mode: e.target.value })}
+                    onChange={(e) => { modeTouched.current = true; setForm({ ...form, mode: e.target.value }); }}
                   >
                     <option>Cash</option>
                     <option>UPI</option>
@@ -651,22 +653,15 @@ export default function RokadPanna() {
                   <select
                     className="input-dense"
                     value={form.cash_account_id}
-                    onChange={async (e) => {
-                      const a = accounts.find((x) => x.id === e.target.value);
-                      let voucher_no = "";
-                      if (a) {
-                        try {
-                          const { data } = await api.get(`/cash-accounts/${a.id}/next-voucher`);
-                          voucher_no = data.next_voucher || "";
-                        } catch {}
-                      }
-                      setForm({
-                        ...form,
-                        cash_account_id: e.target.value,
-                        cash_account_name: a ? a.name : "",
-                        mode: a ? modeForAccount(a) : form.mode,
-                        voucher_no,
-                      });
+                    onChange={(e) => {
+                      const id = e.target.value; // read synchronously — after an await the controlled select has already reset
+                      const a = accounts.find((x) => x.id === id);
+                      setForm((f) => ({ ...f, cash_account_id: id, cash_account_name: a ? a.name : "",
+                        mode: a && !modeTouched.current ? modeForAccount(a) : f.mode, voucher_no: "" }));
+                      if (!a) return;
+                      api.get(`/cash-accounts/${a.id}/next-voucher`)
+                        .then(({ data }) => setForm((f) => (f.cash_account_id !== a.id || f.voucher_no ? f : { ...f, voucher_no: data.next_voucher || "" })))
+                        .catch(() => {});
                     }}
                     data-testid="select-cash-account"
                   >
