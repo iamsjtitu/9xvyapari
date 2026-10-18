@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ChangePasswordCard } from "@/components/ChangePasswordCard";
 import { SoftwareUpdateCard } from "@/components/SoftwareUpdateCard";
 import { BackupPasswordCard } from "@/components/BackupPasswordCard";
+import { SoundSettingsCard } from "@/components/SoundSettingsCard";
 import { LoadState } from "@/components/LoadState";
 
 export default function Settings() {
@@ -98,6 +99,7 @@ export default function Settings() {
 
       <ChangePasswordCard />
       <BackupPasswordCard />
+      <SoundSettingsCard />
       <SoftwareUpdateCard />
     </div>
   );

@@ -121,6 +121,9 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 ### Jun 2026 – Enter = next field (FoxPro style)
 - `hooks/useEnterToNext.js` (global, in App): Enter in input/select/textarea → focus next usable field within the closest `form` / `[data-enter-scope]` / modal `.fixed.inset-0` / `main` (text selected on arrival); last field → `form.requestSubmit()` or click `[data-enter-submit]` / submit button / last `.btn-primary`; for plain page filters (scope = main) Enter only blurs. Shift+Enter keeps native (textarea newline). Skips when a component already handled Enter (`defaultPrevented`, e.g. PartyAutocomplete pick). `data-enter-submit` on Journal & Bill save buttons. ShortcutHelp updated. Verified: Login, Rokad entry saved via Enter-only, Journal walk, filters.
 
+### Jun 2026 – Entry Sound (FoxPro beep)
+- `lib/sound.js`: Web Audio (no files) — `beepOk` soft ascending chirp (880→1318 Hz), `beepError` low square buzz; `installSoundHooks()` (App.js) wraps sonner `toast.success`/`toast.error` app-wide + native `invalid` form events → every save beeps, every error/validation buzzes. Burst de-dupe (120 ms), audio unlock on first gesture. Preference in localStorage `vyapari.sound` (device-level, default ON). `components/SoundSettingsCard.jsx` in Settings: ON/OFF switch + "Save beep sunein / Error buzz sunein" test buttons. Verified via instrumented AudioContext in Playwright (buzz on login error, 0 sounds when OFF, persists).
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅

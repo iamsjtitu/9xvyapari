@@ -6,6 +6,9 @@ import Layout from "@/components/Layout";
 import UpdateBanner from "@/components/UpdateBanner";
 import { useRefocusOnWindowFocus } from "@/hooks/useRefocusOnWindowFocus";
 import { useEnterToNext } from "@/hooks/useEnterToNext";
+import { installSoundHooks } from "@/lib/sound";
+
+installSoundHooks();
 import Login from "@/pages/Login";
 import SetPassword from "@/pages/SetPassword";
 import SetBackupPassword from "@/pages/SetBackupPassword";
