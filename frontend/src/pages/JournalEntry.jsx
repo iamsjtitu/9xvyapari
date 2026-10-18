@@ -277,7 +277,7 @@ export default function JournalEntry() {
             <div className="flex justify-end gap-2 mt-5">
               <button className="btn-outline" onClick={closeForm}>Cancel</button>
               <button className="btn-primary" onClick={save} disabled={totals.diff !== 0 || totals.d === 0}
-                data-testid="btn-save-journal">
+                data-enter-submit data-testid="btn-save-journal">
                 {editId ? "Update Journal" : "Save Journal"}
               </button>
             </div>

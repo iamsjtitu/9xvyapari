@@ -844,7 +844,7 @@ export default function NayaBill() {
               </div>
               <div className="flex gap-2">
                 <button className="btn-outline" onClick={closeForm}>Cancel (Esc)</button>
-                <button className="btn-primary" onClick={save} data-testid="btn-save-bill">
+                <button className="btn-primary" onClick={save} data-enter-submit data-testid="btn-save-bill">
                   {editId ? "Update Bill (Ctrl+S)" : "Save Bill (Ctrl+S)"}
                 </button>
               </div>
