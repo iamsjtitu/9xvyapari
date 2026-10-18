@@ -39,7 +39,7 @@ export const AutoBackupList = () => {
     setBusy(true);
     try {
       const { data } = await api.post("/backup/restore-file", { name: pending.name, password: password || "" });
-      toast.success(`Restored: ${Object.entries(data.restored).map(([k, v]) => `${k}:${v}`).join(", ")}`);
+      toast.success(`Restored: ${Object.entries(data.restored).filter(([, v]) => v).map(([k, v]) => `${k}:${v}`).join(", ")}${data.safety_backup ? ` · pehle ka data safety backup me: ${data.safety_backup}` : ""}`);
       setPending(null);
       setTimeout(() => window.location.reload(), 1200);
     } catch (err) {

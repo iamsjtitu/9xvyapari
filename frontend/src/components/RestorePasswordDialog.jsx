@@ -23,7 +23,7 @@ export const RestorePasswordDialog = ({ file, onCancel, onConfirm, busy }) => {
           </div>
           <button type="button" className="btn-ghost p-1" onClick={onCancel} title="Band karein" data-testid="restore-cancel-x"><X size={16} /></button>
         </div>
-        <div className="text-sm text-kharch font-medium">Sara existing data REPLACE ho jayega.</div>
+        <div className="text-sm text-kharch font-medium">Sara existing data REPLACE ho jayega. <span className="text-muted2 font-normal">(Pehle current data ka safety backup apne aap ban jayega.)</span></div>
         {encrypted ? (
           <div>
             <label className="lbl">Backup Password{file.hint ? <span className="normal-case tracking-normal text-muted2"> · Hint: "{file.hint}"</span> : null}</label>

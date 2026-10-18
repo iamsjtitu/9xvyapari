@@ -304,8 +304,7 @@ export default function NayaBill() {
       }, description: "Add new bill" },
     { ctrl: true, key: "s", action: () => open && save(),
       allowInInputs: true, description: "Save bill" },
-    { key: "Escape", action: () => closeForm(), allowInInputs: true,
-      description: "Close bill modal" },
+    open ? { key: "Escape", action: () => closeForm(), allowInInputs: true, description: "Close bill modal" } : null,
     { key: "+", action: () => open && addLine(),
       description: "Add line item" },
   ], [open, filter]);

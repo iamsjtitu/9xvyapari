@@ -136,8 +136,7 @@ export default function PartyKhata() {
     { key: "a", action: startNew, description: "Add new ledger" },
     { key: "/", action: () => document.querySelector('[data-testid="input-search-party"]')?.focus(),
       description: "Focus search" },
-    { key: "Escape", action: () => setEditing(null), allowInInputs: true,
-      description: "Close dialog" },
+    editing ? { key: "Escape", action: () => setEditing(null), allowInInputs: true, description: "Close dialog" } : null,
   ], []);
 
   // Arrow-key table navigation

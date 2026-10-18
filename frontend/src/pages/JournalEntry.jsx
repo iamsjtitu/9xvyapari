@@ -101,8 +101,7 @@ export default function JournalEntry() {
       description: "Add new journal" },
     { ctrl: true, key: "s", action: () => open && save(),
       allowInInputs: true, description: "Save journal" },
-    { key: "Escape", action: () => closeForm(), allowInInputs: true,
-      description: "Close modal" },
+    open ? { key: "Escape", action: () => closeForm(), allowInInputs: true, description: "Close modal" } : null,
   ], [open]);
 
   return (

@@ -8,25 +8,22 @@ import { RestorePasswordDialog } from "@/components/RestorePasswordDialog";
 
 const isVbk = (name) => /\.vbk$/i.test(name || "");
 
+const LABELS = {
+  account_groups: "Account Groups", accounts: "Accounts (Cash/Bank)", parties: "Parties / Ledgers", items: "Items (Galla)",
+  bills: "Bills", rokad: "Rokad Entries", journal: "Journal Entries", dos_journal: "DOS Journal (imported)", inward: "Inward Register",
+  gst_returns: "GST Returns", settings: "Settings (Firm, FY)", fiscal_years: "Year-End History", users: "Login (User & Password)",
+  archive_bills: "Archive · Bills", archive_rokad: "Archive · Rokad", archive_journal: "Archive · Journal",
+  archive_dos_journal: "Archive · DOS Journal", archive_inward: "Archive · Inward", archive_gst_returns: "Archive · GST",
+};
+
 export default function Backup() {
-  const [stats, setStats] = useState(null);
+  const [contents, setContents] = useState(null);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState(null); // File chosen for restore → password dialog
   const fileRef = useRef(null);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const [g, a, p, i, b, r, j] = await Promise.all([
-          api.get("/account-groups"), api.get("/accounts"), api.get("/parties"),
-          api.get("/items"), api.get("/bills"), api.get("/rokad"), api.get("/journal"),
-        ]);
-        setStats({
-          groups: g.data.length, accounts: a.data.length, parties: p.data.length,
-          items: i.data.length, bills: b.data.length, rokad: r.data.length, journal: j.data.length,
-        });
-      } catch {}
-    })();
+    api.get("/backup/contents").then((r) => setContents(r.data)).catch(() => {});
   }, []);
 
   const download = async () => {
@@ -65,7 +62,7 @@ export default function Backup() {
       fd.append("file", pending, pending.name);
       fd.append("password", password || "");
       const { data } = await api.post("/restore", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      toast.success(`Restored: ${Object.entries(data.restored).map(([k, v]) => `${k}:${v}`).join(", ")}`);
+      toast.success(`Restored: ${Object.entries(data.restored).filter(([, v]) => v).map(([k, v]) => `${k}:${v}`).join(", ")}${data.safety_backup ? ` · pehle ka data safety backup me: ${data.safety_backup}` : ""}`);
       setPending(null);
       setTimeout(() => window.location.reload(), 1200);
     } catch (err) {
@@ -79,20 +76,27 @@ export default function Backup() {
         <div className="section-title">Maintenance · Backup</div>
         <h1 className="font-heading font-semibold text-3xl tracking-tight">Backup & Restore</h1>
         <div className="text-muted2 text-sm mt-1 flex items-center gap-1.5">
-          <LockKey size={14} weight="bold" color="#1B5E20" /> Har backup encrypted <span className="font-mono-data">.vbk</span> file hai — sirf 9x Vyapari + Backup Password se khulti hai. (Users / Auth shamil nahi.)
+          <LockKey size={14} weight="bold" color="#1B5E20" /> Har backup encrypted <span className="font-mono-data">.vbk</span> file hai — sirf 9x Vyapari + Backup Password se khulti hai. Isme poora data jata hai (khate, entries, settings, login sab).
         </div>
       </div>
 
-      {stats && (
-        <div className="card-flat p-5">
-          <div className="section-title mb-3">Current Data</div>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 text-sm">
-            {Object.entries(stats).map(([k, v]) => (
-              <div key={k} className="border border-khaki rounded-sm p-3 bg-parchment/50">
-                <div className="text-[11px] uppercase tracking-wider text-muted2">{k}</div>
-                <div className="font-mono-data text-2xl mt-1">{v}</div>
-              </div>
-            ))}
+      {contents && (
+        <div className="card-flat p-5" data-testid="backup-contents">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+            <div className="section-title">Backup me kya-kya jata hai · Current Data</div>
+            <div className="text-xs text-muted2" data-testid="backup-contents-count">
+              {Object.keys(contents.collections).length} cheezein · sab kuch (login bhi) · sirf encryption key file me nahi jaati
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 text-sm">
+            {Object.entries(contents.collections)
+              .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]))
+              .map(([k, v]) => (
+                <div key={k} className={`border border-khaki rounded-sm px-3 py-2 ${v ? "bg-parchment/50" : "bg-transparent opacity-60"}`} data-testid={`backup-content-${k}`}>
+                  <div className="text-[10px] uppercase tracking-wider text-muted2 truncate" title={k}>{LABELS[k] || k}</div>
+                  <div className="font-mono-data text-lg leading-tight mt-0.5">{v}</div>
+                </div>
+              ))}
           </div>
         </div>
       )}

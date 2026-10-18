@@ -42,8 +42,7 @@ export default function GallaMaster() {
   useKeyboardShortcuts([
     { key: "a", action: () => { setEditing({ id: null }); setForm(EMPTY); },
       description: "Add new galla item" },
-    { key: "Escape", action: () => setEditing(null), allowInInputs: true,
-      description: "Close modal" },
+    editing ? { key: "Escape", action: () => setEditing(null), allowInInputs: true, description: "Close modal" } : null,
   ], []);
 
   // Arrow-key table navigation

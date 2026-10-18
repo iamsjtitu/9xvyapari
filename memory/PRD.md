@@ -114,6 +114,10 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 ### Jun 2026 – Rokad form: Cash/Bank account & Mode reverting (user video)
 - Cause: account `<select onChange={async …}>` read `e.target.value` AFTER `await next-voucher`; the controlled select had already re-rendered back to the old value → old account restored and mode recomputed to "Cash". Fix: read value synchronously, set account+mode immediately, fetch V.No. async with functional update guard. Also `modeTouched` ref: a Mode picked by hand (Mode field comes before Account in the form) is no longer overwritten by the account's auto mode. Verified with a throttled API in Playwright.
 
+### Jun 2026 – Full-DB backup ("har ek chiz") + DOS-style Esc back/logout
+- Backup now dumps EVERY collection dynamically (`_backup_collection_names()` = DB collections ∪ known set, minus `backup_key`), incl. `users` (login). Restore makes the DB exactly equal to the file (wipes all non-excluded collections, keeps `users` if an old file has none) and ALWAYS writes a `*_pre-restore.vbk` safety backup first (`_restore_with_safety`). `GET /backup/contents` lists what's inside; Backup page shows "Backup me kya-kya jata hai" grid (19 items). ⚠️ Lesson: a restore of a file lacking collections now wipes them — the safety backup protects against that.
+- Esc: `hooks/useEscapeBack.js` (runs after page handlers via setTimeout; skips if `defaultPrevented` or an overlay `.fixed.inset-0` is open): field → blur, `/x/y` → `/x`, `/x` → `/`, `/` → `LogoutConfirm` ("Logout karna hai kya?" Enter = auto-backup + logout, Esc = nahi). Page-level Escape shortcuts (8 pages + help) made conditional on their form being open so Esc on a plain screen goes back. Verified in Playwright end-to-end.
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅

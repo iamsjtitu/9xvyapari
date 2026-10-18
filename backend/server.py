@@ -1173,10 +1173,20 @@ async def update_settings(body: SettingsIn, current=Depends(get_current_user)):
 
 
 # ---------- BACKUP / RESTORE ----------
+BACKUP_EXCLUDE = {"backup_key"}  # encryption key never travels inside the file it protects
 BACKUP_COLLECTIONS = ["account_groups", "accounts", "parties", "items", "bills", "rokad",
                       "journal", "settings", "inward", "gst_returns", "dos_journal",
                       "fiscal_years", "archive_bills", "archive_rokad", "archive_journal",
-                      "archive_dos_journal", "archive_inward", "archive_gst_returns"]
+                      "archive_dos_journal", "archive_inward", "archive_gst_returns", "users"]  # minimum set; dump is dynamic
+
+
+async def _backup_collection_names() -> list:
+    """Every collection in the DB (so nothing is ever left out) + the known set, minus excluded."""
+    names = set(BACKUP_COLLECTIONS)
+    for n in await db.list_collection_names():
+        if not n.startswith("system.") and re.fullmatch(r"[a-z][a-z0-9_]*", n):
+            names.add(n)
+    return sorted(n for n in names if n not in BACKUP_EXCLUDE)
 BACKUP_DIR = Path(os.environ.get("BACKUP_DIR") or (ROOT_DIR / "backups"))
 BACKUP_KEEP = 30  # default retention (files) — user can change via /backup/retention
 
@@ -1232,19 +1242,23 @@ async def set_backup_retention(body: RetentionIn, current=Depends(get_current_us
 
 
 async def _dump_all() -> dict:
-    data = {"exported_at": now_iso(), "version": "1.2", "app": "9x Vyapari", "data": {}}
-    for c in BACKUP_COLLECTIONS:
-        data["data"][c] = await db[c].find({}, {"_id": 0}).to_list(200000)
+    data = {"exported_at": now_iso(), "version": "1.3", "app": "9x Vyapari", "data": {}}
+    for c in await _backup_collection_names():
+        data["data"][c] = await db[c].find({}, {"_id": 0}).to_list(500000)
     return data
 
 
 async def _restore_all(data: dict) -> dict:
+    """DB becomes exactly the backup: every non-excluded collection is wiped, then the file's collections are loaded.
+    `users` is kept when an older backup has none (never lock the user out)."""
+    incoming = {c: (docs or []) for c, docs in (data or {}).items()
+                if c not in BACKUP_EXCLUDE and re.fullmatch(r"[a-z][a-z0-9_]*", c) and isinstance(docs, list)}
     summary = {}
-    for c in BACKUP_COLLECTIONS:
-        if c not in data:
+    for c in await _backup_collection_names():
+        if c == "users" and "users" not in incoming:
             continue
         await db[c].delete_many({})
-        docs = data.get(c) or []
+    for c, docs in incoming.items():
         if docs:
             await db[c].insert_many(docs)
         summary[c] = len(docs)
@@ -1310,6 +1324,13 @@ async def backup_security(current=Depends(get_current_user)):
     return {**_backup_key_out(await _backup_key()), "plain_files": len(_plain_backup_files()), "folder": str(BACKUP_DIR)}
 
 
+@api.get("/backup/contents")
+async def backup_contents(current=Depends(get_current_user)):
+    """What goes into every backup file: every collection + document count (users included, encryption key excluded)."""
+    names = await _backup_collection_names()
+    return {"collections": {c: await db[c].count_documents({}) for c in names}, "excluded": sorted(BACKUP_EXCLUDE)}
+
+
 @api.post("/backup/password")
 async def set_backup_password(body: BackupPasswordIn, current=Depends(get_current_user)):
     k = await _backup_key()
@@ -1370,12 +1391,23 @@ async def backup(current=Depends(get_current_user)):
                     headers={"Content-Disposition": f'attachment; filename="vyapari-backup_{stamp}_download.vbk"'})
 
 
+async def _restore_with_safety(data: dict, name: str) -> dict:
+    """Pre-restore safety backup of the current state (so a wrong file never loses today's work), then restore."""
+    safety = None
+    if await _backup_key():
+        try:
+            safety = (await _write_backup("pre-restore"))["name"]
+        except Exception as e:
+            logger.warning(f"Pre-restore safety backup failed: {e}")
+    summary = await _restore_all(data.get("data") or {})
+    return {"ok": True, "restored": summary, "name": name, "safety_backup": safety}
+
+
 @api.post("/restore")
 async def restore(file: UploadFile = File(...), password: str = Form(""), current=Depends(get_current_user)):
-    """Restore from an uploaded .vbk (password) or legacy .json backup. Wipes existing app data (not users)."""
+    """Restore from an uploaded .vbk (password) or legacy .json backup. DB becomes exactly the backup."""
     data = _decode_backup(await file.read(), password, file.filename or "")
-    summary = await _restore_all(data.get("data") or {})
-    return {"ok": True, "restored": summary, "name": file.filename}
+    return await _restore_with_safety(data, file.filename or "")
 
 
 async def _write_backup(reason: str) -> dict:
@@ -1385,7 +1417,7 @@ async def _write_backup(reason: str) -> dict:
     target = BACKUP_DIR / f"vyapari-backup_{stamp}_{reason}.vbk"
     target.write_bytes(blob)
     deleted = _prune_backups(await _retention(), protect=target)
-    counts = {c: await db[c].count_documents({}) for c in BACKUP_COLLECTIONS}
+    counts = {c: await db[c].count_documents({}) for c in await _backup_collection_names()}
     return {"ok": True, "folder": str(BACKUP_DIR), **_backup_file_info(target), "counts": counts, "deleted": deleted}
 
 
@@ -1415,8 +1447,7 @@ async def backup_restore_file(payload: dict, current=Depends(get_current_user)):
     if not name.startswith("vyapari-backup_") or target.suffix not in (".vbk", ".json") or not target.is_file():
         raise HTTPException(404, "Backup file nahi mili")
     data = _decode_backup(target.read_bytes(), str(payload.get("password") or ""), name)
-    summary = await _restore_all(data.get("data") or {})
-    return {"ok": True, "restored": summary, "name": name}
+    return await _restore_with_safety(data, name)
 
 
 # ---------- YEAR-END (Naya Saal / Carry Forward) ----------

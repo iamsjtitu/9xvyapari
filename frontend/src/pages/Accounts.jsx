@@ -60,8 +60,7 @@ export default function Accounts() {
   useKeyboardShortcuts([
     { key: "a", action: () => { setEditing({ id: null }); setForm(EMPTY); },
       description: "Add new account" },
-    { key: "Escape", action: () => setEditing(null), allowInInputs: true,
-      description: "Close modal" },
+    editing ? { key: "Escape", action: () => setEditing(null), allowInInputs: true, description: "Close modal" } : null,
   ], []);
 
   return (

@@ -101,8 +101,7 @@ export default function Inward() {
       description: "Add new inward" },
     { ctrl: true, key: "s", action: (e) => open && save(e),
       allowInInputs: true, description: "Save inward" },
-    { key: "Escape", action: () => setOpen(false), allowInInputs: true,
-      description: "Close modal" },
+    open ? { key: "Escape", action: () => setOpen(false), allowInInputs: true, description: "Close modal" } : null,
   ], [open, date]);
 
   // Arrow-key table navigation

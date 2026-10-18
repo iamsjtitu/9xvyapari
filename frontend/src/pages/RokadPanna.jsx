@@ -82,8 +82,7 @@ export default function RokadPanna() {
       description: "Payment (Kharch) entry" },
     { key: "t", action: () => { setDateFrom(todayISO()); setDateTo(todayISO()); },
       description: "Set to Today" },
-    { key: "Escape", action: () => closeForm(), allowInInputs: true,
-      description: "Close dialog" },
+    showAdd ? { key: "Escape", action: () => closeForm(), allowInInputs: true, description: "Close dialog" } : null,
   ], [dateTo]);
 
 

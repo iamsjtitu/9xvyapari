@@ -1,10 +1,12 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import ShortcutHelp from "@/components/ShortcutHelp";
+import { LogoutConfirm } from "@/components/LogoutConfirm";
+import { useEscapeBack } from "@/hooks/useEscapeBack";
 import AppFooter from "@/components/AppFooter";
 import {
   House, Notebook, UsersThree, Package, Receipt, ChartBar, SignOut, Storefront,
@@ -60,8 +62,9 @@ export default function Layout() {
   }, []);
 
   const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutAsk, setLogoutAsk] = useState(false);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     if (loggingOut) return;
     setLoggingOut(true);
     try {
@@ -72,8 +75,14 @@ export default function Layout() {
     }
     await logout();
     setLoggingOut(false);
+    setLogoutAsk(false);
     navigate("/login", { replace: true });
-  };
+  }, [loggingOut, logout, navigate]);
+
+  // Esc = back (field → screen → Dashboard); on Dashboard Esc asks "Logout karna hai kya?" (Enter = haan)
+  const askLogout = useCallback(() => setLogoutAsk(true), []);
+  const cancelLogout = useCallback(() => setLogoutAsk(false), []);
+  useEscapeBack(askLogout);
 
   // Flatten nav for shortcut binding
   const navShortcuts = sections.flatMap((sec) =>
@@ -89,11 +98,10 @@ export default function Layout() {
     ...navShortcuts,
     { key: "?", action: () => setHelpOpen((v) => !v),
       allowInInputs: true, description: "Show keyboard help" },
-    { key: "Escape", action: () => setHelpOpen(false),
-      allowInInputs: true },
+    helpOpen ? { key: "Escape", action: () => setHelpOpen(false), allowInInputs: true } : null,
     { ctrl: true, key: "/", action: () => setHelpOpen((v) => !v),
       allowInInputs: true, description: "Show keyboard help" },
-  ], [navigate]);
+  ], [navigate, helpOpen]);
 
   return (
     <div className="h-screen flex paper-bg" data-testid="app-shell">
@@ -203,6 +211,7 @@ export default function Layout() {
           <Keyboard size={18} weight="bold" />
         </button>
 
+        <LogoutConfirm open={logoutAsk} busy={loggingOut} onConfirm={handleLogout} onCancel={cancelLogout} />
         <ShortcutHelp
           open={helpOpen}
           onClose={() => setHelpOpen(false)}
