@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useState } from "react";
 import { useParams, Link, useSearchParams, useOutletContext } from "react-router-dom";
-import api, { inr, todayISO } from "@/lib/api";
-import { ArrowLeft, Receipt, Notebook, BookOpen, BookOpenText, Wallet, Printer, CheckCircle, PencilSimple } from "@phosphor-icons/react";
+import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
+import { ArrowLeft, Receipt, Notebook, BookOpen, BookOpenText, Wallet, Printer, CheckCircle, PencilSimple, Trash } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import { ExportBar } from "@/components/ExportBar";
 import { PartyStatement } from "@/components/PartyStatement";
 import { LoadState } from "@/components/LoadState";
@@ -89,6 +90,27 @@ export default function PartyLedger() {
     if (r.kind === "journal") return r.settles_rokad_id ? `/rokad?edit=${r.settles_rokad_id}&return=${back}` : `/journal?edit=${r.refId}&return=${back}`;
     if (r.kind === "bill") return `/bills?edit=${r.ref}&return=${back}`;
     return null;
+  };
+  // Delete the voucher behind a ledger line without leaving the page (confirm first)
+  const deleteRow = async (r) => {
+    if (r.settles_rokad_id) { if (await reopenSettled(r.settles_rokad_id, party.name)) setAttempt((a) => a + 1); return; }
+    const url = r.kind === "rokad" || r.kind === "cash" ? `/rokad/${r.id}` : r.kind === "journal" ? `/journal/${r.refId}` : r.kind === "bill" ? `/bills/${r.ref}` : null;
+    if (!url) return;
+    const amt = r.debit || r.credit || 0;
+    const what = r.kind === "bill" ? "Bill" : r.kind === "journal" ? "Journal voucher" : "Rokad entry";
+    if (!window.confirm(`${what} delete karein?
+
+${fmtDate((r.date || "").slice(0, 10))} · ${r.label}
+₹ ${inr(amt)}
+
+Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer entry ho toh dono legs hat jayenge; Account Settled ho toh uska adjustment bhi)" : ""}.`)) return;
+    try {
+      await api.delete(url);
+      toast.success(`${what} delete ho gaya · ₹ ${inr(amt)}`);
+      setAttempt((a) => a + 1);
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
+    }
   };
   const opening = data.opening ?? (party.opening_balance || 0);
   const rows = buildRows(data);
@@ -206,7 +228,7 @@ export default function PartyLedger() {
               <th className="num" style={{ width: 130 }}>Debit (+)</th>
               <th className="num" style={{ width: 130 }}>Credit (-)</th>
               <th className="num" style={{ width: 130 }}>Balance</th>
-              <th className="print:hidden" style={{ width: 44 }}></th>
+              <th className="print:hidden" style={{ width: 72 }}></th>
             </tr>
           </thead>
           <tbody>
@@ -253,10 +275,17 @@ export default function PartyLedger() {
                   </td>
                   <td className="print:hidden">
                     {editHref(r) && (
-                      <Link to={editHref(r)} className="btn-ghost p-1.5 inline-flex" title={r.settles_rokad_id ? "Settlement wali Rokad entry edit karein" : "Voucher edit karein"}
-                        data-testid={`ledger-edit-${r.kind}-${r.refId || r.ref || r.id}`}>
-                        <PencilSimple size={14} />
-                      </Link>
+                      <div className="flex items-center gap-0.5">
+                        <Link to={editHref(r)} className="btn-ghost p-1.5 inline-flex" title={r.settles_rokad_id ? "Settlement wali Rokad entry edit karein" : "Voucher edit karein"}
+                          data-testid={`ledger-edit-${r.kind}-${r.refId || r.ref || r.id}`}>
+                          <PencilSimple size={14} />
+                        </Link>
+                        <button type="button" className="btn-ghost p-1.5 inline-flex text-[#B71C1C]" onClick={() => deleteRow(r)}
+                          title={r.settles_rokad_id ? "Settlement hatao (Reopen)" : "Voucher delete karein"}
+                          data-testid={`ledger-del-${r.kind}-${r.refId || r.ref || r.id}`}>
+                          <Trash size={14} />
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
