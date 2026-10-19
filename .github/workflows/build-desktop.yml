@@ -33,13 +33,16 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Set version 1.0.${{ github.run_number }}
+      - name: Set version <major.minor from electron/package.json>.${{ github.run_number }}
         working-directory: electron
         shell: pwsh
         run: |
-          $v = "1.0.${{ github.run_number }}"
+          $base = (Get-Content package.json | ConvertFrom-Json).version
+          $mm = ($base -split '\.')[0..1] -join '.'
+          $v = "$mm.${{ github.run_number }}"
           npm version $v --no-git-tag-version --allow-same-version
           "APP_VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "App version: $v"
 
       - name: Build frontend (desktop mode)
         working-directory: frontend

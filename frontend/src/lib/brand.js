@@ -4,8 +4,8 @@ export const BRAND = {
   developerUrl: "https://9x.design",
   contact: "7587922222",
   year: 2026,
-  // CI injects REACT_APP_VERSION (= desktop release 1.0.<run>); dev/preview falls back
-  version: process.env.REACT_APP_VERSION || "1.0.0",
+  // Base MAJOR.MINOR lives in electron/package.json; CI builds <major.minor>.<run>. Keep this fallback in sync.
+  version: process.env.REACT_APP_VERSION || "1.1.0",
 };
 
 // Desktop: Electron's app.getVersion() is authoritative; web: build-time version
