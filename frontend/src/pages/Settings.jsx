@@ -101,9 +101,9 @@ export default function Settings() {
       <ChangePasswordCard />
       <BackupPasswordCard />
       <div className="card-flat p-6" data-testid="settle-account-card">
-        <h3 className="font-heading font-semibold text-base mb-1">Account Clear ledger (Account Settled)</h3>
-        <p className="text-xs text-muted2 mb-3">Rokad entry me "Account Settled" tick karne par party ka baki is ledger me jata hai aur party ka ledger us date tak 0 ho jata hai (narration auto: "Account cleared upto ...").</p>
-        <SettleAccountPicker settings={form} onSaved={(d) => setForm((f) => ({ ...f, settle_account_id: d.settle_account_id, settle_account_name: d.settle_account_name }))} />
+        <h3 className="font-heading font-semibold text-base mb-1">Account Clear ledger(s) · Account Settled</h3>
+        <p className="text-xs text-muted2 mb-3">Rokad entry me "Account Settled" tick karne par party ka baki in me se chune ledger me jata hai aur party ka ledger us date tak 0 ho jata hai (narration auto: "Account cleared upto ..."). 2-3 ledger link kar sakte ho — entry ke waqt chun lena; ★ wala default rahega.</p>
+        <SettleAccountPicker settings={form} onSaved={(d) => setForm((f) => ({ ...f, settle_account_id: d.settle_account_id, settle_account_name: d.settle_account_name, settle_accounts: d.settle_accounts || [] }))} />
       </div>
       <SoundSettingsCard />
       <SoftwareUpdateCard />

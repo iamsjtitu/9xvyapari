@@ -3,7 +3,7 @@ import { useSearchParams, Link, useOutletContext } from "react-router-dom";
 import api, { formatApiErrorDetail, todayISO } from "@/lib/api";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { OpeningBalanceSheet } from "@/components/OpeningBalanceSheet";
-import { fetchClearBreakdown, clearRowLabel } from "@/lib/accountClear";
+import { fetchClearBreakdowns, clearRowLabel, clearLedgerIds } from "@/lib/accountClear";
 import { BookOpen, CalendarCheck } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
@@ -16,8 +16,8 @@ export default function OpeningBalance() {
   const asOn = params.get("as_on") || todayISO();
   const [data, setData] = useState(null);
   const [years, setYears] = useState([]);
-  const [breakdown, setBreakdown] = useState(null);   // Account Clear → party-wise rows
-  const [showClear, setShowClear] = useState(false);  // "+" clicked → breakdown on screen & print
+  const [breakdowns, setBreakdowns] = useState(null);   // { [ledgerId]: party-wise rows } per linked Account Clear head
+  const [expanded, setExpanded] = useState({});         // ledgerId → "+" clicked (breakdown on screen & print)
 
   useEffect(() => {
     api.get("/year-end/history").then((r) => setYears(r.data.years || [])).catch(() => {});
@@ -32,16 +32,18 @@ export default function OpeningBalance() {
     return () => { alive = false; };
   }, [fyId, asOn]);
 
-  // Party-wise make-up of the Account Clear head (what every party's settlement put there, as on date)
+  // Party-wise make-up of every Account Clear head (what each party's settlement put there, as on date)
   useEffect(() => {
     let alive = true;
-    setBreakdown(null);
-    if (!data?.settle_account_id || !data?.as_on) return undefined;
-    const head = data.sections.flatMap((sec) => sec.rows).find((r) => r.id === data.settle_account_id);
-    fetchClearBreakdown(data.settle_account_id, head ? head.balance : undefined, data.as_on)
-      .then((b) => { if (alive) setBreakdown(b); }).catch(() => {});
+    setBreakdowns(null);
+    const ids = clearLedgerIds(data);
+    if (!ids.length || !data?.as_on) return undefined;
+    const headBal = (id) => data.sections.flatMap((sec) => sec.rows).find((r) => r.id === id)?.balance;
+    fetchClearBreakdowns(ids, headBal, data.as_on)
+      .then((b) => { if (alive) setBreakdowns(b); }).catch(() => {});
     return () => { alive = false; };
   }, [data]);
+  const toggle = (id) => setExpanded((e) => ({ ...e, [id]: !e[id] }));
 
   const setAsOn = (d) => d && setParams({ as_on: d });
   const quick = [
@@ -63,8 +65,8 @@ export default function OpeningBalance() {
     rows: data.sections.flatMap((sec) => [
       ...sec.rows.flatMap((r) => [
         { group: sec.group_name, code: r.code || "", name: r.name, debit: r.balance > 0 ? r.balance : 0, credit: r.balance < 0 ? -r.balance : 0 },
-        ...(showClear && breakdown && r.id === breakdown.ledgerId
-          ? breakdown.rows.map((b) => ({ group: sec.group_name, code: "", name: `   ${clearRowLabel(b)}`,
+        ...(breakdowns?.[r.id] && expanded[r.id]
+          ? breakdowns[r.id].map((b) => ({ group: sec.group_name, code: "", name: `   ${clearRowLabel(b)}`,
               debit: b.net > 0 ? b.net : 0, credit: b.net < 0 ? -b.net : 0 }))
           : []),
       ]),
@@ -118,7 +120,7 @@ export default function OpeningBalance() {
         {!data ? (
           <div className="text-muted2 font-heading" data-testid="ob-loading">Opening balances load ho rahe hain...</div>
         ) : (
-          <OpeningBalanceSheet data={data} breakdown={breakdown} expanded={showClear} onToggle={() => setShowClear((v) => !v)} />
+          <OpeningBalanceSheet data={data} breakdowns={breakdowns} expanded={expanded} onToggle={toggle} />
         )}
       </div>
 

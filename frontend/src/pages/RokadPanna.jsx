@@ -55,6 +55,7 @@ export default function RokadPanna() {
     voucher_no: "",
     chq_no: "",
     settle: false,
+    settle_account_id: "",
   };
   const [form, setForm] = useState(emptyForm);
 
@@ -206,7 +207,7 @@ export default function RokadPanna() {
       date: (e.date || "").slice(0, 10), type: e.type, amount: String(e.amount ?? ""),
       party_id: e.party_id || "", party_name: e.party_name || "", description: e.description || "",
       mode: e.mode || "Cash", cash_account_id: e.cash_account_id || "", cash_account_name: e.cash_account_name || "",
-      voucher_no: e.voucher_no || "", chq_no: e.chq_no || "", settle: !!e.settle,
+      voucher_no: e.voucher_no || "", chq_no: e.chq_no || "", settle: !!e.settle, settle_account_id: e.settle_account_id || "",
     });
     setShowAdd(true);
   };
@@ -311,7 +312,7 @@ export default function RokadPanna() {
                       </span>
                     )}
                     {e.settle_journal_id && (
-                      <span className="kbd !text-[10px] !px-1.5 !py-0 font-semibold !text-white !bg-jama !border-jama" title={`Account Settled · ₹${inr(Math.abs(e.settled_amount || 0))} Account Clear me`} data-testid={`rokad-settled-badge-${e.id}`}>
+                      <span className="kbd !text-[10px] !px-1.5 !py-0 font-semibold !text-white !bg-jama !border-jama" title={`Account Settled · ₹${inr(Math.abs(e.settled_amount || 0))} → ${e.settle_account_name || "Account Clear"}`} data-testid={`rokad-settled-badge-${e.id}`}>
                         SETTLED
                       </span>
                     )}
@@ -809,6 +810,7 @@ export default function RokadPanna() {
                 />
                 <LedgerBalanceHint ledgerId={form.party_id} delta={liveDelta.party} className="mt-1" testId="rokad-party-balance" />
                 <SettleToggle form={form} onChange={(v) => setForm((f) => ({ ...f, settle: v }))}
+                  onLedgerChange={(id) => setForm((f) => ({ ...f, settle_account_id: id }))}
                   editEntry={editId ? entries.find((x) => x.id === editId) : null} />
               </div>
 

@@ -24,8 +24,17 @@ export const aggregateClearRows = (rows, headBalance) => {
 
 export const clearRowLabel = (b) => `↳ ${b.party_name}${b.last_date ? ` · cleared upto ${fmtDate(b.last_date)}` : ""}${b.count > 1 ? ` (${b.count})` : ""}`;
 
-// Fetch + aggregate in one go. dateTo omitted → everything till today.
+// Fetch + aggregate in one go for one linked Account Clear ledger. dateTo omitted → everything till today.
 export const fetchClearBreakdown = async (ledgerId, headBalance, dateTo) => {
-  const { data } = await api.get("/reports/account-clear", { params: dateTo ? { date_to: dateTo } : {} });
+  const { data } = await api.get("/reports/account-clear", { params: { ledger_id: ledgerId, ...(dateTo ? { date_to: dateTo } : {}) } });
   return { ledgerId, rows: aggregateClearRows(data.rows, headBalance) };
 };
+
+// All linked Account Clear heads at once → { [ledgerId]: rows }. headBalanceOf(id) → that head's balance (or undefined)
+export const fetchClearBreakdowns = async (ledgerIds, headBalanceOf, dateTo) => {
+  const list = await Promise.all((ledgerIds || []).map((id) => fetchClearBreakdown(id, headBalanceOf(id), dateTo)));
+  return Object.fromEntries(list.map((b) => [b.ledgerId, b.rows]));
+};
+
+// Linked Account Clear ledger ids from a report payload (new list, or legacy single id)
+export const clearLedgerIds = (data) => data?.settle_account_ids?.length ? data.settle_account_ids : data?.settle_account_id ? [data.settle_account_id] : [];

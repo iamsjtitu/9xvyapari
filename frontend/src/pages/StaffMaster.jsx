@@ -4,6 +4,7 @@ import api, { inr, formatApiErrorDetail, todayISO } from "@/lib/api";
 import { toast } from "sonner";
 import { Plus, PencilSimple, Trash, X, UsersThree, LinkSimple } from "@phosphor-icons/react";
 import { backdropClose } from "@/lib/backdrop";
+import { useEscClose } from "@/hooks/useEscClose";
 import { StaffPageHeader } from "@/components/staff/common";
 
 const EMPTY = { name: "", phone: "", salary_type: "monthly", salary: "", join_date: todayISO(), active: true, notes: "" };
@@ -11,6 +12,7 @@ const EMPTY = { name: "", phone: "", salary_type: "monthly", salary: "", join_da
 const StaffForm = ({ editing, onClose, onSaved }) => {
   const [form, setForm] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
+  useEscClose(onClose);
   useEffect(() => { setForm(editing?.id ? { ...EMPTY, ...editing, salary: String(editing.salary ?? "") } : EMPTY); }, [editing]);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
   const submit = async (e) => {

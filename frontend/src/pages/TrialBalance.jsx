@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import api, { inr } from "@/lib/api";
 import { Scales } from "@phosphor-icons/react";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
-import { fetchClearBreakdown, clearRowLabel } from "@/lib/accountClear";
+import { fetchClearBreakdowns, clearRowLabel, clearLedgerIds } from "@/lib/accountClear";
 
 const NATURE_COLORS = {
   asset: "#1B5E20", liability: "#8B2520",
@@ -11,8 +11,8 @@ const NATURE_COLORS = {
 
 export default function TrialBalance() {
   const [data, setData] = useState(null);
-  const [breakdown, setBreakdown] = useState(null);   // Account Clear → party-wise rows
-  const [showClear, setShowClear] = useState(false);  // "+" clicked → rows on screen & print
+  const [breakdowns, setBreakdowns] = useState(null);   // { [ledgerId]: party-wise rows } for every linked Account Clear head
+  const [expanded, setExpanded] = useState({});         // ledgerId → "+" clicked (rows on screen & print)
 
   useEffect(() => {
     api.get("/reports/trial-balance").then((r) => setData(r.data));
@@ -20,15 +20,17 @@ export default function TrialBalance() {
 
   useEffect(() => {
     let alive = true;
-    setBreakdown(null);
-    if (!data?.settle_account_id) return undefined;
-    const head = data.sections.flatMap((sec) => sec.rows).find((r) => r.id === data.settle_account_id);
-    fetchClearBreakdown(data.settle_account_id, head ? head.balance : undefined)
-      .then((b) => { if (alive) setBreakdown(b); }).catch(() => {});
+    setBreakdowns(null);
+    const ids = clearLedgerIds(data);
+    if (!ids.length) return undefined;
+    const headBal = (id) => data.sections.flatMap((sec) => sec.rows).find((r) => r.id === id)?.balance;
+    fetchClearBreakdowns(ids, headBal)
+      .then((b) => { if (alive) setBreakdowns(b); }).catch(() => {});
     return () => { alive = false; };
   }, [data]);
 
   if (!data) return <div className="text-muted2 font-heading">Loading Trial Balance...</div>;
+  const toggle = (id) => setExpanded((e) => ({ ...e, [id]: !e[id] }));
 
   const excelSheets = [
     {
@@ -44,8 +46,8 @@ export default function TrialBalance() {
       rows: data.sections.flatMap((sec) => sec.rows.flatMap((r) => [
         { group: sec.group_name, code: r.code || "", name: r.name, debit: r.balance > 0 ? r.balance : 0, credit: r.balance < 0 ? Math.abs(r.balance) : 0 },
         // Account Clear party-wise rows (only when "+" expanded) — amount kept in the name so group subtotals stay head-only
-        ...(showClear && breakdown && r.id === breakdown.ledgerId
-          ? breakdown.rows.map((b) => ({ group: sec.group_name, code: "", name: `   ${clearRowLabel(b)} · ₹${inr(Math.abs(b.net))} ${b.net > 0 ? "Dr" : "Cr"}`, debit: "", credit: "", _sub: true }))
+        ...(breakdowns?.[r.id] && expanded[r.id]
+          ? breakdowns[r.id].map((b) => ({ group: sec.group_name, code: "", name: `   ${clearRowLabel(b)} · ₹${inr(Math.abs(b.net))} ${b.net > 0 ? "Dr" : "Cr"}`, debit: "", credit: "", _sub: true }))
           : []),
       ])),
       groupBy: "group",
@@ -106,20 +108,22 @@ export default function TrialBalance() {
                 </thead>
                 <tbody>
                   {sec.rows.map((r, i) => {
-                    const isClear = breakdown && r.id && r.id === breakdown.ledgerId;
+                    const subRows = r.id ? breakdowns?.[r.id] : null;
+                    const isClear = !!subRows;
+                    const showClear = isClear && !!expanded[r.id];
                     return (
                       <Fragment key={`${r.kind}-${i}-${r.code}`}>
-                        <tr data-testid={isClear ? "tb-clear-row" : undefined}>
+                        <tr data-testid={isClear ? `tb-clear-row-${r.id}` : undefined}>
                           <td className="font-mono-data text-muted2">{r.code || "—"}</td>
                           <td>
                             {isClear && (
-                              <button type="button" onClick={() => setShowClear((v) => !v)}
+                              <button type="button" onClick={() => toggle(r.id)}
                                 className="print:hidden inline-flex items-center justify-center w-4 h-4 mr-1.5 border border-ink text-[10px] leading-none font-bold hover:bg-khaki/60 align-middle"
-                                title={showClear ? "Party-wise breakdown chhupao" : "Party-wise breakdown dikhao"} data-testid="tb-clear-toggle">{showClear ? "−" : "+"}</button>
+                                title={showClear ? "Party-wise breakdown chhupao" : "Party-wise breakdown dikhao"} data-testid={`tb-clear-toggle-${r.id}`}>{showClear ? "−" : "+"}</button>
                             )}
                             <span className="font-medium">{r.name}</span>
                             {r.kind === "account" && <span className="text-[10px] text-muted2 ml-2">(A/C)</span>}
-                            {isClear && showClear && <span className="text-[10px] text-muted2 ml-2">(party-wise)</span>}
+                            {showClear && <span className="text-[10px] text-muted2 ml-2">(party-wise)</span>}
                           </td>
                           <td className="num">
                             {r.balance > 0 ? inr(r.balance) : ""}
@@ -128,11 +132,11 @@ export default function TrialBalance() {
                             {r.balance < 0 ? inr(Math.abs(r.balance)) : ""}
                           </td>
                         </tr>
-                        {isClear && showClear && (
-                          breakdown.rows.length === 0
-                            ? <tr className="tb-sub" data-testid="tb-clear-breakdown"><td></td><td className="text-xs italic text-muted2 pl-6">↳ koi party settlement nahi</td><td></td><td></td></tr>
-                            : breakdown.rows.map((b, bi) => (
-                              <tr key={b.party_id} className="tb-sub bg-[#faf8f2]" data-testid={`tb-clear-sub-${b.party_id}`}>
+                        {showClear && (
+                          subRows.length === 0
+                            ? <tr className="tb-sub" data-testid={`tb-clear-breakdown-${r.id}`}><td></td><td className="text-xs italic text-muted2 pl-6">↳ koi party settlement nahi</td><td></td><td></td></tr>
+                            : subRows.map((b) => (
+                              <tr key={b.party_id} className="tb-sub bg-[#faf8f2]" data-testid={`tb-clear-sub-${r.id}-${b.party_id}`}>
                                 <td></td>
                                 <td className="text-xs italic text-[#333] pl-6">{clearRowLabel(b)}</td>
                                 <td className="num text-xs text-[#333]">{b.net > 0 ? inr(b.net) : ""}</td>

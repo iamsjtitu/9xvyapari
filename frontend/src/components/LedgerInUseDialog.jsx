@@ -1,11 +1,13 @@
 import { inr } from "@/lib/api";
 import { Prohibit, X } from "@phosphor-icons/react";
 import { backdropClose } from "@/lib/backdrop";
+import { useEscClose } from "@/hooks/useEscClose";
 
 const LABELS = { rokad: "Rokad entries", bills: "Bills", journal: "Journal entries", dos_journal: "DOS (purani) entries", inward: "Inward entries" };
 
 // Shown when DELETE returns 409: the ledger is referenced by entries
 export const LedgerInUseDialog = ({ info, onClose }) => {
+  useEscClose(onClose, !!info);
   if (!info) return null;
   const counts = Object.entries(info.counts || {}).filter(([, n]) => n > 0);
   return (

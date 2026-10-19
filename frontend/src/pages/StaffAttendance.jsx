@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import api, { formatApiErrorDetail, todayISO } from "@/lib/api";
 import { toast } from "sonner";
-import { CalendarCheck, CheckCircle, Printer } from "@phosphor-icons/react";
-import { FoxProPrintHeader } from "@/components/ExportBar";
+import { CalendarCheck, CheckCircle } from "@phosphor-icons/react";
+import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { MonthPicker, MARK_META, MARK_CYCLE, thisMonth, monthLabel, StaffPageHeader } from "@/components/staff/common";
 
 const nextMark = (cur) => MARK_CYCLE[(MARK_CYCLE.indexOf(cur ?? null) + 1) % MARK_CYCLE.length];
@@ -15,7 +15,8 @@ export default function StaffAttendance() {
   const load = (m = month) => api.get("/staff/attendance", { params: { month: m } })
     .then((r) => setData((cur) => (r.data.month === monthRef.current ? r.data : cur)))   // ignore stale month responses
     .catch((err) => toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message));
-  useEffect(() => { monthRef.current = month; setData(null); load(month); /* eslint-disable-next-line */ }, [month]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { monthRef.current = month; setData(null); load(month); }, [month]);
 
   const today = todayISO();
   const dates = useMemo(() => (data ? Array.from({ length: data.days }, (_, i) => `${data.month}-${String(i + 1).padStart(2, "0")}`) : []), [data]);
@@ -54,6 +55,18 @@ export default function StaffAttendance() {
     } catch (err) { toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message); }
   };
 
+  const excelSheets = [{
+    name: "Attendance",
+    subtitle: "P = Present · H = Half · A = Absent (kata) · C = Choot (paid) · Din = P + H/2 + C",
+    columns: [
+      { key: "name", label: "Staff", width: 26 },
+      ...dates.map((d, i) => ({ key: d, label: `${i + 1} ${(data?.weekdays?.[i] || "").slice(0, 2)}`, width: 5 })),
+      { key: "P", label: "P", width: 5, num: true }, { key: "H", label: "H", width: 5, num: true }, { key: "A", label: "A", width: 5, num: true }, { key: "C", label: "C", width: 5, num: true },
+      { key: "paid_days", label: "Din", width: 7, num: true },
+    ],
+    rows: (data?.rows || []).map((r) => ({ name: r.name + (r.active === false ? " (inactive)" : ""), ...Object.fromEntries(dates.map((d) => [d, r.marks[d] || ""])), P: r.counts.P, H: r.counts.H, A: r.counts.A, C: r.counts.C, paid_days: r.paid_days })),
+  }];
+
   return (
     <div className="space-y-4" data-testid="page-staff-attendance">
       <style>{`@media print { @page { size: A4 landscape; margin: 8mm; } .att-grid td, .att-grid th { font-size: 9px !important; padding: 1px 2px !important; } }`}</style>
@@ -64,7 +77,7 @@ export default function StaffAttendance() {
             <CheckCircle size={14} weight="bold" /> Aaj sab Present
           </button>
         )}
-        <button className="btn-outline" onClick={() => window.print()} data-testid="btn-att-print"><Printer size={14} /> Print</button>
+        <ExportBar filename={`staff-attendance-${month}`} title={`Staff Attendance · ${monthLabel(month)}`} sheets={excelSheets} />
       </StaffPageHeader>
 
       <div className="flex flex-wrap gap-3 text-xs print:hidden" data-testid="att-legend">

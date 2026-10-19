@@ -249,13 +249,15 @@ function injectPageRule(orientation) {
 }
 
 function detectOrientation() {
+  if (document.body.classList.contains("print-slip")) return "portrait";   // voucher / salary slip overlay
   // landscape for pages with wide tables
   const path = window.location.pathname;
   if (path.includes("/rokad") || path.includes("/gst-returns") ||
       path.includes("/trial-balance") || path.includes("/reports") ||
       path.includes("/bills") || path.includes("/parties") ||
       path.includes("/inward") || path.includes("/journal") ||
-      path.includes("/opening-balance") || path.includes("/outstanding")) {
+      path.includes("/opening-balance") || path.includes("/outstanding") ||
+      path.includes("/account-clear") || path.includes("/staff/")) {
     return "landscape";
   }
   return "portrait";

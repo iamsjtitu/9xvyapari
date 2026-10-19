@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { inr, formatApiErrorDetail, todayISO } from "@/lib/api";
 import { toast } from "sonner";
-import { Money, Printer, Trash, X, CheckCircle, Receipt } from "@phosphor-icons/react";
+import { Money, Trash, X, CheckCircle, Receipt } from "@phosphor-icons/react";
 import { SalarySlip } from "@/components/staff/SalarySlip";
-import { FoxProPrintHeader } from "@/components/ExportBar";
+import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { backdropClose } from "@/lib/backdrop";
+import { useEscClose } from "@/hooks/useEscClose";
 import { MonthPicker, MODES, thisMonth, monthLabel, StaffPageHeader } from "@/components/staff/common";
 import { fetchCashAccounts, defaultCashAccount, accountLabel } from "@/lib/cashAccounts";
 
@@ -15,6 +16,7 @@ const PayDialog = ({ row, month, monthEnd, onClose, onPaid }) => {
   const today = todayISO();
   const [form, setForm] = useState({ deduct: String(row.suggested_deduct), pay_now: true, cash_account_id: "", mode: "Cash", date: monthEnd < today ? monthEnd : today, note: "" });
   const [busy, setBusy] = useState(false);
+  useEscClose(onClose);
   useEffect(() => { fetchCashAccounts().then((list) => { setAccounts(list); const c = defaultCashAccount(list); if (c) setForm((f) => ({ ...f, cash_account_id: c.id })); }); }, []);
   const deduct = Math.min(Math.max(Number(form.deduct) || 0, 0), row.gross, row.advance_due);
   const net = Math.round((row.gross - deduct) * 100) / 100;
@@ -70,7 +72,8 @@ export default function StaffSalary() {
   const load = (m = month) => api.get("/staff/salary", { params: { month: m } })
     .then((r) => setData((cur) => (r.data.month === monthRef.current ? r.data : cur)))   // ignore stale month responses
     .catch((err) => toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message));
-  useEffect(() => { monthRef.current = month; setData(null); load(month); /* eslint-disable-next-line */ }, [month]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { monthRef.current = month; setData(null); load(month); }, [month]);
 
   const unpay = async (r) => {
     if (!window.confirm(`${r.name} ki ${monthLabel(month)} salary entry delete karein?\nSalary journal aur payment (Rokad) dono hat jayenge.`)) return;
@@ -80,12 +83,31 @@ export default function StaffSalary() {
 
   const rows = data?.rows || [];
   const pending = rows.filter((r) => !r.paid && r.gross > 0);
+  const excelSheets = [{
+    name: "Salary",
+    subtitle: `Din = P + H/2 + C · Monthly ÷ 30 · Paid ₹${inr(data?.totals?.paid_net || 0)} · Advance kata ₹${inr(data?.totals?.deduct || 0)}`,
+    columns: [
+      { key: "name", label: "Staff", width: 26 }, { key: "type", label: "Salary", width: 16 },
+      { key: "P", label: "P", width: 5, num: true }, { key: "H", label: "H", width: 5, num: true }, { key: "A", label: "A", width: 5, num: true }, { key: "C", label: "C", width: 5, num: true },
+      { key: "paid_days", label: "Din", width: 7, num: true }, { key: "per_day", label: "Rate/din", width: 11, num: true },
+      { key: "gross", label: "Gross", width: 13, num: true }, { key: "advance_due", label: "Advance Baki", width: 13, num: true },
+      { key: "deduct", label: "Advance Kata", width: 13, num: true }, { key: "net", label: "Net", width: 13, num: true },
+      { key: "status", label: "Status", width: 20 }, { key: "vno", label: "V.No.", width: 9 },
+    ],
+    rows: rows.map((r) => ({
+      name: r.name, type: r.salary_type === "monthly" ? `Monthly ₹${inr(r.salary)}` : `Daily ₹${inr(r.salary)}`,
+      P: r.counts.P, H: r.counts.H, A: r.counts.A, C: r.counts.C, paid_days: r.paid_days, per_day: r.per_day,
+      gross: r.paid ? r.paid.gross : r.gross, advance_due: r.advance_due, deduct: r.paid ? r.paid.advance_deducted : r.suggested_deduct, net: r.paid ? r.paid.net : r.net,
+      status: r.paid ? (r.paid.paid_now ? `PAID ${r.paid.date.split("-").reverse().join("-")}` : "CREDITED") : r.gross > 0 ? "PENDING" : "attendance nahi",
+      vno: r.paid?.voucher_no || "",
+    })),
+  }];
   return (
     <div className="space-y-4" data-testid="page-staff-salary">
       <style>{`@media print { @page { size: A4 landscape; margin: 8mm; } }`}</style>
       <StaffPageHeader title="Staff Salary Payments" icon={Money} subtitle="Attendance se salary: paid din = P + H/2 + C · Monthly = salary ÷ 30 × din · bacha advance apne aap katta hai (kam kar sakte ho).">
         <MonthPicker value={month} onChange={setMonth} testId="sal-month" />
-        <button className="btn-outline" onClick={() => window.print()} data-testid="btn-sal-print"><Printer size={14} /> Print</button>
+        <ExportBar filename={`staff-salary-${month}`} title={`Staff Salary Sheet · ${monthLabel(month)}`} sheets={excelSheets} />
       </StaffPageHeader>
 
       {data && (

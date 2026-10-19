@@ -4,6 +4,7 @@ import { ArrowsLeftRight, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 import { backdropClose } from "@/lib/backdrop";
+import { useEscClose } from "@/hooks/useEscClose";
 
 const EMPTY = { date: "", from_account_id: "", to_account_id: "", amount: "", description: "", voucher_no: "", chq_no: "", mode: "Bank" };
 
@@ -11,6 +12,7 @@ const EMPTY = { date: "", from_account_id: "", to_account_id: "", amount: "", de
 export const TransferForm = ({ accounts, date, contraId, onClose, onSaved }) => {
   const [form, setForm] = useState({ ...EMPTY, date });
   const [busy, setBusy] = useState(false);
+  useEscClose(onClose);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const [orig, setOrig] = useState(null);  // original transfer when editing → live balance subtracts it

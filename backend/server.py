@@ -239,6 +239,7 @@ class RokadIn(BaseModel):
     voucher_no: Optional[str] = ""        # per-cash-account voucher number
     chq_no: Optional[str] = ""             # cheque number
     settle: bool = False                   # Account Settled: post the leftover to the "Account Clear" ledger → party = 0 as on date
+    settle_account_id: Optional[str] = None  # which linked Account Clear ledger (None → default from Settings)
 
 class RokadOut(RokadIn):
     id: str
@@ -291,13 +292,18 @@ class JournalIn(BaseModel):
     lines: List[JournalLine]
     ref: Optional[str] = ""
 
+class SettleLedger(BaseModel):
+    id: str
+    name: str = ""
+
 class SettingsIn(BaseModel):
     firm_name: Optional[str] = "9x Vyapari"
     fy_start: str = ""   # ISO date
     fy_end: str = ""     # ISO date
     current_date: str = ""
-    settle_account_id: Optional[str] = None     # "Account Clear" ledger used by Account Settled
+    settle_account_id: Optional[str] = None     # default "Account Clear" ledger used by Account Settled
     settle_account_name: Optional[str] = ""
+    settle_accounts: Optional[List[SettleLedger]] = None   # all linked Account Clear ledgers (entry form lets user pick one)
 
 
 # --- App / Router ---
@@ -395,13 +401,12 @@ async def me(current=Depends(get_current_user)):
 async def list_parties(current=Depends(get_current_user)):
     parties = await db.parties.find({}, {"_id": 0}).sort("name", 1).to_list(2000)
     # latest Account Settled date per party (settlement journals: party line + Account Clear line)
-    st = await db.settings.find_one({"id": "default"}, {"_id": 0, "settle_account_id": 1}) or {}
-    sid = st.get("settle_account_id")
+    sids = await _settle_ids()
     settled_upto: dict = {}
     async for j in db.journal.find({"settles_rokad_id": {"$exists": True}}, {"_id": 0, "date": 1, "lines.account_id": 1}):
         for ln in j.get("lines", []):
             aid = ln.get("account_id")
-            if aid and aid != sid:
+            if aid and aid not in sids:
                 settled_upto[aid] = max(settled_upto.get(aid, ""), (j.get("date") or "")[:10])
     # compute live balance
     for p in parties:
@@ -749,11 +754,28 @@ async def create_rokad(body: RokadIn, current=Depends(get_current_user)):
 
 
 # ---- Account Settled: leftover balance → "Account Clear" ledger so the party stands at 0 as on the entry date ----
-async def _settle_account() -> dict:
-    s = await db.settings.find_one({"id": "default"}, {"_id": 0, "settle_account_id": 1, "settle_account_name": 1}) or {}
+async def _settle_accounts() -> list:
+    """All linked Account Clear ledgers [{id, name}], default (settings.settle_account_id) first."""
+    s = await db.settings.find_one({"id": "default"}, {"_id": 0, "settle_account_id": 1, "settle_account_name": 1, "settle_accounts": 1}) or {}
+    accs = [{"id": a["id"], "name": a.get("name") or ""} for a in (s.get("settle_accounts") or []) if a.get("id")]
     sid = s.get("settle_account_id")
-    if not sid:
+    if sid and all(a["id"] != sid for a in accs):
+        accs.insert(0, {"id": sid, "name": s.get("settle_account_name") or ""})
+    accs.sort(key=lambda a: a["id"] != sid)
+    return accs
+
+
+async def _settle_ids() -> set:
+    return {a["id"] for a in await _settle_accounts()}
+
+
+async def _settle_account(chosen: Optional[str] = None) -> dict:
+    accs = await _settle_accounts()
+    if not accs:
         raise HTTPException(400, "Pehle 'Account Clear' ledger link karein (Settings ya entry form me) — tabhi Account Settled chalega")
+    if chosen and all(a["id"] != chosen for a in accs):
+        raise HTTPException(400, "Chuna hua ledger Account Clear me link nahi hai — Settings me pehle link karein")
+    sid = chosen or accs[0]["id"]
     led = await db.parties.find_one({"id": sid}, {"_id": 0, "id": 1, "name": 1}) or await db.accounts.find_one({"id": sid}, {"_id": 0, "id": 1, "name": 1})
     if not led:
         raise HTTPException(400, "Link kiya hua 'Account Clear' ledger nahi mila — Settings me dobara chunein")
@@ -769,7 +791,7 @@ async def _settle_targets(rok: dict) -> Optional[tuple]:
     party = await db.parties.find_one({"id": rok["party_id"]}, {"_id": 0, "id": 1, "name": 1, "opening_balance": 1})
     if not party:
         raise HTTPException(400, "Account Settled sirf party ledger ke saath ho sakta hai")
-    led = await _settle_account()
+    led = await _settle_account(rok.get("settle_account_id"))
     if led["id"] == party["id"]:
         raise HTTPException(400, "Party aur 'Account Clear' ledger ek hi nahi ho sakte")
     return party, led
@@ -811,9 +833,10 @@ async def _apply_settlement(rok: dict) -> Optional[dict]:
          "voucher_no": await _next_journal_vno(), "created_at": now_iso(), "auto": "settle"}
     await db.journal.insert_one(j.copy())
     j.pop("_id", None)
-    await db.rokad.update_one({"id": rid}, {"$set": {"settle_journal_id": j["id"], "settled_amount": amt if rem > 0 else -amt}})
+    await db.rokad.update_one({"id": rid}, {"$set": {"settle_journal_id": j["id"], "settled_amount": amt if rem > 0 else -amt,
+                                                     "settle_account_id": led["id"], "settle_account_name": led["name"]}})
     return {"journal_id": j["id"], "voucher_no": j["voucher_no"], "amount": amt, "side": "Dr" if rem > 0 else "Cr",
-            "ledger": led["name"], "narration": narr}
+            "ledger": led["name"], "ledger_id": led["id"], "narration": narr}
 
 
 SALARY_LOCK_MSG = "Yeh Staff Salary ki entry hai — isse seedha badal/hata nahi sakte. Staff Salary Payments page se us mahine ki salary delete karein"
@@ -858,18 +881,29 @@ async def reopen_rokad(rid: str, current=Depends(get_current_user)):
 
 
 @api.get("/reports/account-clear")
-async def account_clear_report(date_from: Optional[str] = None, date_to: Optional[str] = None, current=Depends(get_current_user)):
-    """Everything posted to the Account Clear ledger (auto settlements + manual journals) in a date range."""
+async def account_clear_report(date_from: Optional[str] = None, date_to: Optional[str] = None, ledger_id: Optional[str] = None,
+                               current=Depends(get_current_user)):
+    """Everything posted to the Account Clear ledger(s) (auto settlements + manual journals) in a date range.
+    ledger_id: one linked ledger; omitted → all linked ledgers together (rows carry ledger_id/ledger_name)."""
     for d in (date_from, date_to):
         if d and not _is_date(d):
             raise HTTPException(400, "Date YYYY-MM-DD format me do")
     st = await db.settings.find_one({"id": "default"}, {"_id": 0}) or {}
-    sid = st.get("settle_account_id")
-    if not sid:
-        return {"ledger": None, "date_from": date_from, "date_to": date_to, "rows": [], "count": 0,
-                "total_off": 0.0, "total_back": 0.0, "net": 0.0, "firm_name": st.get("firm_name", "")}
-    led = await db.parties.find_one({"id": sid}, {"_id": 0, "id": 1, "name": 1}) or {"id": sid, "name": st.get("settle_account_name", "")}
-    q: dict = {"lines.account_id": sid}
+    accs = await _settle_accounts()
+    empty = {"ledger": None, "ledgers": accs, "ledger_id": ledger_id, "date_from": date_from, "date_to": date_to, "rows": [], "count": 0,
+             "total_off": 0.0, "total_back": 0.0, "net": 0.0, "firm_name": st.get("firm_name", "")}
+    if not accs:
+        return empty
+    async for p in db.parties.find({"id": {"$in": [a["id"] for a in accs]}}, {"_id": 0, "id": 1, "name": 1}):
+        for a in accs:
+            if a["id"] == p["id"]: a["name"] = p["name"]
+    sel = [a for a in accs if a["id"] == ledger_id] if ledger_id else accs
+    if not sel:
+        raise HTTPException(400, "Yeh ledger Account Clear me link nahi hai")
+    ids = {a["id"] for a in sel}
+    names = {a["id"]: a["name"] for a in accs}
+    led = sel[0] if len(sel) == 1 else {"id": None, "name": f"Sab Account Clear ledgers ({len(sel)})"}
+    q: dict = {"lines.account_id": {"$in": list(ids)}}
     rng = {}
     if date_from: rng["$gte"] = date_from
     if date_to: rng["$lte"] = date_to
@@ -877,8 +911,8 @@ async def account_clear_report(date_from: Optional[str] = None, date_to: Optiona
     rows, total_off, total_back = [], 0.0, 0.0
     rokad_ids = set()
     async for j in db.journal.find(q, {"_id": 0}).sort([("date", 1), ("created_at", 1)]):
-        mine = [ln for ln in j.get("lines", []) if ln.get("account_id") == sid]
-        others = [ln for ln in j.get("lines", []) if ln.get("account_id") != sid]
+        mine = [ln for ln in j.get("lines", []) if ln.get("account_id") in ids]
+        others = [ln for ln in j.get("lines", []) if ln.get("account_id") not in ids]
         dr = sum(float(ln.get("debit") or 0) for ln in mine)
         cr = sum(float(ln.get("credit") or 0) for ln in mine)
         amt = round(dr - cr, 2)
@@ -889,9 +923,11 @@ async def account_clear_report(date_from: Optional[str] = None, date_to: Optiona
         else: total_back += -amt
         rid = j.get("settles_rokad_id")
         if rid: rokad_ids.add(rid)
+        lid = mine[0].get("account_id")
         rows.append({"journal_id": j["id"], "date": (j.get("date") or "")[:10], "voucher_no": j.get("voucher_no", ""),
                      "party_id": others[0].get("account_id") if others else None,
                      "party_name": ", ".join(o.get("account_name", "") for o in others) or "—",
+                     "ledger_id": lid, "ledger_name": names.get(lid) or mine[0].get("account_name", ""),
                      "amount": abs(amt), "side": side, "narration": j.get("narration", ""),
                      "rokad_id": rid, "auto": bool(rid)})
     if rokad_ids:
@@ -901,9 +937,8 @@ async def account_clear_report(date_from: Optional[str] = None, date_to: Optiona
             if rk:
                 r["rokad_vno"] = rk.get("voucher_no", ""); r["cash_account_name"] = rk.get("cash_account_name", "")
                 r["rokad_amount"] = rk.get("amount"); r["rokad_type"] = rk.get("type")
-    return {"ledger": led, "date_from": date_from, "date_to": date_to, "rows": rows, "count": len(rows),
-            "total_off": round(total_off, 2), "total_back": round(total_back, 2), "net": round(total_off - total_back, 2),
-            "firm_name": st.get("firm_name", "")}
+    return {**empty, "ledger": led, "rows": rows, "count": len(rows),
+            "total_off": round(total_off, 2), "total_back": round(total_back, 2), "net": round(total_off - total_back, 2)}
 
 
 @api.delete("/rokad/{rid}")
@@ -1369,8 +1404,30 @@ async def get_settings(current=Depends(get_current_user)):
 
 @api.put("/settings")
 async def update_settings(body: SettingsIn, current=Depends(get_current_user)):
-    update = {k: v for k, v in body.model_dump().items() if v not in (None, "")}
-    await db.settings.update_one({"id": "default"}, {"$set": update}, upsert=True)
+    data = body.model_dump()
+    accounts = data.pop("settle_accounts", None)
+    update = {k: v for k, v in data.items() if v not in (None, "")}
+    op: dict = {"$set": update}
+    if accounts is not None:
+        # full list of linked Account Clear ledgers; default = settle_account_id if it is in the list, else the first one
+        seen, clean = set(), []
+        for a in accounts:
+            if a["id"] and a["id"] not in seen:
+                seen.add(a["id"]); clean.append({"id": a["id"], "name": a.get("name") or ""})
+        update["settle_accounts"] = clean
+        default = next((a for a in clean if a["id"] == data.get("settle_account_id")), clean[0] if clean else None)
+        if default:
+            update["settle_account_id"], update["settle_account_name"] = default["id"], default["name"]
+        else:
+            update.pop("settle_account_id", None); update.pop("settle_account_name", None)
+            op["$unset"] = {"settle_account_id": "", "settle_account_name": ""}
+    elif update.get("settle_account_id"):
+        # legacy single-ledger save → make sure it is part of the linked list too
+        cur = await _settle_accounts()
+        if all(a["id"] != update["settle_account_id"] for a in cur):
+            cur.append({"id": update["settle_account_id"], "name": update.get("settle_account_name") or ""})
+        update["settle_accounts"] = cur
+    await db.settings.update_one({"id": "default"}, op, upsert=True)
     return await db.settings.find_one({"id": "default"}, {"_id": 0})
 
 
@@ -1855,7 +1912,7 @@ async def opening_balances(fy_id: Optional[str] = None, as_on: Optional[str] = N
     return {"firm_name": s.get("firm_name") or "9x Vyapari", "as_on": as_on, "fy_text": fy_text, "fy_id": fy_id,
             "sections": sections, "grand_dr": grand_dr, "grand_cr": grand_cr,
             "difference": round(grand_dr - grand_cr, 2), "count": len(ledgers),
-            "settle_account_id": s.get("settle_account_id")}
+            "settle_account_id": s.get("settle_account_id"), "settle_account_ids": [a["id"] for a in await _settle_accounts()]}
 
 
 # Add cash_account_id to rokad – update field if not set by client (handled in model fallback)
@@ -1903,13 +1960,12 @@ async def delete_inward(iid: str, current=Depends(get_current_user)):
 # ---------- OUTSTANDING ----------
 async def _settled_now_map() -> dict:
     """party_id → latest Account Settled date, only for parties whose ledger stands at 0 TODAY (cleared accounts)."""
-    st = await db.settings.find_one({"id": "default"}, {"_id": 0, "settle_account_id": 1}) or {}
-    sid = st.get("settle_account_id")
+    sids = await _settle_ids()
     upto: dict = {}
     async for j in db.journal.find({"settles_rokad_id": {"$exists": True}}, {"_id": 0, "date": 1, "lines.account_id": 1}):
         for ln in j.get("lines", []):
             aid = ln.get("account_id")
-            if aid and aid != sid:
+            if aid and aid not in sids:
                 upto[aid] = max(upto.get(aid, ""), (j.get("date") or "")[:10])
     out = {}
     for pid, d in upto.items():
@@ -2061,7 +2117,7 @@ async def trial_balance(current=Depends(get_current_user)):
     grand_cr = sum(s["cr_total"] for s in sections)
     st = await db.settings.find_one({"id": "default"}, {"_id": 0, "settle_account_id": 1}) or {}
     return {"sections": sections, "grand_dr": round(grand_dr, 2), "grand_cr": round(grand_cr, 2),
-            "settle_account_id": st.get("settle_account_id")}
+            "settle_account_id": st.get("settle_account_id"), "settle_account_ids": [a["id"] for a in await _settle_accounts()]}
 
 
 # ---------- NEXT FREE CODE in a group ----------

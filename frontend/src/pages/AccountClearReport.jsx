@@ -15,25 +15,28 @@ export default function AccountClearReport() {
   const [params, setParams] = useSearchParams();
   const to = params.get("to") || todayISO();
   const from = params.has("from") ? params.get("from") : (settings?.fy_start && settings.fy_start <= to ? settings.fy_start : "");
+  const ledgerId = params.get("ledger") || "";   // "" → all linked Account Clear ledgers together
   const [data, setData] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const [view, setView] = useState("list");
   const [localSettings, setLocalSettings] = useState(null);
 
-  const setP = (next) => setParams({ from: next.from ?? from ?? "", to: next.to ?? to });
+  const setP = (next) => setParams({ from: next.from ?? from ?? "", to: next.to ?? to, ...((next.ledger ?? ledgerId) ? { ledger: next.ledger ?? ledgerId } : {}) });
 
   useEffect(() => {
     setData(null);
-    api.get("/reports/account-clear", { params: { ...(from ? { date_from: from } : {}), date_to: to } })
+    api.get("/reports/account-clear", { params: { ...(from ? { date_from: from } : {}), date_to: to, ...(ledgerId ? { ledger_id: ledgerId } : {}) } })
       .then((r) => setData(r.data))
       .catch((err) => toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message));
-  }, [from, to, attempt]);
+  }, [from, to, ledgerId, attempt]);
 
   const quick = [
     { l: "Aaj", d: todayISO(), tid: "ac-quick-today" },
     { l: "FY End", d: settings?.fy_end, tid: "ac-quick-fyend" },
   ].filter((q) => q.d);
   const period = from ? `${fmtDate(from)} → ${fmtDate(to)}` : `upto ${fmtDate(to)}`;
+  const multi = (data?.ledgers?.length || 0) > 1;
+  const allView = multi && !ledgerId;   // rows from several ledgers → show which one
 
   return (
     <div className="space-y-5" data-testid="page-account-clear">
@@ -49,6 +52,12 @@ export default function AccountClearReport() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {multi && (
+            <select className="input-dense h-9 text-sm !w-auto max-w-[260px]" value={ledgerId} onChange={(e) => setP({ ledger: e.target.value })} data-testid="select-ac-ledger">
+              <option value="">Sab ledgers ({data.ledgers.length})</option>
+              {data.ledgers.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          )}
           <div className="flex items-center gap-1" data-testid="ac-controls">
             <label className="lbl !mb-0 mr-1 whitespace-nowrap">From</label>
             <input type="date" className="input-dense h-9 text-sm !w-[150px]" value={from || ""} max={to}
@@ -68,7 +77,7 @@ export default function AccountClearReport() {
             <Printer size={14} /> {view === "sheet" ? "List View" : "Register (Print)"}
           </button>
           {data && (
-            <ExportBar filename={`account-clear-${from || "start"}-${to}`} title={`Account Clear Register · ${data.ledger?.name || ""} · ${period}`}
+            <ExportBar filename={`account-clear-${ledgerId ? (data.ledger?.name || "").toLowerCase().replace(/\s+/g, "-") + "-" : ""}${from || "start"}-${to}`} title={`Account Clear Register · ${data.ledger?.name || ""} · ${period}`}
               sheets={[{
                 name: "Account Clear",
                 subtitle: `Chhoda ₹${inr(data.total_off)} · Wapas ₹${inr(data.total_back)} · Net ₹${inr(Math.abs(data.net))} ${data.net >= 0 ? "Dr" : "Cr"} · ${data.count} entries`,
@@ -76,6 +85,7 @@ export default function AccountClearReport() {
                   { key: "date", label: "Date", width: 12 },
                   { key: "voucher_no", label: "Journal", width: 10 },
                   { key: "party_name", label: "Party", width: 32 },
+                  ...(allView ? [{ key: "ledger_name", label: "Ledger", width: 22 }] : []),
                   { key: "rokad_vno", label: "Rokad V.No.", width: 11 },
                   { key: "off", label: "Chhoda (Off)", width: 15, num: true },
                   { key: "back", label: "Wapas (Back)", width: 15, num: true },
@@ -107,7 +117,7 @@ export default function AccountClearReport() {
           </div>
 
           <div className={view === "sheet" ? "" : "hidden print:block"}>
-            <AccountClearSheet data={data} />
+            <AccountClearSheet data={data} showLedger={allView} />
           </div>
 
           <div className={`card-flat overflow-hidden ${view === "sheet" ? "hidden" : "print:hidden"}`}>
@@ -115,18 +125,19 @@ export default function AccountClearReport() {
             <table className="dense w-full" data-testid="table-account-clear">
               <thead>
                 <tr>
-                  <th style={{ width: 100 }}>Date</th><th style={{ width: 80 }}>Journal</th><th>Party</th><th style={{ width: 90 }}>Rokad V.</th>
+                  <th style={{ width: 100 }}>Date</th><th style={{ width: 80 }}>Journal</th><th>Party</th>{allView && <th style={{ width: 160 }}>Ledger</th>}<th style={{ width: 90 }}>Rokad V.</th>
                   <th className="num" style={{ width: 130 }}>Chhoda (Off)</th><th className="num" style={{ width: 130 }}>Wapas (Back)</th><th>Narration</th><th style={{ width: 60 }}></th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.length === 0 ? (
-                  <tr><td colSpan={8} className="py-10 text-center text-muted2" data-testid="ac-empty">Is period me Account Clear me kuch nahi gaya.</td></tr>
+                  <tr><td colSpan={allView ? 9 : 8} className="py-10 text-center text-muted2" data-testid="ac-empty">Is period me Account Clear me kuch nahi gaya.</td></tr>
                 ) : data.rows.map((r) => (
                   <tr key={r.journal_id} data-testid={`ac-row-${r.journal_id}`}>
                     <td className="font-mono-data text-muted2 whitespace-nowrap">{fmtDate(r.date)}</td>
                     <td><span className="kbd !text-[10px] !px-1.5 !py-0">{r.voucher_no}</span></td>
                     <td>{r.party_id ? <Link to={`/parties/${r.party_id}`} className="text-terracotta hover:underline" data-testid={`ac-party-link-${r.journal_id}`}>{r.party_name}</Link> : r.party_name}</td>
+                    {allView && <td className="text-xs uppercase text-jama" data-testid={`ac-ledger-${r.journal_id}`}>{r.ledger_name}</td>}
                     <td className="font-mono-data text-muted2">{r.rokad_vno ? `V.${r.rokad_vno}` : <span className="text-[10px] uppercase">{r.auto ? "" : "manual"}</span>}</td>
                     <td className="num amount-kharch whitespace-nowrap">{r.side === "off" ? `₹ ${inr(r.amount)}` : "—"}</td>
                     <td className="num amount-jama whitespace-nowrap">{r.side === "back" ? `₹ ${inr(r.amount)}` : "—"}</td>
@@ -146,7 +157,7 @@ export default function AccountClearReport() {
               {data.rows.length > 0 && (
                 <tfoot>
                   <tr className="bg-parchment/60 font-semibold" data-testid="ac-total-row">
-                    <td colSpan={4} className="text-right">TOTAL ({data.count})</td>
+                    <td colSpan={allView ? 5 : 4} className="text-right">TOTAL ({data.count})</td>
                     <td className="num font-mono-data">₹ {inr(data.total_off)}</td>
                     <td className="num font-mono-data">₹ {inr(data.total_back)}</td>
                     <td colSpan={2} className="text-xs">Net chhoda: ₹ {inr(Math.abs(data.net))} {data.net >= 0 ? "Dr" : "Cr"}</td>
