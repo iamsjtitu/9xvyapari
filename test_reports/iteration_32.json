@@ -1,0 +1,28 @@
+{
+  "summary": "Frontend-only test of the Party Khata 'Remark / Yaad-dasht' feature. All requested flows PASS: the edit modal textarea (input-party-remark, maxlength 500, prefilled), saving the edit, the amber list row remark (party-remark-<id>, '✎ ' prefix, rgb(180,83,9)), remark search ('JCB' and 'test remark 123' each find their party), API persistence, a new khata with remark from /parties, the Rokad '+ Add' inline khata window with remark (party auto-selected in the Rokad form), the ledger-remark box, stmt-remark 'Remark : …' in statement view, the Excel export (ledger-master.xlsx, 'Remark' column at index 9 with the right value), and clearing the remark (row/ledger/stmt remark elements gone). One pre-existing UX issue: a party with no group_id (SETTLE TEST PARTY, created via API) cannot be saved from the Edit modal until a Group is picked, because Group is a required field.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "KhataModal (edit)", "issue": "Parties with group_id=null (legacy/API-created, e.g. SETTLE TEST PARTY; 2 such parties in the DB) cannot be saved from Edit Khata. The 'Group *' select is required, so native validation silently blocks Save and only highlights the Group field. To edit only the remark, the user must assign a group.", "selector": "[data-testid='select-party-group']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Party statement (DOS print)", "issues": ["The remark is upper-cased by the statement's CSS ('QA REMARK: 1,60,000 ME TUTAYA · JCB WALA'). This matches the FoxPro style, but the remark's original case is lost. Cosmetic."]},
+      {"screen": "Rokad entry form", "issues": ["A brand-new party with 0 balance shows 'Abhi ka balance: ₹ 0.00 (settled)'. The 'settled' label for a party that has never had any entries may confuse users. Minor."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: let Edit Khata save when the party has no group (or show a clear toast/message saying Group is required), so legacy parties without a group can have a remark added."
+  ],
+  "critical_code_review_comments": [
+    "The remark is not trimmed on the backend. Whitespace-only remarks would render an empty amber box. Consider .strip() in PartyIn or before the truthy check."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "skipped", "frontend": "100%"},
+  "seed_data_creation": "Created QA REMARK PARTY and QA REMARK PARTY 2; both deleted (one via UI, one via DB). SETTLE TEST PARTY temporarily got group CAPITAL A/C so it could be saved from the modal. Restored via DB to group_id=None, group_name='', remark=''.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "SETTLE TEST PARTY id 640f05fe-107a-4c69-8752-eef837c70f77 has group_id=None, so its Edit modal requires picking a group before Save. The ledger page remembers the statement/ledger view toggle. Excel button testid is btn-excel; the file is ledger-master.xlsx with the header on row 5. Rokad inline create: btn-add-entry → fill select-party → click select-party-create → KhataModal.",
+  "rca of the issue": "Group required: KhataModal.jsx <select required ... data-testid='select-party-group'>. fromParty() maps group_id null to '', so HTML5 validation blocks the submit for parties that have no group."
+}

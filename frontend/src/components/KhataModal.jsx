@@ -56,6 +56,7 @@ export const KhataModal = ({ khata, onClose, onSaved, title }) => {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (!form.group_id) { toast.error("Group chunna zaroori hai — pehle Group select karein"); return; }
     setBusy(true);
     try {
       const payload = {
@@ -86,7 +87,7 @@ export const KhataModal = ({ khata, onClose, onSaved, title }) => {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
           <div className="md:col-span-3">
             <label className="lbl">Group *</label>
-            <select required className="input-dense" value={form.group_id} onChange={(e) => onGroupChange(e.target.value)} data-testid="select-party-group" autoFocus={!form.group_id}>
+            <select className={`input-dense ${!form.group_id && isEdit ? "border-[#B71C1C]" : ""}`} value={form.group_id} onChange={(e) => onGroupChange(e.target.value)} data-testid="select-party-group" autoFocus={!form.group_id}>
               <option value="">— Group chunein —</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.fcode}–{g.lcode} · {g.name}</option>)}
             </select>
