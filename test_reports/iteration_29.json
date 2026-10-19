@@ -1,0 +1,19 @@
+{
+  "summary": "Retested the 3 fixes from iteration 28. All pass. (1) Bill opened from the Party Ledger pencil goes to /bills?return=... The edit= param is removed and return= stays. Save goes back to the ledger URL /parties/<id>?as_on=2026-06-30&from=, and ESC also goes back to the ledger. (2) On /bills with no query, editing a bill and clicking Save still goes to /bills/<id> (Bill View), and the 'update ho gaya' toast shows. (3) The ledger closing row is 3 cells (colSpan 4 + balance + empty print:hidden cell), which covers all 6 columns, so there is no gap. In print media, the last cell of the header, opening, entry and closing rows all compute to display:none. Backend regression test_ledger_edit_v28.py passed 9/9, including accounts-summary not being shadowed and GET /api/rokad/{id} returning 200 or 404.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [{"screen": "Bill View /bills/<id>", "issues": ["Both 'Purchase Entry' and 'Sale / Bill Entry' sidebar items look highlighted or active together (minor, cosmetic, probably existed before)"]}]
+  },
+  "test_report_links": ["/app/backend/tests/test_ledger_edit_v28.py", "/app/test_reports/pytest/pytest_v29.xml"],
+  "action_items": ["Optional: when on /bills/<id>, highlight only the matching sidebar item (Sale or Purchase)"],
+  "critical_code_review_comments": ["NayaBill submit uses the fromLedger flag to skip navigate(/bills/id). Correct. The concerns from iteration 28 about stale settle journals and server.py size are still open."],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% (all 4 retest items)"},
+  "seed_data_creation": "Created a temporary sale bill S00001 (13-06-2026, 100) for SETTLE TEST PARTY and deleted it afterwards. The GET now returns 404. SETTLE TEST PARTY and ACCOUNT CLEAR are kept.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The ledger-edit feature is fully verified. To run the regression: REACT_APP_BACKEND_URL=... pytest /app/backend/tests/test_ledger_edit_v28.py. accounts-summary needs the date_from and date_to query params (without them it returns 422, as expected).",
+  "test_credentials": "admin / Vyapari@2026"
+}
