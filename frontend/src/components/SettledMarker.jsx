@@ -30,7 +30,7 @@ export const SettledBadge = ({ date, className = "" }) => (
 export const SettledMarkerRow = ({ colSpan, date, rokadId, onReopen, balance = 0 }) => {
   const stale = Math.abs(balance) >= 0.005;
   return (
-  <tr className={stale ? "bg-[#FFF3E0]" : "bg-jama-bg"} data-testid={`ledger-settled-marker-${rokadId}`} data-stale={stale ? "1" : "0"}>
+  <tr className={stale ? "!bg-[#FFF3E0]" : "!bg-jama-bg"} data-testid={`ledger-settled-marker-${rokadId}`} data-stale={stale ? "1" : "0"}>
     <td colSpan={colSpan} className="!py-1.5">
       <div className="flex items-center justify-between gap-3">
         <span className={`flex items-center gap-1.5 font-heading font-semibold text-xs uppercase tracking-wider ${stale ? "text-[#B45309]" : "text-jama"}`}>

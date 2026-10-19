@@ -130,6 +130,7 @@ class PartyIn(BaseModel):
     group_id: Optional[str] = None      # which AccountGroup it belongs to
     group_name: Optional[str] = ""
     alt_name: Optional[str] = ""        # GL_NAME1
+    remark: Optional[str] = ""          # free note: "160000 me tutaya", "JCB wala", etc.
 
 class PartyOut(PartyIn):
     id: str

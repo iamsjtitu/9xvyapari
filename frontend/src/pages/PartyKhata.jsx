@@ -51,7 +51,8 @@ export default function PartyKhata() {
       (p.name || "").toLowerCase().includes(q.toLowerCase()) ||
       String(p.code || "").includes(q) ||
       (p.phone || "").includes(q) ||
-      (p.place || "").toLowerCase().includes(q.toLowerCase());
+      (p.place || "").toLowerCase().includes(q.toLowerCase()) ||
+      (p.remark || "").toLowerCase().includes(q.toLowerCase());
     const matchG = !filterGroup || p.group_id === filterGroup;
     const matchS = settledFilter === "all" || (settledFilter === "only" ? !!p.settled : !p.settled);
     return matchQ && matchG && matchS;
@@ -102,6 +103,7 @@ export default function PartyKhata() {
               { key: "opening_balance", label: "Opening Bal", width: 14, num: true },
               { key: "balance", label: "Current Bal", width: 14, num: true },
               { key: "settled_text", label: "Settled", width: 18 },
+              { key: "remark", label: "Remark", width: 40 },
             ],
             rows: filtered.map((p) => ({ ...p, settled_text: p.settled ? `Cleared upto ${(p.settled_upto || "").split("-").reverse().join("-")}` : "" })),
           }]} />
@@ -193,6 +195,7 @@ export default function PartyKhata() {
                     </span>
                   )}
                   {p.alt_name && <div className="text-xs text-muted2">{p.alt_name}</div>}
+                  {p.remark && <div className="text-xs text-[#B45309] truncate max-w-md" title={p.remark} data-testid={`party-remark-${p.id}`}>✎ {p.remark}</div>}
                 </td>
                 <td className="text-xs text-muted2">{p.group_name || "—"}</td>
                 <td className="text-xs">{p.place || "—"}</td>

@@ -6,7 +6,7 @@ import { backdropClose } from "@/lib/backdrop";
 
 export const EMPTY_KHATA = {
   code: "", name: "", alt_name: "", group_id: "", group_name: "", type: "both", place: "", phone: "",
-  address: "", address2: "", gstin: "", pan: "", cstno: "", mpstno: "", opening_balance: 0, opening_qty: 0, rate: 0,
+  address: "", address2: "", gstin: "", pan: "", cstno: "", mpstno: "", opening_balance: 0, opening_qty: 0, rate: 0, remark: "",
 };
 
 const fromParty = (p) => ({
@@ -127,6 +127,13 @@ export const KhataModal = ({ khata, onClose, onSaved, title }) => {
           </div>
           <div className="md:col-span-4"><label className="lbl">Opening Qty</label><input type="number" step="0.001" className="input-dense num" value={form.opening_qty} onChange={set("opening_qty")} /></div>
           <div className="md:col-span-4"><label className="lbl">Default Rate</label><input type="number" step="0.01" className="input-dense num" value={form.rate} onChange={set("rate")} /></div>
+
+          <div className="md:col-span-12">
+            <label className="lbl">Remark / Yaad-dasht</label>
+            <textarea rows={2} className="input-dense !h-auto py-1.5" value={form.remark} onChange={set("remark")} maxLength={500}
+              placeholder='Jaise: "Is party se 1,60,000 me tutaya hai" · "JCB wala, Sunday band"' data-testid="input-party-remark" />
+            <div className="text-[10px] text-muted2 mt-1">Ledger ke upar aur Party Khata list me dikhega (print statement me bhi).</div>
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 mt-5 border-t border-khaki pt-4">

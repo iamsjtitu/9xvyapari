@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { useParams, Link, useSearchParams, useOutletContext } from "react-router-dom";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
-import { ArrowLeft, Receipt, Notebook, BookOpen, BookOpenText, Wallet, Printer, CheckCircle, PencilSimple, Trash } from "@phosphor-icons/react";
+import { ArrowLeft, Receipt, Notebook, BookOpen, BookOpenText, Wallet, Printer, CheckCircle, PencilSimple, Trash, NotePencil } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar } from "@/components/ExportBar";
 import { PartyStatement } from "@/components/PartyStatement";
@@ -192,6 +192,11 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
               {party.phone && <span className="font-mono-data mr-3">Ph: {party.phone}</span>}
               {party.address && <span>{party.address}</span>}
             </div>
+            {party.remark && (
+              <div className="mt-2 inline-flex items-start gap-1.5 text-sm text-ink bg-[#FFF8E1] border border-[#F0C674] px-2.5 py-1 max-w-xl whitespace-pre-wrap" data-testid="ledger-remark">
+                <NotePencil size={16} weight="duotone" className="shrink-0 mt-0.5 text-[#B45309]" /> <span><span className="font-heading font-semibold text-xs uppercase tracking-wider text-[#B45309] mr-1">Remark:</span>{party.remark}</span>
+              </div>
+            )}
             {data.settled_upto && <SettledBadge date={data.settled_upto} className="mt-2" />}
           </div>
           <div className="text-right">

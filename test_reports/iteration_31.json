@@ -1,0 +1,32 @@
+{
+  "summary": "Retest of the stale-settlement indicator in Party Ledger + DOS statement on SETTLE TEST PARTY (frontend only, setup via API). All requested flows pass: green 'ledger 0' (data-stale=0) -> delete 300 receipt -> amber stale text 'settlement purana — baki ₹ 300.00 Dr (Rokad entry edit karein ya Reopen)' (data-stale=1), closing 300.00 Dr, statement row 'SETTLEMENT PURANA · BAKI 300.00 DR' with bl 300.00 Dr -> Reopen removes marker, closing 360.00 Dr -> edit 640 + settle-checkbox -> fresh green marker, closing 0. Extra: Cr branch checked (100 receipt added before settlement -> 'BAKI ₹ 100.00 CR', stmt '100.00 Cr'). Found and fixed one CSS bug: the amber/green marker background was overridden by the table zebra/hover rule.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SettledMarkerRow", "issue": "FIXED by tester: amber bg-[#FFF3E0] (and green bg-jama-bg) was overridden by index.css 'table.dense tbody tr:nth-child(even)' / ':hover' (more specific selector). In the stale scenario the marker was an even row, so it showed rgba(244,241,234,0.4) instead of amber; only the text/icon was amber. Changed to !bg-[#FFF3E0] / !bg-jama-bg; now verified rgb(255,243,224) incl. hover, and green rgb(232,245,233) on an even row.", "selector": "[data-testid^=ledger-settled-marker-]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Party Ledger / Statement (stale state)", "issues": [
+        "Header SettledBadge (ledger-settled-badge) and statement header tag (stmt-settled-upto) stay GREEN 'Account cleared upto' even when the settlement is stale — consider amber/warning there too.",
+        "DOS statement stale row (stmt-settled-row) keeps the green .dos-settled styling; only the text changes. Consider an amber variant.",
+        "Reopen button in an amber marker keeps green text-jama."
+      ]}
+    ]
+  },
+  "test_report_links": ["/app/tests/setup_stale_settle.py"],
+  "action_items": [
+    "Optional: make the header badge, the statement header tag and the stmt-settled-row amber when stale (they are green now)"
+  ],
+  "critical_code_review_comments": [
+    "Tailwind bg classes on <tr> inside table.dense lose to the zebra/hover rules in index.css. Use ! (important) for any row-level background in dense tables."
+  ],
+  "updated_files": ["/app/frontend/src/components/SettledMarker.jsx", "/app/tests/setup_stale_settle.py"],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% of requested flows (after 1 CSS fix)"},
+  "test_credentials": "admin / Vyapari@2026",
+  "seed_data_creation": "Temporary TEST_stale receipts on SETTLE TEST PARTY, all deleted. Party is back to 1000 Dr with no rokad and no journal (checked via API).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "SETTLE TEST PARTY id 640f05fe-107a-4c69-8752-eef837c70f77 (1000 Dr opening). /app/tests/setup_stale_settle.py setup|show creates the 300 (06-10) + 640 settle (06-12) receipts. Ledger URL /parties/<id>?as_on=2026-06-30&from= . Edit from the ledger opens RokadPanna edit modal (settle-checkbox, btn-save-rokad) and returns to the ledger.",
+  "rca of the issue": "Marker <tr> used Tailwind bg-[#FFF3E0]. The rule table.dense tbody tr:nth-child(even) {background: rgba(244,241,234,.4)} has higher specificity. Repro: a stale marker at an even row index -> beige instead of amber. Fix: !bg-[#FFF3E0] / !bg-jama-bg."
+}

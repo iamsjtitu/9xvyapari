@@ -22,6 +22,7 @@ export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFr
           {party.place ? ` · ${party.place}` : ""}
         </div>
         <div>Period : <b>{period}</b></div>
+        {party.remark && <div data-testid="stmt-remark">Remark : <b>{party.remark}</b></div>}
         {settledUpto && <div className="dos-settled-tag" data-testid="stmt-settled-upto">✔ ACCOUNT CLEARED UPTO {fmtDate(settledUpto)}</div>}
       </div>
       <div className="dos-stmt-row dos-head mt-2">
