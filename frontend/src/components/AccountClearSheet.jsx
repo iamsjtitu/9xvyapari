@@ -17,7 +17,7 @@ export const AccountClearSheet = ({ data, showLedger = false }) => {
       <div className="dos-stmt-row dos-head ac-row mt-2">
         <span className="dt">Date</span><span className="rf">Jrnl</span><span className="pt">Party</span>
         {showLedger && <span className="ld">Ledger</span>}
-        <span className="rf">Rokad V.</span><span className="am">Chhoda (Off)</span><span className="am">Wapas (Back)</span><span className="nr">Narration</span>
+        <span className="rf">Rokad V.</span><span className="iv">INV No</span><span className="am">Chhoda (Off)</span><span className="am">Wapas (Back)</span><span className="nr">Narration</span>
       </div>
       {rows.length === 0 && <div className="dos-stmt-row"><span className="dt"></span><span className="pt">-- is period me Account Clear me kuch nahi gaya --</span></div>}
       {rows.map((r) => (
@@ -27,13 +27,14 @@ export const AccountClearSheet = ({ data, showLedger = false }) => {
           <span className="pt" title={r.party_name}>{r.party_name}</span>
           {showLedger && <span className="ld" title={r.ledger_name}>{r.ledger_name}</span>}
           <span className="rf">{r.rokad_vno || (r.auto ? "" : "manual")}</span>
+          <span className="iv">{r.rokad_inv || ""}</span>
           <span className="am">{r.side === "off" ? inr(r.amount) : ""}</span>
           <span className="am">{r.side === "back" ? inr(r.amount) : ""}</span>
           <span className="nr" title={r.narration}>{r.narration}</span>
         </div>
       ))}
       <div className="dos-stmt-row dos-total ac-row" data-testid="ac-sheet-total">
-        <span className="dt"></span><span className="rf"></span><span className="pt">TOTAL ({count} entries)</span>{showLedger && <span className="ld"></span>}<span className="rf"></span>
+        <span className="dt"></span><span className="rf"></span><span className="pt">TOTAL ({count} entries)</span>{showLedger && <span className="ld"></span>}<span className="rf"></span><span className="iv"></span>
         <span className="am">{inr(total_off)}</span><span className="am">{inr(total_back)}</span>
         <span className="nr">NET CHHODA: {inr(Math.abs(net))} {net >= 0 ? "Dr" : "Cr"}</span>
       </div>

@@ -231,6 +231,8 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
           <thead>
             <tr>
               <th style={{ width: 100 }}>Date</th>
+              <th style={{ width: 70 }}>V.No.</th>
+              <th style={{ width: 100 }}>INV No.</th>
               <th>Vivran</th>
               <th className="num" style={{ width: 130 }}>Debit (+)</th>
               <th className="num" style={{ width: 130 }}>Credit (-)</th>
@@ -241,6 +243,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
           <tbody>
             <tr className="bg-parchment/40" data-testid="ledger-opening-row">
               <td className="font-mono-data text-muted2 whitespace-nowrap">{dateFrom ? fmtDate(dateFrom) : ""}</td>
+              <td></td><td></td>
               <td className="font-semibold uppercase text-xs tracking-wider">Opening Balance{dateFrom ? " (B/F)" : ""}</td>
               <td className="num">—</td><td className="num">—</td>
               <td className="num font-medium whitespace-nowrap" style={{ color: opening >= 0 ? "#1A1A1A" : "#1B5E20" }}>
@@ -249,12 +252,15 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
               <td className="print:hidden"></td>
             </tr>
             {enriched.length === 0 ? (
-              <tr><td colSpan={6} className="py-10 text-center text-muted2">Is period me koi transaction nahi.</td></tr>
+              <tr><td colSpan={8} className="py-10 text-center text-muted2">Is period me koi transaction nahi.</td></tr>
             ) : (
               enriched.map((r) => (
                 <Fragment key={`${r.kind}-${r.id}`}>
                 <tr>
                   <td className="font-mono-data text-muted2 whitespace-nowrap">{fmtDate((r.date || "").slice(0, 10))}</td>
+                  <td className="font-mono-data text-xs text-terracotta whitespace-nowrap" title={r.kind === "bill" ? "Bill No." : r.kind === "journal" ? "Journal Voucher No." : r.kind === "dos" ? "DOS Ref" : "Rokad Voucher No."}
+                    data-testid={`ledger-vno-${r.id}`}>{r.kind === "bill" && r.vno ? `Bill ${r.vno}` : r.vno || r.ref_no || "—"}</td>
+                  <td className="font-mono-data text-xs text-jama whitespace-nowrap" title="Invoice No." data-testid={`ledger-inv-${r.id}`}>{r.inv || ""}</td>
                   <td>
                     <div className="flex items-center gap-2">
                       {KIND_ICON[r.kind]}
@@ -269,16 +275,6 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                       ) : (
                         <span>{r.label}</span>
                       )}
-                      {(r.kind === "bill" || r.kind === "journal") && r.vno ? (
-                        <span className="kbd !text-[10px] !px-1.5 !py-0 whitespace-nowrap" title={r.kind === "bill" ? "Bill No." : "Journal Voucher No."}
-                          data-testid={`ledger-vno-${r.id}`}>{r.kind === "bill" ? `Bill ${r.vno}` : r.vno}</span>
-                      ) : null}
-                      {(r.kind === "rokad" || r.kind === "cash") && r.vno ? (
-                        <span className="kbd !text-[10px] !px-1.5 !py-0 whitespace-nowrap" title="Rokad Voucher No." data-testid={`ledger-vno-${r.id}`}>V.{r.vno}</span>
-                      ) : null}
-                      {r.inv ? (
-                        <span className="kbd !text-[10px] !px-1.5 !py-0 whitespace-nowrap text-jama border-jama/40" title="Invoice No." data-testid={`ledger-inv-${r.id}`}>INV {r.inv}</span>
-                      ) : null}
                     </div>
                   </td>
                   <td className="num amount-kharch whitespace-nowrap">{r.debit ? `₹ ${inr(r.debit)}` : "—"}</td>
@@ -303,7 +299,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                   </td>
                 </tr>
                 {r.settles_rokad_id && (
-                  <SettledMarkerRow colSpan={6} date={(r.date || "").slice(0, 10)} rokadId={r.settles_rokad_id} balance={r.balance}
+                  <SettledMarkerRow colSpan={8} date={(r.date || "").slice(0, 10)} rokadId={r.settles_rokad_id} balance={r.balance}
                     onReopen={async () => { if (await reopenSettled(r.settles_rokad_id, party.name)) setAttempt((a) => a + 1); }} />
                 )}
                 </Fragment>
@@ -313,7 +309,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
           {enriched.length > 0 && (
             <tfoot>
               <tr className="bg-parchment/60 font-semibold" data-testid="ledger-closing-row">
-                <td colSpan={4} className="text-right">CLOSING BALANCE AS ON {fmtDate(asOn)}</td>
+                <td colSpan={6} className="text-right">CLOSING BALANCE AS ON {fmtDate(asOn)}</td>
                 <td className="num font-mono-data" style={{ color: balColor }}>
                   ₹ {inr(Math.abs(party.balance))} {party.balance < 0 ? "Cr" : "Dr"}
                 </td>

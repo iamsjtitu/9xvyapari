@@ -87,6 +87,7 @@ export default function AccountClearReport() {
                   { key: "party_name", label: "Party", width: 32 },
                   ...(allView ? [{ key: "ledger_name", label: "Ledger", width: 22 }] : []),
                   { key: "rokad_vno", label: "Rokad V.No.", width: 11 },
+                  { key: "rokad_inv", label: "INV No.", width: 12 },
                   { key: "off", label: "Chhoda (Off)", width: 15, num: true },
                   { key: "back", label: "Wapas (Back)", width: 15, num: true },
                   { key: "narration", label: "Narration", width: 60 },
@@ -125,20 +126,21 @@ export default function AccountClearReport() {
             <table className="dense w-full" data-testid="table-account-clear">
               <thead>
                 <tr>
-                  <th style={{ width: 100 }}>Date</th><th style={{ width: 80 }}>Journal</th><th>Party</th>{allView && <th style={{ width: 160 }}>Ledger</th>}<th style={{ width: 90 }}>Rokad V.</th>
+                  <th style={{ width: 100 }}>Date</th><th style={{ width: 80 }}>Journal</th><th>Party</th>{allView && <th style={{ width: 160 }}>Ledger</th>}<th style={{ width: 70 }}>Rokad V.</th><th style={{ width: 90 }}>INV No.</th>
                   <th className="num" style={{ width: 130 }}>Chhoda (Off)</th><th className="num" style={{ width: 130 }}>Wapas (Back)</th><th>Narration</th><th style={{ width: 60 }}></th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.length === 0 ? (
-                  <tr><td colSpan={allView ? 9 : 8} className="py-10 text-center text-muted2" data-testid="ac-empty">Is period me Account Clear me kuch nahi gaya.</td></tr>
+                  <tr><td colSpan={allView ? 10 : 9} className="py-10 text-center text-muted2" data-testid="ac-empty">Is period me Account Clear me kuch nahi gaya.</td></tr>
                 ) : data.rows.map((r) => (
                   <tr key={r.journal_id} data-testid={`ac-row-${r.journal_id}`}>
                     <td className="font-mono-data text-muted2 whitespace-nowrap">{fmtDate(r.date)}</td>
                     <td><span className="kbd !text-[10px] !px-1.5 !py-0">{r.voucher_no}</span></td>
                     <td>{r.party_id ? <Link to={`/parties/${r.party_id}`} className="text-terracotta hover:underline" data-testid={`ac-party-link-${r.journal_id}`}>{r.party_name}</Link> : r.party_name}</td>
                     {allView && <td className="text-xs uppercase text-jama" data-testid={`ac-ledger-${r.journal_id}`}>{r.ledger_name}</td>}
-                    <td className="font-mono-data text-muted2">{r.rokad_vno ? `V.${r.rokad_vno}` : <span className="text-[10px] uppercase">{r.auto ? "" : "manual"}</span>}{r.rokad_inv ? <div className="text-[10px]">INV {r.rokad_inv}</div> : null}</td>
+                    <td className="font-mono-data text-muted2">{r.rokad_vno ? `V.${r.rokad_vno}` : <span className="text-[10px] uppercase">{r.auto ? "" : "manual"}</span>}</td>
+                    <td className="font-mono-data text-xs text-jama whitespace-nowrap" data-testid={`ac-inv-${r.journal_id}`}>{r.rokad_inv || ""}</td>
                     <td className="num amount-kharch whitespace-nowrap">{r.side === "off" ? `₹ ${inr(r.amount)}` : "—"}</td>
                     <td className="num amount-jama whitespace-nowrap">{r.side === "back" ? `₹ ${inr(r.amount)}` : "—"}</td>
                     <td className="text-xs text-muted2 max-w-[420px] truncate" title={r.narration}>{r.narration}</td>
@@ -157,7 +159,7 @@ export default function AccountClearReport() {
               {data.rows.length > 0 && (
                 <tfoot>
                   <tr className="bg-parchment/60 font-semibold" data-testid="ac-total-row">
-                    <td colSpan={allView ? 5 : 4} className="text-right">TOTAL ({data.count})</td>
+                    <td colSpan={allView ? 6 : 5} className="text-right">TOTAL ({data.count})</td>
                     <td className="num font-mono-data">₹ {inr(data.total_off)}</td>
                     <td className="num font-mono-data">₹ {inr(data.total_back)}</td>
                     <td colSpan={2} className="text-xs">Net chhoda: ₹ {inr(Math.abs(data.net))} {data.net >= 0 ? "Dr" : "Cr"}</td>

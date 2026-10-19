@@ -7,11 +7,10 @@ const sortByDate = (a, b) => (a.date || "").localeCompare(b.date || "") || Strin
 // One account's T-shaped cash book: JAMA (receipts) left | KHARCH (payments) right.
 // Opening B/F sits on the Jama side (Dr) or Kharch side (Cr/overdraft); Closing C/F balances the other side.
 function buildSides(acct, entries) {
-  const sub = (e) => [e.description && e.party_name ? e.description : "", e.inv_no ? `INV ${e.inv_no}` : ""].filter(Boolean).join(" · ");
-  const jama = entries.filter((e) => e.type === "jama").sort(sortByDate)
-    .map((e) => ({ date: e.date, text: e.party_name || e.description || "", sub: sub(e), ref: e.voucher_no || e.chq_no || "", amount: e.amount }));
-  const kharch = entries.filter((e) => e.type === "kharch").sort(sortByDate)
-    .map((e) => ({ date: e.date, text: e.party_name || e.description || "", sub: sub(e), ref: e.voucher_no || e.chq_no || "", amount: e.amount }));
+  const row = (e) => ({ date: e.date, text: e.party_name || e.description || "", sub: e.description && e.party_name ? e.description : "",
+    ref: e.voucher_no || e.chq_no || "", inv: e.inv_no || "", amount: e.amount });
+  const jama = entries.filter((e) => e.type === "jama").sort(sortByDate).map(row);
+  const kharch = entries.filter((e) => e.type === "kharch").sort(sortByDate).map(row);
   const left = [], right = [];
   if (acct.opening >= 0) left.push({ text: "OPENING BALANCE B/F", amount: acct.opening, bold: true });
   else right.push({ text: "OPENING BALANCE B/F (Cr)", amount: -acct.opening, bold: true });
@@ -28,12 +27,13 @@ function buildSides(acct, entries) {
 
 const Side = ({ rows, title, testId }) => (
   <div className="db-side" data-testid={testId}>
-    <div className="dos-stmt-row dos-head db-row"><span className="dt">Date</span><span className="pt">{title}</span><span className="rf">V.No</span><span className="am">Amount</span></div>
+    <div className="dos-stmt-row dos-head db-row"><span className="dt">Date</span><span className="pt">{title}</span><span className="rf">V.No</span><span className="iv">INV No</span><span className="am">Amount</span></div>
     {rows.map((r, i) => (
       <div className={`dos-stmt-row db-row ${r.bold ? "db-bold" : ""} ${r.closing ? "db-closing" : ""}`} key={i}>
         <span className="dt">{r.date ? fmtDate(r.date) : ""}</span>
         <span className="pt" title={r.sub || r.text}>{r.text}{r.sub ? ` · ${r.sub}` : ""}</span>
         <span className="rf">{r.ref || ""}</span>
+        <span className="iv">{r.inv || ""}</span>
         <span className="am">{inr(r.amount)}</span>
       </div>
     ))}
@@ -72,8 +72,8 @@ export const DayBookSheet = ({ firmName, dateFrom, dateTo, accounts, entries }) 
               <Side rows={sides.right} title="Kharch (Payments)" testId={`daybook-kharch-${a.id}`} />
             </div>
             <div className="db-t dos-total">
-              <div className="db-side"><div className="dos-stmt-row db-row"><span className="dt"></span><span className="pt">TOTAL ({sides.left.length} lines · Jama {inr(sides.jamaTotal)})</span><span className="rf"></span><span className="am" data-testid={`daybook-total-left-${a.id}`}>{inr(sides.total)}</span></div></div>
-              <div className="db-side"><div className="dos-stmt-row db-row"><span className="dt"></span><span className="pt">TOTAL ({sides.right.length} lines · Kharch {inr(sides.kharchTotal)})</span><span className="rf"></span><span className="am" data-testid={`daybook-total-right-${a.id}`}>{inr(sides.total)}</span></div></div>
+              <div className="db-side"><div className="dos-stmt-row db-row"><span className="dt"></span><span className="pt">TOTAL ({sides.left.length} lines · Jama {inr(sides.jamaTotal)})</span><span className="rf"></span><span className="iv"></span><span className="am" data-testid={`daybook-total-left-${a.id}`}>{inr(sides.total)}</span></div></div>
+              <div className="db-side"><div className="dos-stmt-row db-row"><span className="dt"></span><span className="pt">TOTAL ({sides.right.length} lines · Kharch {inr(sides.kharchTotal)})</span><span className="rf"></span><span className="iv"></span><span className="am" data-testid={`daybook-total-right-${a.id}`}>{inr(sides.total)}</span></div></div>
             </div>
           </div>
         );
@@ -82,10 +82,10 @@ export const DayBookSheet = ({ firmName, dateFrom, dateTo, accounts, entries }) 
       {idle.length > 0 && (
         <div className="db-account" data-testid="daybook-idle">
           <div className="dos-group uppercase">Anya accounts — is period me koi lenden nahi (Opening = Closing)</div>
-          <div className="dos-stmt-row dos-head db-row"><span className="dt">Code</span><span className="pt">Account</span><span className="rf"></span><span className="am">Balance</span></div>
+          <div className="dos-stmt-row dos-head db-row"><span className="dt">Code</span><span className="pt">Account</span><span className="rf"></span><span className="iv"></span><span className="am">Balance</span></div>
           {idle.map((a) => (
             <div className="dos-stmt-row db-row" key={a.id} data-testid={`daybook-idle-${a.id}`}>
-              <span className="dt">{a.code || ""}</span><span className="pt">{a.name}</span><span className="rf"></span>
+              <span className="dt">{a.code || ""}</span><span className="pt">{a.name}</span><span className="rf"></span><span className="iv"></span>
               <span className="am">{inr(Math.abs(a.closing))} {a.closing < 0 ? "Cr" : "Dr"}</span>
             </div>
           ))}

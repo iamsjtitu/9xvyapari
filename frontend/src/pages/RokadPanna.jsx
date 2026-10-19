@@ -307,7 +307,8 @@ export default function RokadPanna() {
         <thead>
           <tr>
             <th style={{ width: 80 }}>Date</th>
-            <th style={{ width: 70 }}>V.No. / INV</th>
+            <th style={{ width: 50 }}>V.No.</th>
+            <th style={{ width: 90 }}>INV No.</th>
             <th>Party / Vivran</th>
             <th className="num" style={{ width: 110 }}>Amount</th>
             <th style={{ width: 96 }} className="print:hidden"></th>
@@ -316,7 +317,7 @@ export default function RokadPanna() {
         <tbody>
           {list.length === 0 ? (
             <tr>
-              <td colSpan={5} className="text-center text-muted2 py-8 text-sm">
+              <td colSpan={6} className="text-center text-muted2 py-8 text-sm">
                 Koi entry nahi.
               </td>
             </tr>
@@ -326,8 +327,8 @@ export default function RokadPanna() {
                 <td className="font-mono-data text-xs">{(e.date || "").slice(0, 10)}</td>
                 <td className="font-mono-data text-xs text-terracotta">
                   {e.voucher_no || "—"}
-                  {e.inv_no && <div className="text-[10px] text-muted2 whitespace-nowrap" title="Invoice No." data-testid={`rokad-inv-${e.id}`}>INV {e.inv_no}</div>}
                 </td>
+                <td className="font-mono-data text-xs text-jama whitespace-nowrap" title="Invoice No." data-testid={`rokad-inv-${e.id}`}>{e.inv_no || ""}</td>
                 <td>
                   <div className="font-medium flex items-center gap-1.5">
                     {e.contra_id && (

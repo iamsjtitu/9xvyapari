@@ -4,7 +4,6 @@ import { BRAND, appVersionLabel } from "@/lib/brand";
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
 const drcr = (n) => `${inr(Math.abs(n))} ${n < 0 ? "Cr" : n > 0 ? "Dr" : "  "}`;
 const refOf = (r) => r.vno || r.voucher_no || r.ref_no || r.bill_no || "";
-const particulars = (r) => `${r.label || ""}${r.inv ? ` · INV ${r.inv}` : ""}`;
 
 // DOS-style printable ledger statement: opening → entries → totals → closing, one page
 export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFrom, asOn, settledUpto }) => {
@@ -27,12 +26,12 @@ export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFr
         {settledUpto && <div className="dos-settled-tag" data-testid="stmt-settled-upto">✔ ACCOUNT CLEARED UPTO {fmtDate(settledUpto)}</div>}
       </div>
       <div className="dos-stmt-row dos-head mt-2">
-        <span className="dt">Date</span><span className="pt">Particulars</span><span className="rf">Vch/Ref</span>
+        <span className="dt">Date</span><span className="pt">Particulars</span><span className="rf">V.No</span><span className="iv">INV No</span>
         <span className="am">Debit</span><span className="am">Credit</span><span className="bl">Balance</span>
       </div>
       <div className="dos-stmt-row dos-open" data-testid="stmt-opening-row">
         <span className="dt">{dateFrom ? fmtDate(dateFrom) : ""}</span>
-        <span className="pt">OPENING BALANCE{dateFrom ? ` (B/F)` : ""}</span><span className="rf"></span>
+        <span className="pt">OPENING BALANCE{dateFrom ? ` (B/F)` : ""}</span><span className="rf"></span><span className="iv"></span>
         <span className="am"></span><span className="am"></span><span className="bl">{drcr(opening)}</span>
       </div>
       {rows.length === 0 ? (
@@ -41,8 +40,8 @@ export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFr
         <div key={`${r.kind}-${r.id}-${i}`}>
           <div className="dos-stmt-row">
             <span className="dt">{fmtDate((r.date || "").slice(0, 10))}</span>
-            <span className="pt" title={particulars(r)}>{particulars(r)}</span>
-            <span className="rf">{refOf(r)}</span>
+            <span className="pt" title={r.label}>{r.label}</span>
+            <span className="rf">{refOf(r)}</span><span className="iv">{r.inv || ""}</span>
             <span className="am">{r.debit ? inr(r.debit) : ""}</span>
             <span className="am">{r.credit ? inr(r.credit) : ""}</span>
             <span className="bl">{drcr(r.balance)}</span>
@@ -51,17 +50,17 @@ export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFr
             <div className="dos-stmt-row dos-settled" data-testid="stmt-settled-row">
               <span className="dt"></span>
               <span className="pt">*** ACCOUNT CLEARED UPTO {fmtDate((r.date || "").slice(0, 10))} — {Math.abs(r.balance) < 0.005 ? "LEDGER 0" : `SETTLEMENT PURANA · BAKI ${drcr(r.balance)}`} ***</span>
-              <span className="rf"></span><span className="am"></span><span className="am"></span><span className="bl">{drcr(r.balance)}</span>
+              <span className="rf"></span><span className="iv"></span><span className="am"></span><span className="am"></span><span className="bl">{drcr(r.balance)}</span>
             </div>
           )}
         </div>
       ))}
       <div className="dos-stmt-row dos-total" data-testid="stmt-total-row">
-        <span className="dt"></span><span className="pt">TOTAL ({rows.length} entries)</span><span className="rf"></span>
+        <span className="dt"></span><span className="pt">TOTAL ({rows.length} entries)</span><span className="rf"></span><span className="iv"></span>
         <span className="am">{inr(totalDr)}</span><span className="am">{inr(totalCr)}</span><span className="bl"></span>
       </div>
       <div className="dos-stmt-row dos-close" data-testid="stmt-closing-row">
-        <span className="dt">{fmtDate(asOn)}</span><span className="pt">CLOSING BALANCE AS ON {fmtDate(asOn)}</span><span className="rf"></span>
+        <span className="dt">{fmtDate(asOn)}</span><span className="pt">CLOSING BALANCE AS ON {fmtDate(asOn)}</span><span className="rf"></span><span className="iv"></span>
         <span className="am"></span><span className="am"></span><span className="bl">{drcr(closing)}</span>
       </div>
       <div className="flex justify-between mt-3 text-[10px] uppercase">
