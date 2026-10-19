@@ -25,6 +25,7 @@ export default function JournalEntry() {
   const [form, setForm] = useState(blank());
   const [dateFrom, setDateFrom] = useState(todayISO()); // default: aaj ki entries (Rokad jaisa)
   const [dateTo, setDateTo] = useState(todayISO());
+  const [accountFilter, setAccountFilter] = useState(""); // only vouchers touching this ledger
 
   const closeForm = () => { setOpen(false); setEditId(null); setForm(blank(dateTo)); };
   const openNew = () => { setEditId(null); setForm(blank(dateTo)); setOpen(true); };
@@ -43,8 +44,9 @@ export default function JournalEntry() {
   };
 
   const load = async () => setEntries((await api.get("/journal", { params: {
-    ...(dateFrom ? { date_from: dateFrom } : {}), ...(dateTo ? { date_to: dateTo } : {}) } })).data);
-  useEffect(() => { load(); }, [dateFrom, dateTo]); // eslint-disable-line react-hooks/exhaustive-deps
+    ...(dateFrom ? { date_from: dateFrom } : {}), ...(dateTo ? { date_to: dateTo } : {}),
+    ...(accountFilter ? { account_id: accountFilter } : {}) } })).data);
+  useEffect(() => { load(); }, [dateFrom, dateTo, accountFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     Promise.all([api.get("/accounts"), api.get("/parties")]).then(([a, p]) => {
       setAccounts(a.data); setParties(p.data);
@@ -56,6 +58,7 @@ export default function JournalEntry() {
     ...accounts.map((a) => ({ id: a.id, name: a.name, group: a.group_name || "" })),
     ...parties.map((p) => ({ id: p.id, name: p.name, group: "Party / " + p.type })),
   ], [accounts, parties]);
+  const filterName = accountFilter ? (allOptions.find((o) => o.id === accountFilter)?.name || "") : "";
 
   const totals = useMemo(() => {
     let d = 0, c = 0;
@@ -120,7 +123,7 @@ export default function JournalEntry() {
           <div className="text-muted2 text-sm mt-1">Double-entry: Debit = Credit. Bina cash ke adjustments / transfers.</div>
         </div>
         <div className="flex items-end gap-2">
-          <ExportBar filename={`journal-entries_${dateFrom || "all"}_${dateTo || "all"}`} title={`Journal Voucher Register · ${rangeLabel}`} sheets={[{
+          <ExportBar filename={`journal-entries_${dateFrom || "all"}_${dateTo || "all"}`} title={`Journal Voucher Register · ${rangeLabel}${filterName ? ` · ${filterName}` : ""}`} sheets={[{
             name: "Journal Register",
             columns: [
               { key: "voucher_no", label: "V.No.", width: 10 },
@@ -152,11 +155,24 @@ export default function JournalEntry() {
         <button className="btn-outline" onClick={monthRange} title="Is mahine ki entries" data-testid="journal-quick-month">Is Mahina</button>
         <button className={!dateFrom && !dateTo ? "btn-primary" : "btn-outline"}
           onClick={() => { setDateFrom(""); setDateTo(""); }} title="Sabhi entries (koi date filter nahi)" data-testid="journal-quick-all">Sab</button>
-        <div className="text-xs text-muted2 ml-auto font-mono-data" data-testid="journal-range-label">{rangeLabel} · {entries.length} voucher</div>
+        <div>
+          <label className="lbl">Account / Party</label>
+          <select className="input-dense" style={{ minWidth: 220, maxWidth: 320 }} value={accountFilter}
+            onChange={(e) => setAccountFilter(e.target.value)} data-testid="select-journal-account">
+            <option value="">— Sabhi accounts —</option>
+            {allOptions.map((o) => <option key={o.id} value={o.id}>{o.name} ({o.group})</option>)}
+          </select>
+        </div>
+        {accountFilter && (
+          <button className="btn-ghost text-xs" onClick={() => setAccountFilter("")} title="Account filter hatao" data-testid="journal-account-clear">✕ Account</button>
+        )}
+        <div className="text-xs text-muted2 ml-auto font-mono-data" data-testid="journal-range-label">
+          {rangeLabel}{filterName ? ` · ${filterName}` : ""} · {entries.length} voucher
+        </div>
       </div>
 
       <FoxProPrintHeader title="JOURNAL VOUCHER REGISTER"
-        subtitle={`${rangeLabel} · Total ${entries.length} vouchers`} />
+        subtitle={`${rangeLabel}${filterName ? ` · ${filterName}` : ""} · Total ${entries.length} vouchers`} />
 
       <div className="card-flat overflow-hidden">
         <table className="dense w-full" data-testid="table-journal">
@@ -173,7 +189,7 @@ export default function JournalEntry() {
           <tbody>
             {entries.length === 0 ? (
               <tr><td colSpan={6} className="py-10 text-center text-muted2" data-testid="journal-empty">
-                {rangeLabel} me koi journal entry nahi. <button className="underline hover:text-terracotta" onClick={() => { setDateFrom(""); setDateTo(""); }}>Sabhi dikhayein</button>
+                {rangeLabel}{filterName ? ` · ${filterName}` : ""} me koi journal entry nahi. <button className="underline hover:text-terracotta" onClick={() => { setDateFrom(""); setDateTo(""); }}>Sabhi dikhayein</button>
               </td></tr>
             ) : entries.map((j) => (
               <tr key={j.id} data-testid={`journal-row-${j.id}`}>

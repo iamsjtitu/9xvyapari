@@ -127,6 +127,11 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 ### Jun 2026 – Journal date filter
 - JournalEntry page: From/To date filter bar (default aaj, Rokad jaisa) + Today / Is Mahina / Sab chips, range label with count, empty-state link "Sabhi dikhayein"; `/journal?date_from&date_to` already supported. New journal default date = selected To date; print header + Excel filename/title carry the range.
 
+### Jun 2026 – Journal account filter · Excel group subtotals · Data-folder "✕ forget path"
+- `/journal?account_id=` (matches `lines.account_id`); Journal page: "Account / Party" select (accounts + parties) + ✕ clear, label/print/Excel carry the account name.
+- `exportToExcel` sheet option `groupBy: "group"`: group column hidden, per group → merged bold header row "GROUP (n)", rows, bold `Sub-total · GROUP` with `SUBTOTAL(9,…)` formulas, then `GRAND TOTAL` (SUBTOTAL ignores nested subtotals → no double count). Used by Outstanding + Trial Balance (TB's manual total rows removed).
+- Electron chooser: each "Pichle Folders" row has ✕ → confirm → `chooser:forget` IPC → `forgetRecent()` in config.js removes the path from the list only (folder/data untouched; if it was current, falls back to next recent/default). Unit-checked with mocked electron app.
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅

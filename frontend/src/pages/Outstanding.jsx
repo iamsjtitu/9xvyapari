@@ -87,6 +87,7 @@ export default function Outstanding() {
                 { key: "cr", label: "Cr (Dena)", width: 16, num: true },
               ],
               rows: flatRows,
+              groupBy: "group",
             }]} />
           )}
         </div>

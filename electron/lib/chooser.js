@@ -1,7 +1,7 @@
 const { BrowserWindow, dialog, ipcMain } = require("electron");
 const path = require("path");
 const log = require("electron-log");
-const { saveAppConfig, ensureWritableDir } = require("./config");
+const { saveAppConfig, forgetRecent, ensureWritableDir } = require("./config");
 
 // Shows the "Data Folder chunein" window; resolves with chosen folder, or null if closed
 function chooseDataRoot(appCfg, icon) {
@@ -25,6 +25,7 @@ function chooseDataRoot(appCfg, icon) {
       ipcMain.removeHandler("chooser:state");
       ipcMain.removeHandler("chooser:browse");
       ipcMain.removeHandler("chooser:start");
+      ipcMain.removeHandler("chooser:forget");
       if (!win.isDestroyed()) win.destroy();
       resolve(value);
     };
@@ -41,6 +42,15 @@ function chooseDataRoot(appCfg, icon) {
       if (canceled || !filePaths[0]) return null;
       current = filePaths[0];
       return current;
+    });
+
+    ipcMain.handle("chooser:forget", (_e, folder) => {
+      const next = forgetRecent(folder, appCfg);
+      appCfg.recent = next.recent;
+      appCfg.dataRoot = next.dataRoot;
+      if (current === folder) current = next.dataRoot;
+      log.info(`Recent folder removed from list (data untouched) → ${folder}`);
+      return { current, recent: appCfg.recent, portable: appCfg.portable };
     });
 
     ipcMain.handle("chooser:start", (_e, chosen) => {

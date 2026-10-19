@@ -40,6 +40,16 @@ function saveAppConfig(dataRoot, prev) {
   return { dataRoot, recent, portable: !!portableDir() };
 }
 
+// Remove a path from the "Pichle Folders" list only — the folder and its data stay untouched
+function forgetRecent(folder, prev) {
+  const recent = (prev?.recent || []).filter((r) => r !== folder);
+  const dataRoot = prev?.dataRoot === folder ? (recent[0] || defaultDataRoot()) : (prev?.dataRoot || defaultDataRoot());
+  const file = configFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify({ dataRoot, recent }, null, 2));
+  return { dataRoot, recent, portable: !!portableDir() };
+}
+
 function ensureWritableDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
   const probe = path.join(dir, ".write-test");
@@ -47,4 +57,4 @@ function ensureWritableDir(dir) {
   fs.unlinkSync(probe);
 }
 
-module.exports = { portableDir, defaultDataRoot, loadAppConfig, saveAppConfig, ensureWritableDir };
+module.exports = { portableDir, defaultDataRoot, loadAppConfig, saveAppConfig, forgetRecent, ensureWritableDir };

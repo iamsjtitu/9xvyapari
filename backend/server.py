@@ -1094,7 +1094,7 @@ async def _compute_account_balance(aid: str, opening: float, as_on: Optional[str
 # ---------- JOURNAL ENTRIES ----------
 @api.get("/journal")
 async def list_journal(date_from: Optional[str] = None, date_to: Optional[str] = None,
-                       current=Depends(get_current_user)):
+                       account_id: Optional[str] = None, current=Depends(get_current_user)):
     q = {}
     if date_from or date_to:
         q["date"] = {}
@@ -1102,6 +1102,8 @@ async def list_journal(date_from: Optional[str] = None, date_to: Optional[str] =
             q["date"]["$gte"] = date_from
         if date_to:
             q["date"]["$lte"] = date_to
+    if account_id:
+        q["lines.account_id"] = account_id  # only vouchers touching this ledger
     entries = await db.journal.find(q, {"_id": 0}).sort("date", -1).to_list(5000)
     return entries
 

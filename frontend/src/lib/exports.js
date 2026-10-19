@@ -55,17 +55,22 @@ function columnKind(col, values) {
   return "text";
 }
 
+// groupBy given as a column key (string) → that column is hidden and shown as group headers instead
+const groupKeyOf = (sh) => (typeof sh.groupBy === "string" && sh.hideGroupColumn !== false ? sh.groupBy : null);
+
 function buildSheet(wb, sh, firm, meta) {
   const ws = wb.addWorksheet(sh.name.slice(0, 31).replace(/[\\/?*[\]:]/g, "-"), {
     views: [{ state: "frozen", ySplit: 5, showGridLines: false }],
-    pageSetup: { orientation: sh.columns.length > 6 ? "landscape" : "portrait", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+    pageSetup: { orientation: (sh.columns.length - (groupKeyOf(sh) ? 1 : 0)) > 6 ? "landscape" : "portrait", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
       margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 }, printTitlesRow: "5:5" },
     properties: { tabColor: { argb: X.terracotta } },
   });
-  const nCols = sh.columns.length;
+  // grouped sheets drop the group column — the group header row carries the name (DOS print style)
+  const columns = groupKeyOf(sh) ? sh.columns.filter((c) => c.key !== sh.groupBy) : sh.columns;
+  const nCols = columns.length;
   const last = ws.getColumn(nCols).letter;
-  const matrix = sh.rows.map((r) => sh.columns.map((c) => cellValue(c, r)));
-  const kinds = sh.columns.map((c, i) => columnKind(c, matrix.map((row) => row[i])));
+  const matrix = sh.rows.map((r) => columns.map((c) => cellValue(c, r)));
+  const kinds = columns.map((c, i) => columnKind(c, matrix.map((row) => row[i])));
 
   // Rows 1-4: firm band
   ws.mergeCells(`A1:${last}1`);
@@ -96,7 +101,7 @@ function buildSheet(wb, sh, firm, meta) {
 
   // Row 5: header
   const header = ws.getRow(5);
-  sh.columns.forEach((c, i) => {
+  columns.forEach((c, i) => {
     const cell = header.getCell(i + 1);
     cell.value = c.label;
     cell.font = { name: "Calibri", size: 11, bold: true, color: { argb: X.white } };
@@ -106,9 +111,15 @@ function buildSheet(wb, sh, firm, meta) {
   });
   header.height = 24;
 
-  // Data rows
-  matrix.forEach((vals, r) => {
-    const row = ws.getRow(6 + r);
+  // Data rows (optionally grouped: group header → rows → bold sub-total, like the DOS print)
+  const sumCols = columns.map((c, i) => c.sum === true || (c.sum !== false && (kinds[i] === "money" || kinds[i] === "int")
+    && (SUM_LABEL.test(c.label) || c.num) && !NO_SUM_LABEL.test(c.label)));
+  const groupOf = sh.groupBy ? (typeof sh.groupBy === "function" ? sh.groupBy : (r) => r[sh.groupBy]) : null;
+  const firstData = 6;
+  let cursor = 6;
+
+  const writeDataRow = (vals, zebra) => {
+    const row = ws.getRow(cursor++);
     vals.forEach((v, i) => {
       const cell = row.getCell(i + 1);
       const kind = kinds[i];
@@ -127,35 +138,65 @@ function buildSheet(wb, sh, firm, meta) {
       }
       if (!cell.font) cell.font = { name: "Calibri", size: 10.5, color: { argb: X.ink } };
       cell.border = BORDER;
-      if (r % 2 === 1) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: X.bone } };
+      if (zebra) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: X.bone } };
     });
     row.height = 18;
-  });
+  };
 
-  // Totals row (SUM formulas on amount-like columns)
-  const sumCols = sh.columns.map((c, i) => c.sum === true || (c.sum !== false && (kinds[i] === "money" || kinds[i] === "int")
-    && (SUM_LABEL.test(c.label) || c.num) && !NO_SUM_LABEL.test(c.label)));
-  const firstData = 6, lastData = 5 + matrix.length;
-  if (matrix.length && sumCols.some(Boolean)) {
-    const tr = ws.getRow(lastData + 1);
+  const writeGroupHeader = (name, count) => {
+    const row = ws.getRow(cursor++);
+    ws.mergeCells(`A${row.number}:${last}${row.number}`);
+    const cell = row.getCell(1);
+    cell.value = `${String(name || "—").toUpperCase()}   (${count})`;
+    cell.font = { name: "Calibri", size: 10.5, bold: true, color: { argb: X.terracotta } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: X.band } };
+    cell.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+    cell.border = { ...BORDER, top: { style: "thin", color: { argb: X.terracotta } } };
+    row.height = 20;
+  };
+
+  // SUBTOTAL(9, …) ignores other SUBTOTAL cells → group sub-totals and the grand total never double count
+  const writeTotalRow = (label, from, to, grand) => {
+    const row = ws.getRow(cursor++);
     const labelAt = sumCols.findIndex(Boolean);
-    sh.columns.forEach((c, i) => {
-      const cell = tr.getCell(i + 1);
+    columns.forEach((c, i) => {
+      const cell = row.getCell(i + 1);
       const L = ws.getColumn(i + 1).letter;
       if (sumCols[i]) {
-        cell.value = { formula: `SUM(${L}${firstData}:${L}${lastData})` };
+        cell.value = { formula: `SUBTOTAL(9,${L}${from}:${L}${to})` };
         cell.numFmt = kinds[i] === "int" ? INT : INR;
         cell.alignment = { horizontal: "right", vertical: "middle" };
-      } else if (i === Math.max(0, labelAt - 1) || (labelAt === 0 && i === 0)) {
-        cell.value = i === 0 && labelAt === 0 ? undefined : "TOTAL";
-        cell.alignment = { horizontal: "right", vertical: "middle" };
+      } else if (i === 0 && labelAt !== 0) {
+        cell.value = label;
+        cell.alignment = { horizontal: "left", vertical: "middle", indent: grand ? 0 : 1 };
       }
-      cell.font = { name: "Calibri", size: 11, bold: true, color: { argb: X.ink } };
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: X.parchment } };
-      cell.border = { ...BORDER, top: { style: "medium", color: { argb: X.ink } }, bottom: { style: "double", color: { argb: X.ink } } };
+      cell.font = { name: "Calibri", size: grand ? 11 : 10.5, bold: true, color: { argb: X.ink } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: grand ? X.parchment : X.band } };
+      cell.border = grand
+        ? { ...BORDER, top: { style: "medium", color: { argb: X.ink } }, bottom: { style: "double", color: { argb: X.ink } } }
+        : { ...BORDER, top: { style: "thin", color: { argb: X.ink } } };
     });
-    tr.height = 22;
+    row.height = grand ? 22 : 19;
+  };
+
+  const hasSums = matrix.length > 0 && sumCols.some(Boolean);
+  if (groupOf) {
+    let i = 0;
+    while (i < matrix.length) {
+      const g = groupOf(sh.rows[i]);
+      let j = i;
+      while (j < matrix.length && groupOf(sh.rows[j]) === g) j++;
+      writeGroupHeader(g, j - i);
+      const from = cursor;
+      for (let k = i; k < j; k++) writeDataRow(matrix[k], (k - i) % 2 === 1);
+      if (hasSums) writeTotalRow(`Sub-total · ${g || "—"}`, from, cursor - 1, false);
+      i = j;
+    }
+  } else {
+    matrix.forEach((vals, r) => writeDataRow(vals, r % 2 === 1));
   }
+  const lastData = cursor - 1;
+  if (hasSums) writeTotalRow(groupOf ? "GRAND TOTAL" : "TOTAL", firstData, lastData, true);
 
   // Footer note
   const fr = ws.getRow(lastData + 3);
@@ -164,7 +205,7 @@ function buildSheet(wb, sh, firm, meta) {
   fr.getCell(1).font = { name: "Calibri", size: 9, italic: true, color: { argb: X.muted } };
 
   // Widths: definition or sniffed from content
-  sh.columns.forEach((c, i) => {
+  columns.forEach((c, i) => {
     const longest = Math.max(String(c.label).length, ...matrix.map((row) => String(row[i] ?? "").length));
     ws.getColumn(i + 1).width = c.width || Math.min(48, Math.max(8, longest + 2));
   });
