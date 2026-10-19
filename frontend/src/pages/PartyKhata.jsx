@@ -15,6 +15,7 @@ export default function PartyKhata() {
   const [groups, setGroups] = useState([]);
   const [q, setQ] = useState("");
   const [filterGroup, setFilterGroup] = useState("");
+  const [settledFilter, setSettledFilter] = useState("all"); // all | only | hide
   const [editing, setEditing] = useState(null);
 
   const load = async () => {
@@ -52,8 +53,10 @@ export default function PartyKhata() {
       (p.phone || "").includes(q) ||
       (p.place || "").toLowerCase().includes(q.toLowerCase());
     const matchG = !filterGroup || p.group_id === filterGroup;
-    return matchQ && matchG;
+    const matchS = settledFilter === "all" || (settledFilter === "only" ? !!p.settled : !p.settled);
+    return matchQ && matchG && matchS;
   });
+  const settledCount = parties.filter((p) => p.settled).length;
 
   // Keyboard shortcuts
   useKeyboardShortcuts([
@@ -98,8 +101,9 @@ export default function PartyKhata() {
               { key: "gstin", label: "GSTIN", width: 18 },
               { key: "opening_balance", label: "Opening Bal", width: 14, num: true },
               { key: "balance", label: "Current Bal", width: 14, num: true },
+              { key: "settled_text", label: "Settled", width: 18 },
             ],
-            rows: filtered,
+            rows: filtered.map((p) => ({ ...p, settled_text: p.settled ? `Cleared upto ${(p.settled_upto || "").split("-").reverse().join("-")}` : "" })),
           }]} />
           <button className="btn-primary" onClick={startNew} data-testid="btn-add-party">
             <Plus size={16} weight="bold" /> Naya Khata
@@ -108,7 +112,7 @@ export default function PartyKhata() {
       </div>
 
       <FoxProPrintHeader title="MASTER LEDGER / KHATA BAHI"
-        subtitle={`Total ${filtered.length} ledgers · ${groups.length} groups`} />
+        subtitle={`Total ${filtered.length} ledgers · ${groups.length} groups${settledFilter === "only" ? " · SETTLED ONLY" : settledFilter === "hide" ? " · settled hidden" : ""}`} />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="card-flat p-4">
@@ -146,6 +150,12 @@ export default function PartyKhata() {
               <option key={g.id} value={g.id}>{g.fcode}–{g.lcode} · {g.name}</option>
             ))}
           </select>
+          <select className="input-dense !w-auto" value={settledFilter} onChange={(e) => setSettledFilter(e.target.value)}
+            title="Account Settled (Account Clear) se clear hue khate" data-testid="select-party-settled">
+            <option value="all">Sabhi khate ({parties.length})</option>
+            <option value="only">Sirf Settled ({settledCount})</option>
+            <option value="hide">Settled chhupao ({parties.length - settledCount})</option>
+          </select>
         </div>
 
         <table className="dense w-full" data-testid="table-parties">
@@ -174,6 +184,12 @@ export default function PartyKhata() {
                   <Link to={`/parties/${p.id}`} className="font-medium text-ink hover:text-terracotta">
                     {p.name}
                   </Link>
+                  {p.settled && (
+                    <span className="kbd !text-[9px] !px-1 !py-0 ml-2 !text-white !bg-jama !border-jama font-semibold align-middle"
+                      title={`Account cleared upto ${(p.settled_upto || "").split("-").reverse().join("-")}`} data-testid={`party-settled-badge-${p.id}`}>
+                      SETTLED {(p.settled_upto || "").split("-").reverse().join("-")}
+                    </span>
+                  )}
                   {p.alt_name && <div className="text-xs text-muted2">{p.alt_name}</div>}
                 </td>
                 <td className="text-xs text-muted2">{p.group_name || "—"}</td>
@@ -187,7 +203,7 @@ export default function PartyKhata() {
                 >
                   ₹ {inr(Math.abs(p.balance || 0))}
                   <div className="text-[10px] uppercase tracking-wider text-muted2">
-                    {p.balance > 0 ? "Udhaar" : p.balance < 0 ? "Hum Owe" : "—"}
+                    {p.balance > 0 ? "Udhaar" : p.balance < 0 ? "Hum Owe" : p.settled ? "Settled" : "—"}
                   </div>
                 </td>
                 <td>

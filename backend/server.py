@@ -393,10 +393,21 @@ async def me(current=Depends(get_current_user)):
 @api.get("/parties")
 async def list_parties(current=Depends(get_current_user)):
     parties = await db.parties.find({}, {"_id": 0}).sort("name", 1).to_list(2000)
+    # latest Account Settled date per party (settlement journals: party line + Account Clear line)
+    st = await db.settings.find_one({"id": "default"}, {"_id": 0, "settle_account_id": 1}) or {}
+    sid = st.get("settle_account_id")
+    settled_upto: dict = {}
+    async for j in db.journal.find({"settles_rokad_id": {"$exists": True}}, {"_id": 0, "date": 1, "lines.account_id": 1}):
+        for ln in j.get("lines", []):
+            aid = ln.get("account_id")
+            if aid and aid != sid:
+                settled_upto[aid] = max(settled_upto.get(aid, ""), (j.get("date") or "")[:10])
     # compute live balance
     for p in parties:
         bal = await _compute_party_balance(p["id"], p.get("opening_balance", 0.0))
         p["balance"] = bal
+        p["settled_upto"] = settled_upto.get(p["id"])
+        p["settled"] = bool(p["settled_upto"]) and abs(bal) < 0.005   # cleared via Account Settled and still at 0
     return parties
 
 @api.post("/parties")
@@ -1939,6 +1950,7 @@ async def trial_balance(current=Depends(get_current_user)):
         gid = p.get("group_id")
         g = groups_by_id.get(gid) if gid else None
         ledgers.append({
+            "id": p["id"],
             "code": p.get("code") or 0,
             "name": p.get("name", ""),
             "group_id": gid,
@@ -1953,6 +1965,7 @@ async def trial_balance(current=Depends(get_current_user)):
         bal = await _compute_account_balance(a["id"], a.get("opening_balance", 0.0))
         g = groups_by_id.get(a.get("group_id"))
         ledgers.append({
+            "id": a["id"],
             "code": a.get("code") or 0,
             "name": a.get("name", ""),
             "group_id": a.get("group_id"),
@@ -1992,7 +2005,9 @@ async def trial_balance(current=Depends(get_current_user)):
 
     grand_dr = sum(s["dr_total"] for s in sections)
     grand_cr = sum(s["cr_total"] for s in sections)
-    return {"sections": sections, "grand_dr": round(grand_dr, 2), "grand_cr": round(grand_cr, 2)}
+    st = await db.settings.find_one({"id": "default"}, {"_id": 0, "settle_account_id": 1}) or {}
+    return {"sections": sections, "grand_dr": round(grand_dr, 2), "grand_cr": round(grand_cr, 2),
+            "settle_account_id": st.get("settle_account_id")}
 
 
 # ---------- NEXT FREE CODE in a group ----------

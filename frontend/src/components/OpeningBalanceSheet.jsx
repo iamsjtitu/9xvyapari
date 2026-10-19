@@ -1,4 +1,5 @@
 import { inr } from "@/lib/api";
+import { clearRowLabel } from "@/lib/accountClear";
 
 const amt = (v) => (v > 0.004 ? inr(v) : "");
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
@@ -19,7 +20,7 @@ const ClearBreakdown = ({ rows }) => (
     {rows.map((b) => (
       <div className="dos-line dos-sub" key={b.party_id || b.party_name} data-testid={`ob-clear-sub-${b.party_id}`}>
         <span className="c"></span>
-        <span className="n" title={b.party_name}>↳ {b.party_name}{b.last_date ? ` · cleared upto ${fmtDate(b.last_date)}` : ""}{b.count > 1 ? ` (${b.count})` : ""}</span>
+        <span className="n" title={b.party_name}>{clearRowLabel(b)}</span>
         <span className="d">{amt(b.net)}</span>
         <span className="k">{amt(-b.net)}</span>
       </div>

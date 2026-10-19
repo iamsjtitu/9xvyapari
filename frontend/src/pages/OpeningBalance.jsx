@@ -3,6 +3,7 @@ import { useSearchParams, Link, useOutletContext } from "react-router-dom";
 import api, { formatApiErrorDetail, todayISO } from "@/lib/api";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { OpeningBalanceSheet } from "@/components/OpeningBalanceSheet";
+import { fetchClearBreakdown, clearRowLabel } from "@/lib/accountClear";
 import { BookOpen, CalendarCheck } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
@@ -36,24 +37,9 @@ export default function OpeningBalance() {
     let alive = true;
     setBreakdown(null);
     if (!data?.settle_account_id || !data?.as_on) return undefined;
-    api.get("/reports/account-clear", { params: { date_to: data.as_on } }).then((r) => {
-      if (!alive) return;
-      const by = new Map();
-      for (const row of r.data.rows || []) {
-        const key = row.party_id || row.party_name;
-        const cur = by.get(key) || { party_id: row.party_id || key, party_name: row.party_name, net: 0, last_date: "", count: 0 };
-        cur.net += row.side === "off" ? row.amount : -row.amount;
-        cur.count += 1;
-        if (row.date > cur.last_date) cur.last_date = row.date;
-        by.set(key, cur);
-      }
-      const rows = [...by.values()].filter((b) => Math.abs(b.net) >= 0.005).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
-      // Head minus the journal-based sub-rows (opening balance / direct rokad on the ledger) → one "Opening / other" line
-      const head = data.sections.flatMap((sec) => sec.rows).find((r) => r.id === data.settle_account_id);
-      const other = head ? head.balance - rows.reduce((t, b) => t + b.net, 0) : 0;
-      if (Math.abs(other) >= 0.005) rows.push({ party_id: "other", party_name: "Opening / other postings", net: other, last_date: "", count: 1 });
-      setBreakdown({ ledgerId: data.settle_account_id, rows });
-    }).catch(() => {});
+    const head = data.sections.flatMap((sec) => sec.rows).find((r) => r.id === data.settle_account_id);
+    fetchClearBreakdown(data.settle_account_id, head ? head.balance : undefined, data.as_on)
+      .then((b) => { if (alive) setBreakdown(b); }).catch(() => {});
     return () => { alive = false; };
   }, [data]);
 
@@ -78,7 +64,7 @@ export default function OpeningBalance() {
       ...sec.rows.flatMap((r) => [
         { group: sec.group_name, code: r.code || "", name: r.name, debit: r.balance > 0 ? r.balance : 0, credit: r.balance < 0 ? -r.balance : 0 },
         ...(showClear && breakdown && r.id === breakdown.ledgerId
-          ? breakdown.rows.map((b) => ({ group: sec.group_name, code: "", name: `   ↳ ${b.party_name}${b.last_date ? ` · cleared upto ${fmtDate(b.last_date)}` : ""}`,
+          ? breakdown.rows.map((b) => ({ group: sec.group_name, code: "", name: `   ${clearRowLabel(b)}`,
               debit: b.net > 0 ? b.net : 0, credit: b.net < 0 ? -b.net : 0 }))
           : []),
       ]),
