@@ -40,7 +40,8 @@ export const AccountClearSheet = ({ data }) => {
         <span>E.&amp;O.E.</span>
         <span>Printed {new Date().toLocaleString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })} · {BRAND.app} {appVersionLabel()}</span>
       </div>
-      <style>{`.ac-row .nr { flex: 1.4; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #333; }`}</style>
+      <style>{`.ac-row .nr { flex: 1.4; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #333; }
+@media print { .ac-row .nr { white-space: normal; overflow: visible; text-overflow: clip; } }`}</style>
     </div>
   );
 };

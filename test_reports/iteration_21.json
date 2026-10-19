@@ -1,0 +1,32 @@
+{
+  "summary": "Tested 3 new features on top of Account Settled: (1) Settled Marker in ledger + print statement, (2) Account Clear Report (/account-clear), (3) Reopen settled rokad from Rokad list, Ledger marker row and Account Clear report. Backend: 6/6 new pytest tests pass (test_settle_v21.py) + 12/12 regression (v19/v20). Frontend: all requested flows verified via Playwright on the public preview URL — badge/marker/statement tag+row, nav (Alt+W), summary cards, table rows, party link, reopen buttons only on auto rows, DOS sheet, Excel download (account-clear-start-2026-06-30.xlsx), date filtering → ac-empty, 'Aaj' quick button, cancel on confirm does nothing in all 3 places, accept → correct toast and UI refresh (closing ₹60.00 Dr), re-settle via edit (settle-checkbox) works, non-settled party shows no badge/markers. No bugs found; only minor polish notes.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/reports/account-clear", "issue": "For a manual multi-line journal, party_id is only others[0] while party_name joins all other ledgers — the party link then points only to the first ledger. Edge case only."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PartyLedger marker Reopen", "issues": ["PartyLedger.jsx line ~247 calls reopenSettled(r.settles_rokad_id) without partyName, so the confirm text there is missing '<PARTY> ka' prefix (Rokad and Account Clear pages pass it). Cosmetic."]},
+      {"screen": "AccountClearSheet (print register)", "issues": ["Narration column uses text-overflow: ellipsis/nowrap, so long narrations are cut off ('… → ACC…') in the printed register. Consider wrapping in print."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_settle_v21.py", "/app/test_reports/pytest/pytest_v21.xml"],
+  "action_items": [
+    "Optional: pass party name to reopenSettled in PartyLedger.jsx for consistent confirm text",
+    "Optional: allow narration wrap in AccountClearSheet for print"
+  ],
+  "critical_code_review_comments": [
+    "Reopen guard `not settle and not settle_journal_id` is fine; an entry ticked settle with 0 leftover can be reopened (removed_amount 0) — acceptable.",
+    "server.py is ~3000 lines (>700) — consider splitting rokad/settlement/report routes into modules."
+  ],
+  "updated_files": ["/app/backend/tests/test_settle_v21.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Created QA rokad (2026-06-20, 940 jama, SETTLE TEST PARTY), manual journal, and QA_V21_CR_* party during tests — all cleaned up. SETTLE TEST PARTY balance back to 1000 Dr, Account Clear report count 0, ACCOUNT CLEAR ledger kept.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_settle_v21.py creates its own settled rokad via module fixture and cleans up. Note journal id changes each time the settlement is re-created (edit/re-settle), so fetch ac-row-* dynamically in UI tests. Preview URL worked fine for both API and UI this iteration. Playwright dialog handling: page.once('dialog', lambda d: asyncio.ensure_future(d.accept())) with `import asyncio`."
+}

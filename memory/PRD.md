@@ -156,6 +156,12 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - Accounts (Khate) page: row / name / book icon → `/parties/<id>` Account Ledger with running balance; account ledgers colour Dr balance ink (red only when overdrawn); ledger rows show DD-MM-YYYY.
 - Verified: iteration 19 + 20 (backend 12/12 pytest, frontend 100%).
 
+### Jun 2026 – Settled marker · Account Clear register · Reopen
+- Ledger API (`/summary/party/{id}`) returns `settled_upto` + journal rows carry `settles_rokad_id`/`auto`. UI: green `SettledBadge` under the party header, `SettledMarkerRow` ("Account cleared upto dd-mm-yyyy · ledger 0" + Reopen) after each settlement line, DOS statement gets `stmt-settled-upto` tag + `*** ACCOUNT CLEARED UPTO … ***` rows (`components/SettledMarker.jsx`, `PartyStatement.jsx`).
+- `GET /reports/account-clear?date_from&date_to` → every journal touching the Account Clear ledger (auto + manual): side `off` (Dr = party ka baki chhoda) / `back` (Cr), totals, rokad V.No. Page `/account-clear` (nav "Account Clear", Alt+W): date range, cards, table with party links + Reopen on auto rows, DOS register print (`AccountClearSheet.jsx`), Excel.
+- `POST /rokad/{id}/reopen` deletes the settlement journal and un-flags the rokad (400 if not settled). Reopen buttons in Rokad list (`rokad-reopen-<id>`), ledger marker (`ledger-reopen-<id>`), report (`ac-reopen-<jid>`) via shared `reopenSettled()` confirm helper. Re-settle = edit entry and tick again.
+- Verified: iteration 21 (backend 6/6 new + 12/12 regression, frontend 100%).
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅

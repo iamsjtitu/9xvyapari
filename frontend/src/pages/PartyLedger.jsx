@@ -244,7 +244,7 @@ export default function PartyLedger() {
                 </tr>
                 {r.settles_rokad_id && (
                   <SettledMarkerRow colSpan={5} date={(r.date || "").slice(0, 10)} rokadId={r.settles_rokad_id}
-                    onReopen={async () => { if (await reopenSettled(r.settles_rokad_id)) setAttempt((a) => a + 1); }} />
+                    onReopen={async () => { if (await reopenSettled(r.settles_rokad_id, party.name)) setAttempt((a) => a + 1); }} />
                 )}
                 </Fragment>
               ))
