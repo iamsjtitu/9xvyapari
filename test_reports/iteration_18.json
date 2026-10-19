@@ -1,0 +1,39 @@
+{
+  "summary": "Tested both bug fixes plus regressions. (1) Creating a party from inside the Rokad form WORKS: in Nayi Rokad Entry I typed a new name, the '+ Add \"X\" as new party' footer appeared, and both clicking it and pressing Enter created the party. The toast 'Party \"X\" ban gayi aur select ho gayi' showed, amount/description/voucher/date stayed as typed, and the hint showed ₹ 0.00 (settled). Save Entry worked, the entry shows in the list with the party name, and GET /api/rokad confirms party_id is set. Searching 'SHANTI' shows 2 parties and Up/Down + Enter picks one (hint showed ₹ 10.00 Cr). Searching CASH IN / SBIC / HDFC shows no cash/bank ledgers. (2) Fix for modals closing after drag-select WORKS on Accounts edit, Account Groups edit and Transfer: drag-releasing over the backdrop keeps the modal open, and a plain backdrop click still closes it. BUT the 'Nayi Rokad Entry' modal itself (and Journal, Naya Bill, Party Khata, Galla Master) still use a plain onClick, so they still close on drag-release. Reproduced on the Rokad form: the form closed and the typed data was lost. Regressions all pass: Mode defaults to Cash for CASH IN HAND, voucher no auto-fills, choosing an HDFC account switches Mode to Bank and keeps the account, Enter moves to the next field, Esc closes the form, Esc on the list goes to Dashboard, VoucherSearch '1' finds 2 entries and 'Kholein' opens 'Rokad Entry Edit'. Backend: 3/4 pytest pass.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/parties", "issue": "Accepts an empty name {name:''} and returns 200 with a blank party. Frontend createParty blocks it, but the backend should return 422."},
+      {"endpoint": "POST /api/parties", "issue": "No duplicate check, even ignoring case: {name:'cash in hand'} was created next to the existing 'CASH IN HAND' ledger. Because partyOptions hides cash/bank ledgers, typing 'CASH IN HAND' in the Party field offers '+ Add \"CASH IN HAND\" as new party', so a duplicate ledger gets created. Consider a case-insensitive uniqueness check (409) or a warning in the UI."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RokadPanna 'Nayi Rokad Entry' modal (RokadPanna.jsx ~line 594)", "issue": "The overlay still uses onClick={closeForm}, not backdropClose(). If you drag-select text in a form input (e.g. Vivran) and release over the dark backdrop, the form closes and all typed data is lost. Reproduced with Playwright mouse.down/move/up. This is the same bug the user reported, still present on the main data-entry form.", "selector": "[data-testid='modal-add-rokad']", "priority": "HIGH"},
+      {"component": "Other modals not converted", "issue": "Same plain onClick backdrop pattern in: JournalEntry.jsx ~223, NayaBill.jsx ~489 (modal-bill), PartyKhata.jsx ~287 (modal-party), GallaMaster.jsx ~130 (modal-item), RestorePasswordDialog, LogoutConfirm, ShortcutHelp. Found by code review; only the Rokad modal was reproduced at runtime.", "selector": "[data-testid='modal-bill'], [data-testid='modal-party'], [data-testid='modal-item']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PartyAutocomplete", "issues": ["Minor: ArrowDown starts from index 0 and moves to 1, so the first ArrowDown skips the first suggestion. Enter without arrows picks the first item, which is fine.", "Minor: if you type a partial name that matches existing parties (e.g. 'SHANTI'), Enter picks the first match rather than creating 'SHANTI'. Creating it needs a click on the footer. This is acceptable, but worth noting."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_party_inline_v18.py", "/app/test_reports/pytest/pytest_v18.xml"],
+  "action_items": [
+    "HIGH: Apply backdropClose(closeForm) to the Nayi Rokad Entry overlay in RokadPanna.jsx (data-testid modal-add-rokad). It is still on plain onClick, so drag-select still closes the form and loses data.",
+    "Apply backdropClose to JournalEntry, NayaBill, PartyKhata, GallaMaster (and the small dialogs) overlays too.",
+    "Backend: reject an empty or whitespace party name with 422 in POST /api/parties.",
+    "Consider a case-insensitive duplicate check on party create, or exclude names that match existing cash/bank ledgers from the '+ Add' footer."
+  ],
+  "critical_code_review_comments": [
+    "RokadPanna.jsx is 775 lines (over 700); consider splitting the entry form into components/rokad/RokadEntryForm.jsx.",
+    "partyOptions uses the regex /cash|bank/i on group_name, so any party group whose name contains 'bank' or 'cash' (e.g. 'BANK LOAN PARTY') is also hidden. Matching the exact group name/nature would be safer.",
+    "Accounts/AccountGroups edit buttons had no data-testid; added btn-edit-account-{id} and btn-edit-group-{id}."
+  ],
+  "updated_files": ["/app/frontend/src/pages/Accounts.jsx (added data-testid btn-edit-account-{id})", "/app/frontend/src/pages/AccountGroups.jsx (added data-testid btn-edit-group-{id})", "/app/backend/tests/test_party_inline_v18.py (new)"],
+  "success_rate": {"backend": "75% (3/4; failure is minor empty-name validation)", "frontend": "~92% (party inline-create and 3/3 requested drag modals pass; the Rokad entry modal itself still has the drag-close bug)"},
+  "seed_data_creation": "Created TEST_E2E_PARTY_*, TEST_E2E_ENTER_*, TEST_API_PARTY_*, an empty-name party, a 'cash in hand' duplicate party and 1 rokad entry (777). All deleted. Party count is back to 527 and today's rokad is empty.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login is admin/Vyapari@2026; the login page has input[type=text] and input[type=password]. The Party field is an input with data-testid select-party; the footer is select-party-create, the list is select-party-list and the clear button is select-party-clear. The Rokad modal is modal-add-rokad. Don't drag-release at the bottom-right corner (1880,1050): the keyboard-shortcut FAB sits there. Use (1700,700). The Transfer button is btn-transfer and the modal is transfer-modal. The server date is 2026-10-19.",
+  "rca of the issue": "Drag-close bug: when mousedown happens on an input inside the modal and mouseup on the backdrop, the browser fires the 'click' on their nearest common ancestor, which is the backdrop. So e.target === backdrop, and stopPropagation on the inner form does not help. backdropClose() fixes this by also requiring mousedown on the backdrop, but it was not applied to the RokadPanna entry modal and several others."
+}

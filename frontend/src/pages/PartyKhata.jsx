@@ -7,6 +7,7 @@ import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useTableNav } from "@/hooks/useTableNav";
 import { LedgerInUseDialog, inUseInfo } from "@/components/LedgerInUseDialog";
+import { backdropClose } from "@/lib/backdrop";
 
 const EMPTY = {
   code: "",
@@ -285,7 +286,7 @@ export default function PartyKhata() {
       {editing !== null && (
         <div
           className="fixed inset-0 bg-black/40 grid place-items-start z-50 p-4 overflow-y-auto"
-          onClick={() => setEditing(null)}
+          {...backdropClose(() => setEditing(null))}
           data-testid="modal-party"
         >
           <form

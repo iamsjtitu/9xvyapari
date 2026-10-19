@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import api, { inr, formatApiErrorDetail } from "@/lib/api";
-import { Plus, PencilSimple, Trash, X, MagnifyingGlass } from "@phosphor-icons/react";
+import { Plus, PencilSimple, Trash, X, MagnifyingGlass, BookOpen } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -10,6 +11,7 @@ import { backdropClose } from "@/lib/backdrop";
 const EMPTY = { name: "", group_id: "", opening_balance: 0, phone: "", address: "", notes: "" };
 
 export default function Accounts() {
+  const navigate = useNavigate();
   const [accounts, setAccounts] = useState([]);
   const [groups, setGroups] = useState([]);
   const [q, setQ] = useState("");
@@ -121,17 +123,23 @@ export default function Accounts() {
             {filtered.length === 0 ? (
               <tr><td colSpan={6} className="text-center text-muted2 py-10">Koi account nahi.</td></tr>
             ) : filtered.map((a) => (
-              <tr key={a.id} data-testid={`account-row-${a.id}`}>
-                <td className="font-medium">{a.name}</td>
+              <tr key={a.id} data-testid={`account-row-${a.id}`} className="cursor-pointer hover:bg-parchment/70"
+                onClick={() => navigate(`/parties/${a.id}`)} title="Ledger dekhein (running balance ke saath)">
+                <td className="font-medium">
+                  <Link to={`/parties/${a.id}`} className="hover:underline text-ink" onClick={(e) => e.stopPropagation()} data-testid={`account-ledger-link-${a.id}`}>{a.name}</Link>
+                </td>
                 <td className="text-muted2">{a.group_name || "—"}</td>
                 <td className="font-mono-data text-muted2">{a.phone || "—"}</td>
                 <td className="num text-muted2">₹ {inr(a.opening_balance)}</td>
                 <td className="num font-medium" style={{ color: a.balance < 0 ? "#B71C1C" : "#1A1A1A" }}>
                   ₹ {inr(a.balance)}
                 </td>
-                <td>
+                <td onClick={(e) => e.stopPropagation()}>
                   <div className="flex gap-1">
-                    <button className="btn-ghost p-1.5" onClick={() => { setEditing(a); setForm({
+                    <button className="btn-ghost p-1.5" title="Ledger" data-testid={`btn-ledger-account-${a.id}`} onClick={() => navigate(`/parties/${a.id}`)}>
+                      <BookOpen size={14} />
+                    </button>
+                    <button className="btn-ghost p-1.5" data-testid={`btn-edit-account-${a.id}`} onClick={() => { setEditing(a); setForm({
                       name: a.name, group_id: a.group_id, opening_balance: a.opening_balance,
                       phone: a.phone || "", address: a.address || "", notes: a.notes || "",
                     }); }}>

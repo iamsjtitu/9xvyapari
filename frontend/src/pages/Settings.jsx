@@ -6,6 +6,7 @@ import { ChangePasswordCard } from "@/components/ChangePasswordCard";
 import { SoftwareUpdateCard } from "@/components/SoftwareUpdateCard";
 import { BackupPasswordCard } from "@/components/BackupPasswordCard";
 import { SoundSettingsCard } from "@/components/SoundSettingsCard";
+import { SettleAccountPicker } from "@/components/rokad/SettleToggle";
 import { LoadState } from "@/components/LoadState";
 
 export default function Settings() {
@@ -99,6 +100,11 @@ export default function Settings() {
 
       <ChangePasswordCard />
       <BackupPasswordCard />
+      <div className="card-flat p-6" data-testid="settle-account-card">
+        <h3 className="font-heading font-semibold text-base mb-1">Account Clear ledger (Account Settled)</h3>
+        <p className="text-xs text-muted2 mb-3">Rokad entry me "Account Settled" tick karne par party ka baki is ledger me jata hai aur party ka ledger us date tak 0 ho jata hai (narration auto: "Account cleared upto ...").</p>
+        <SettleAccountPicker settings={form} onSaved={(d) => setForm((f) => ({ ...f, settle_account_id: d.settle_account_id, settle_account_name: d.settle_account_name }))} />
+      </div>
       <SoundSettingsCard />
       <SoftwareUpdateCard />
     </div>

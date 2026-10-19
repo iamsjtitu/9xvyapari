@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="4" time="4.188" timestamp="2026-10-19T06:24:19.722240+00:00" hostname="agent-env-625b8215-bc03-4e12-88b4-9eed2c3dad5c"><testcase classname="test_party_inline_v18" name="test_party_and_rokad_crud" time="3.431" /><testcase classname="test_party_inline_v18" name="test_party_create_empty_name" time="0.130"><failure message="AssertionError: empty name accepted: 200&#10;assert 200 in (400, 422)&#10; +  where 200 = &lt;Response [200]&gt;.status_code">test_party_inline_v18.py:60: in test_party_create_empty_name
+    assert r.status_code in (400, 422), f"empty name accepted: {r.status_code}"
+E   AssertionError: empty name accepted: 200
+E   assert 200 in (400, 422)
+E    +  where 200 = &lt;Response [200]&gt;.status_code</failure></testcase><testcase classname="test_party_inline_v18" name="test_rokad_by_voucher" time="0.073" /><testcase classname="test_party_inline_v18" name="test_journal_filter_by_account" time="0.130" /></testsuite></testsuites>

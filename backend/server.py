@@ -237,6 +237,7 @@ class RokadIn(BaseModel):
     counter_account_name: Optional[str] = ""
     voucher_no: Optional[str] = ""        # per-cash-account voucher number
     chq_no: Optional[str] = ""             # cheque number
+    settle: bool = False                   # Account Settled: post the leftover to the "Account Clear" ledger → party = 0 as on date
 
 class RokadOut(RokadIn):
     id: str
@@ -294,6 +295,8 @@ class SettingsIn(BaseModel):
     fy_start: str = ""   # ISO date
     fy_end: str = ""     # ISO date
     current_date: str = ""
+    settle_account_id: Optional[str] = None     # "Account Clear" ledger used by Account Settled
+    settle_account_name: Optional[str] = ""
 
 
 # --- App / Router ---
@@ -399,6 +402,12 @@ async def list_parties(current=Depends(get_current_user)):
 @api.post("/parties")
 async def create_party(body: PartyIn, current=Depends(get_current_user)):
     doc = body.model_dump()
+    doc["name"] = (doc.get("name") or "").strip()
+    if not doc["name"]:
+        raise HTTPException(422, "Party ka naam zaroori hai")
+    dup = await db.parties.find_one({"name": {"$regex": f"^{re.escape(doc['name'])}$", "$options": "i"}}, {"_id": 0, "id": 1, "name": 1})
+    if dup:
+        raise HTTPException(409, f"Party \"{dup['name']}\" pehle se hai")
     doc["id"] = str(uuid.uuid4())
     doc["created_at"] = now_iso()
     await db.parties.insert_one(doc.copy())
@@ -718,11 +727,63 @@ async def create_rokad(body: RokadIn, current=Depends(get_current_user)):
             doc["cash_account_name"] = doc.get("cash_account_name") or cash["name"]
     if not (doc.get("voucher_no") or "").strip() and doc.get("cash_account_id"):
         doc["voucher_no"] = await _next_voucher(doc["cash_account_id"])  # auto V.No. per cash a/c
+    if doc.get("settle"):
+        await _settle_account()  # fail early with a clear message if not configured
     doc["id"] = str(uuid.uuid4())
     doc["created_at"] = now_iso()
     await db.rokad.insert_one(doc.copy())
     doc.pop("_id", None)
+    doc["settlement"] = await _apply_settlement(doc)
     return doc
+
+
+# ---- Account Settled: leftover balance → "Account Clear" ledger so the party stands at 0 as on the entry date ----
+async def _settle_account() -> dict:
+    s = await db.settings.find_one({"id": "default"}, {"_id": 0, "settle_account_id": 1, "settle_account_name": 1}) or {}
+    sid = s.get("settle_account_id")
+    if not sid:
+        raise HTTPException(400, "Pehle 'Account Clear' ledger link karein (Settings ya entry form me) — tabhi Account Settled chalega")
+    led = await db.parties.find_one({"id": sid}, {"_id": 0, "id": 1, "name": 1}) or await db.accounts.find_one({"id": sid}, {"_id": 0, "id": 1, "name": 1})
+    if not led:
+        raise HTTPException(400, "Link kiya hua 'Account Clear' ledger nahi mila — Settings me dobara chunein")
+    return led
+
+
+async def _apply_settlement(rok: dict) -> Optional[dict]:
+    """(Re)build the settlement journal for a rokad entry. Returns the journal summary or None."""
+    rid = rok["id"]
+    await db.journal.delete_many({"settles_rokad_id": rid})  # recompute from scratch (edit / un-tick)
+    if not rok.get("settle") or not rok.get("party_id"):
+        await db.rokad.update_one({"id": rid}, {"$unset": {"settle_journal_id": "", "settled_amount": ""}})
+        return None
+    party = await db.parties.find_one({"id": rok["party_id"]}, {"_id": 0, "id": 1, "name": 1, "opening_balance": 1})
+    if not party:
+        raise HTTPException(400, "Account Settled sirf party ledger ke saath ho sakta hai")
+    led = await _settle_account()
+    if led["id"] == party["id"]:
+        raise HTTPException(400, "Party aur 'Account Clear' ledger ek hi nahi ho sakte")
+    rem = round(await _compute_party_balance(party["id"], float(party.get("opening_balance") or 0), rok["date"]), 2)
+    if abs(rem) < 0.005:
+        await db.rokad.update_one({"id": rid}, {"$set": {"settled_amount": 0}, "$unset": {"settle_journal_id": ""}})
+        return {"amount": 0, "note": "Ledger pehle se 0 hai — koi adjustment nahi"}
+    amt = abs(rem)
+    # rem > 0 → party still owes: Dr Account Clear / Cr Party. rem < 0 → we owe party: Dr Party / Cr Account Clear
+    lines = ([{"account_id": led["id"], "account_name": led["name"], "debit": amt, "credit": 0.0},
+              {"account_id": party["id"], "account_name": party["name"], "debit": 0.0, "credit": amt}]
+             if rem > 0 else
+             [{"account_id": party["id"], "account_name": party["name"], "debit": amt, "credit": 0.0},
+              {"account_id": led["id"], "account_name": led["name"], "debit": 0.0, "credit": amt}])
+    d = rok["date"][:10].split("-")
+    narr = f"Account cleared upto {d[2]}-{d[1]}-{d[0]} · {party['name']} · baki ₹{amt:,.2f} {'Dr' if rem > 0 else 'Cr'} → {led['name']}"
+    j = {"id": str(uuid.uuid4()), "date": rok["date"], "narration": narr, "lines": lines, "total": amt,
+         "ref": f"Rokad V.{rok.get('voucher_no') or ''}".strip(), "settles_rokad_id": rid,
+         "voucher_no": f"J{(await db.journal.count_documents({}) + 1):05d}", "created_at": now_iso(), "auto": "settle"}
+    await db.journal.insert_one(j.copy())
+    j.pop("_id", None)
+    await db.rokad.update_one({"id": rid}, {"$set": {"settle_journal_id": j["id"], "settled_amount": amt if rem > 0 else -amt}})
+    return {"journal_id": j["id"], "voucher_no": j["voucher_no"], "amount": amt, "side": "Dr" if rem > 0 else "Cr",
+            "ledger": led["name"], "narration": narr}
+
 
 @api.put("/rokad/{rid}")
 async def update_rokad(rid: str, body: RokadIn, current=Depends(get_current_user)):
@@ -739,12 +800,15 @@ async def update_rokad(rid: str, body: RokadIn, current=Depends(get_current_user
             doc["cash_account_name"] = doc.get("cash_account_name") or cash["name"]
     doc["updated_at"] = now_iso()
     await db.rokad.update_one({"id": rid}, {"$set": doc})
-    return {**existing, **doc}
+    merged = {**existing, **doc}
+    merged["settlement"] = await _apply_settlement(merged)
+    return merged
 
 
 @api.delete("/rokad/{rid}")
 async def delete_rokad(rid: str, current=Depends(get_current_user)):
     existing = await db.rokad.find_one({"id": rid}, {"_id": 0, "contra_id": 1})
+    await db.journal.delete_many({"settles_rokad_id": rid})  # its Account Settled adjustment goes with it
     if existing and existing.get("contra_id"):
         await db.rokad.delete_many({"contra_id": existing["contra_id"]})  # both legs go together
     else:
@@ -1145,6 +1209,7 @@ async def update_journal(jid: str, body: JournalIn, current=Depends(get_current_
 @api.delete("/journal/{jid}")
 async def delete_journal(jid: str, current=Depends(get_current_user)):
     await db.journal.delete_one({"id": jid})
+    await db.rokad.update_one({"settle_journal_id": jid}, {"$set": {"settle": False}, "$unset": {"settle_journal_id": "", "settled_amount": ""}})
     return {"ok": True}
 
 

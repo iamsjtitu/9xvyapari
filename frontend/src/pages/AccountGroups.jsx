@@ -126,7 +126,7 @@ export default function AccountGroups() {
                     <td className="font-mono-data text-xs text-muted2">{g.ecode || "—"}</td>
                     <td>
                       <div className="flex gap-1">
-                        <button className="btn-ghost p-1.5" onClick={() => { setEditing(g); setForm({
+                        <button className="btn-ghost p-1.5" data-testid={`btn-edit-group-${g.id}`} onClick={() => { setEditing(g); setForm({
                           name: g.name, nature: g.nature, fcode: g.fcode || "", lcode: g.lcode || "", ecode: g.ecode || "",
                         }); }}>
                           <PencilSimple size={14} />

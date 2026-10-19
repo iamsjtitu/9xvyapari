@@ -8,6 +8,7 @@ import PartyAutocomplete from "@/components/PartyAutocomplete";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useTableNav } from "@/hooks/useTableNav";
+import { backdropClose } from "@/lib/backdrop";
 
 const blankLine = () => ({
   item_id: "", item_name: "",
@@ -487,7 +488,7 @@ export default function NayaBill() {
 
       {open && (
         <div className="fixed inset-0 bg-black/40 grid place-items-start z-50 p-4 overflow-y-auto"
-             onClick={closeForm} data-testid="modal-bill">
+             {...backdropClose(closeForm)} data-testid="modal-bill">
           <div onClick={(e) => e.stopPropagation()} className="card-flat w-full max-w-7xl my-4 p-5">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">

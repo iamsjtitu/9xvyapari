@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useTableNav } from "@/hooks/useTableNav";
+import { backdropClose } from "@/lib/backdrop";
 
 const EMPTY = { name: "", unit: "Quintal", rate: 0, hsn: "" };
 
@@ -128,7 +129,7 @@ export default function GallaMaster() {
       {editing && (
         <div
           className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4"
-          onClick={() => setEditing(null)}
+          {...backdropClose(() => setEditing(null))}
           data-testid="modal-item"
         >
           <form

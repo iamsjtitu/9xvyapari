@@ -11,7 +11,9 @@ import { VoucherSearch } from "@/components/rokad/VoucherSearch";
 import { RenumberVouchersDialog } from "@/components/rokad/RenumberVouchersDialog";
 import { VoucherSlip } from "@/components/rokad/VoucherSlip";
 import PartyAutocomplete from "@/components/PartyAutocomplete";
+import { SettleToggle } from "@/components/rokad/SettleToggle";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
+import { backdropClose } from "@/lib/backdrop";
 
 // Mode follows the ACCOUNT name only (group "CASH & BANK BALANCE" must not force "Bank" on CASH IN HAND)
 const modeForAccount = (a) =>
@@ -45,6 +47,7 @@ export default function RokadPanna() {
     cash_account_name: "",
     voucher_no: "",
     chq_no: "",
+    settle: false,
   };
   const [form, setForm] = useState(emptyForm);
 
@@ -176,7 +179,7 @@ export default function RokadPanna() {
       date: (e.date || "").slice(0, 10), type: e.type, amount: String(e.amount ?? ""),
       party_id: e.party_id || "", party_name: e.party_name || "", description: e.description || "",
       mode: e.mode || "Cash", cash_account_id: e.cash_account_id || "", cash_account_name: e.cash_account_name || "",
-      voucher_no: e.voucher_no || "", chq_no: e.chq_no || "",
+      voucher_no: e.voucher_no || "", chq_no: e.chq_no || "", settle: !!e.settle,
     });
     setShowAdd(true);
   };
@@ -189,12 +192,12 @@ export default function RokadPanna() {
         toast.error("Amount daalein");
         return;
       }
-      if (editId) {
-        await api.put(`/rokad/${editId}`, payload);
-        toast.success("Entry update ho gayi");
-      } else {
-        await api.post("/rokad", payload);
-        toast.success("Entry add ki gayi");
+      const { data } = editId ? await api.put(`/rokad/${editId}`, payload) : await api.post("/rokad", payload);
+      toast.success(editId ? "Entry update ho gayi" : "Entry add ki gayi");
+      if (data?.settlement?.journal_id) {
+        toast.success(`Account Settled: ₹${inr(data.settlement.amount)} ${data.settlement.side} → ${data.settlement.ledger} · ledger 0 · Journal ${data.settlement.voucher_no}`, { duration: 7000 });
+      } else if (payload.settle && data?.settlement?.note) {
+        toast.info(data.settlement.note);
       }
       closeForm();
       load();
@@ -259,6 +262,11 @@ export default function RokadPanna() {
                     {e.contra_id && (
                       <span className="kbd !text-[9px] !px-1 !py-0 text-jama border-jama/40" title="Cash/Bank transfer (contra)" data-testid={`rokad-contra-badge-${e.id}`}>
                         <ArrowsLeftRight size={9} weight="bold" className="inline mr-0.5" />TRANSFER
+                      </span>
+                    )}
+                    {e.settle_journal_id && (
+                      <span className="kbd !text-[9px] !px-1 !py-0 text-jama border-jama/40" title={`Account Settled · ₹${inr(Math.abs(e.settled_amount || 0))} Account Clear me`} data-testid={`rokad-settled-badge-${e.id}`}>
+                        SETTLED
                       </span>
                     )}
                     <span>{e.party_name || "—"}</span>
@@ -593,7 +601,7 @@ export default function RokadPanna() {
       {showAdd && (
         <div
           className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4"
-          onClick={closeForm}
+          {...backdropClose(closeForm)}
           data-testid="modal-add-rokad"
         >
           <form
@@ -744,6 +752,8 @@ export default function RokadPanna() {
                   testId="select-party"
                 />
                 <LedgerBalanceHint ledgerId={form.party_id} className="mt-1" testId="rokad-party-balance" />
+                <SettleToggle form={form} onChange={(v) => setForm((f) => ({ ...f, settle: v }))}
+                  editEntry={editId ? entries.find((x) => x.id === editId) : null} />
               </div>
 
               <div>

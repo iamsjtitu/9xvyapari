@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
+import { backdropClose } from "@/lib/backdrop";
 
 const blank = (date = todayISO()) => ({
   date,
@@ -221,7 +222,7 @@ export default function JournalEntry() {
 
       {open && (
         <div className="fixed inset-0 bg-black/40 grid place-items-start z-50 p-4 overflow-y-auto"
-             onClick={closeForm}>
+             {...backdropClose(closeForm)}>
           <div onClick={(e) => e.stopPropagation()} className="card-flat w-full max-w-3xl my-6 p-6">
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2">
