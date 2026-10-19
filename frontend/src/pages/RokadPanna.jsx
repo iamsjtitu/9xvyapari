@@ -246,8 +246,15 @@ export default function RokadPanna() {
         toast.error("Amount daalein");
         return;
       }
-      if (invDups.length && !window.confirm(`Invoice No. "${form.inv_no.trim()}" is party ke liye pehle hi ${invDups.length} entry me hai:\n${invDups.slice(0, 3).map(describeDup).join("\n")}\n\nDouble payment ho sakta hai. Phir bhi save karein?`)) {
-        return;
+      payload.inv_no = (payload.inv_no || "").trim();
+      if (payload.party_id && payload.inv_no) {
+        // fresh check at save time (debounced hint may lag a fast typist / paste)
+        const { data } = await api.get("/rokad/invoice-check", { params: { party_id: payload.party_id, inv_no: payload.inv_no, ...(editId ? { exclude_id: editId } : {}) } });
+        const dups = data.duplicates || [];
+        setInvDups(dups);
+        if (dups.length && !window.confirm(`Invoice No. "${payload.inv_no}" is party ke liye pehle hi ${dups.length} entry me hai:\n${dups.slice(0, 3).map(describeDup).join("\n")}\n\nDouble payment ho sakta hai. Phir bhi save karein?`)) {
+          return;
+        }
       }
       const { data } = editId ? await api.put(`/rokad/${editId}`, payload) : await api.post("/rokad", payload);
       toast.success(editId ? "Entry update ho gayi" : "Entry add ki gayi");

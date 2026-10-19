@@ -16,7 +16,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depend
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, field_validator
 
 import backup_crypto as bkc
 from security import LoginThrottle, client_ip, cookie_policy, csrf_block_reason
@@ -239,6 +239,11 @@ class RokadIn(BaseModel):
     voucher_no: Optional[str] = ""        # per-cash-account voucher number
     inv_no: Optional[str] = ""            # party's invoice / bill number (free text, shown next to V.No.)
     chq_no: Optional[str] = ""             # cheque number
+
+    @field_validator("inv_no", mode="before")
+    @classmethod
+    def _trim_inv(cls, v):
+        return v.strip() if isinstance(v, str) else v
     settle: bool = False                   # Account Settled: post the leftover to the "Account Clear" ledger → party = 0 as on date
     settle_account_id: Optional[str] = None  # which linked Account Clear ledger (None → default from Settings)
 

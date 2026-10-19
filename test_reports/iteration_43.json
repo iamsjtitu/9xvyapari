@@ -1,0 +1,31 @@
+{
+  "summary": "Invoice Duplicate Alert tested. Backend GET /api/rokad/invoice-check: 6/6 pytest pass (same party case/space-insensitive, exclude_id, other party -> [], blank inv -> [], partial and regex '.*' don't match, auth required). UI (Playwright, 1920x1080): entry #1 INV-501/500 saved with no warning; typing 'inv-501' shows inv-dup-warning ('19-10-2026 · ₹500.00 Kharch · V.1 (CASH IN HAND)') plus a red border (rgb 183,28,28); clearing the field or typing INV-502 hides it; Save with a duplicate opens a confirm (mentions Invoice No. and 'Phir bhi save karein?'); Cancel = no POST and the form keeps inv/amount; OK = saved and modal closed; Ctrl+S Cancel/OK works the same way; a 3rd entry lists 2 duplicates; editing #1 excludes itself and lists #2 and #3; changing it to INV-999 clears the warning and saves (PUT, no confirm); party QA DUP 43B with INV-501 shows no warning; switching party to A while the form is open shows the warning; Esc closes the form; a fresh form after one with a warning has no stale warning. One bug: the guard can be skipped by a fast save (race with the 300ms debounce).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST/PUT /api/rokad", "issue": "inv_no is not trimmed on save: 'INV-501 ' was stored with a trailing space. The check ignores spaces so the alert still works, but the stored and displayed values are untidy."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RokadPanna submit() / InvoiceDupHint", "issue": "Race condition: the duplicate guard can be skipped. invDups is only set after the 300ms debounce plus the API round-trip. Repro: pick party QA DUP 43 (which already has INV-501), type amount 77, type Invoice No. 'inv-501' and press Ctrl+S right away. Result: no confirm, POST /api/rokad goes through and the duplicate entry is saved (V.4, ₹77). Pasting or fast keyboard entry hits this easily, so it defeats the purpose of the feature. The reverse also happens: invDups can still hold old hits after the user changes to a unique Invoice No., so a confirm can show up when it shouldn't.", "selector": "[data-testid=input-inv-no] + Ctrl+S / [data-testid=btn-save-rokad]", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_inv_dup_v43.py", "/app/test_reports/pytest/pytest_v43.xml"],
+  "action_items": [
+    "HIGH: in submit(), when form.party_id and form.inv_no.trim() are set, await GET /rokad/invoice-check (party_id, inv_no, exclude_id=editId) and decide the confirm from that fresh result, not from the debounced invDups state. A cheaper option: track a 'checking' flag or the last-checked key (party|inv|editId) and re-check whenever it doesn't match the current form.",
+    "Minor: trim inv_no in the backend in create_rokad/update_rokad (or in the frontend payload)."
+  ],
+  "critical_code_review_comments": [
+    "InvoiceDupHint calls onResult([]) right away on clear, but when party_id or inv_no changes to another non-empty value, the parent's invDups keeps the old result until the debounce finishes. This stale state is the cause of the race above.",
+    "Backend regex uses re.escape plus \\s* anchors, so it is safe against regex injection (verified with '.*'). There is no index on party_id+inv_no; fine at the current data size."
+  ],
+  "updated_files": ["/app/backend/tests/test_inv_dup_v43.py"],
+  "success_rate": {"backend": "100%", "frontend": "93% (13/14 checks; the fast-save race failed)"},
+  "seed_data_creation": "Created parties QA DUP 43 and QA DUP 43B, 4 rokad entries for 2026-10-19, and TEST_dupA/B fixtures in pytest. All deleted at the end.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Retest the race: pick a party with an existing Invoice No., type the duplicate and press Ctrl+S within ~100ms. A confirm must still appear (dismiss -> no POST). Also check: change a dup Invoice No. to a unique one and save at once -> no spurious confirm. Use page.on('dialog') with asyncio.ensure_future handler. Party autocomplete: fill [data-testid=select-party] then click [data-testid=select-party-opt-<id>]."
+}
