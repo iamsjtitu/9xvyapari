@@ -815,6 +815,14 @@ async def _apply_settlement(rok: dict) -> Optional[dict]:
             "ledger": led["name"], "narration": narr}
 
 
+@api.get("/rokad/{rid}")
+async def get_rokad(rid: str, current=Depends(get_current_user)):
+    doc = await db.rokad.find_one({"id": rid}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Entry nahi mili")
+    return doc
+
+
 @api.put("/rokad/{rid}")
 async def update_rokad(rid: str, body: RokadIn, current=Depends(get_current_user)):
     existing = await db.rokad.find_one({"id": rid}, {"_id": 0})
@@ -1295,6 +1303,14 @@ async def create_journal(body: JournalIn, current=Depends(get_current_user)):
     doc["created_at"] = now_iso()
     await db.journal.insert_one(doc.copy())
     doc.pop("_id", None)
+    return doc
+
+
+@api.get("/journal/{jid}")
+async def get_journal(jid: str, current=Depends(get_current_user)):
+    doc = await db.journal.find_one({"id": jid}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Journal entry nahi mili")
     return doc
 
 

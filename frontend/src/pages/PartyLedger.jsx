@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { useParams, Link, useSearchParams, useOutletContext } from "react-router-dom";
 import api, { inr, todayISO } from "@/lib/api";
-import { ArrowLeft, Receipt, Notebook, BookOpen, BookOpenText, Wallet, Printer, CheckCircle } from "@phosphor-icons/react";
+import { ArrowLeft, Receipt, Notebook, BookOpen, BookOpenText, Wallet, Printer, CheckCircle, PencilSimple } from "@phosphor-icons/react";
 import { ExportBar } from "@/components/ExportBar";
 import { PartyStatement } from "@/components/PartyStatement";
 import { LoadState } from "@/components/LoadState";
@@ -36,7 +36,7 @@ function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = 
     debit: r.type === "jama" ? r.amount : 0, credit: r.type === "kharch" ? r.amount : 0,
   }));
   journal.forEach((j, i) => rows.push({
-    kind: "journal", id: `${j.id}-${i}`, date: j.date, vno: j.voucher_no || "",
+    kind: "journal", id: `${j.id}-${i}`, refId: j.id, date: j.date, vno: j.voucher_no || "",
     label: `Journal${j.narration ? " · " + j.narration : ""}${j.other ? " | vs " + j.other : ""}`,
     debit: j.debit, credit: j.credit, settles_rokad_id: j.settles_rokad_id || null,
   }));
@@ -82,6 +82,14 @@ export default function PartyLedger() {
   if (!data) return <LoadState error={error} onRetry={() => setAttempt((a) => a + 1)} backTo="/parties" backLabel="Party Khata par wapas" testid="ledger" />;
   const { party, dos_journal = [], journal = [], cash_rokad = [] } = data;
   const isAccount = data.kind === "account";
+  // Edit the voucher behind a ledger line, then come back here (DOS-imported rows are read-only)
+  const back = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
+  const editHref = (r) => {
+    if (r.kind === "rokad" || r.kind === "cash") return `/rokad?edit=${r.id}&return=${back}`;
+    if (r.kind === "journal") return r.settles_rokad_id ? `/rokad?edit=${r.settles_rokad_id}&return=${back}` : `/journal?edit=${r.refId}&return=${back}`;
+    if (r.kind === "bill") return `/bills?edit=${r.ref}&return=${back}`;
+    return null;
+  };
   const opening = data.opening ?? (party.opening_balance || 0);
   const rows = buildRows(data);
   let running = opening;
@@ -198,6 +206,7 @@ export default function PartyLedger() {
               <th className="num" style={{ width: 130 }}>Debit (+)</th>
               <th className="num" style={{ width: 130 }}>Credit (-)</th>
               <th className="num" style={{ width: 130 }}>Balance</th>
+              <th className="print:hidden" style={{ width: 44 }}></th>
             </tr>
           </thead>
           <tbody>
@@ -208,9 +217,10 @@ export default function PartyLedger() {
               <td className="num font-medium whitespace-nowrap" style={{ color: opening >= 0 ? "#1A1A1A" : "#1B5E20" }}>
                 ₹ {inr(Math.abs(opening))} {opening < 0 && <span className="text-[10px] ml-1 text-jama">CR</span>}
               </td>
+              <td className="print:hidden"></td>
             </tr>
             {enriched.length === 0 ? (
-              <tr><td colSpan={5} className="py-10 text-center text-muted2">Is period me koi transaction nahi.</td></tr>
+              <tr><td colSpan={6} className="py-10 text-center text-muted2">Is period me koi transaction nahi.</td></tr>
             ) : (
               enriched.map((r) => (
                 <Fragment key={`${r.kind}-${r.id}`}>
@@ -241,9 +251,17 @@ export default function PartyLedger() {
                   <td className="num font-medium whitespace-nowrap" style={{ color: r.balance >= 0 ? "#1A1A1A" : "#1B5E20" }}>
                     ₹ {inr(Math.abs(r.balance))} {r.balance < 0 && <span className="text-[10px] ml-1 text-jama">CR</span>}
                   </td>
+                  <td className="print:hidden">
+                    {editHref(r) && (
+                      <Link to={editHref(r)} className="btn-ghost p-1.5 inline-flex" title={r.settles_rokad_id ? "Settlement wali Rokad entry edit karein" : "Voucher edit karein"}
+                        data-testid={`ledger-edit-${r.kind}-${r.refId || r.ref || r.id}`}>
+                        <PencilSimple size={14} />
+                      </Link>
+                    )}
+                  </td>
                 </tr>
                 {r.settles_rokad_id && (
-                  <SettledMarkerRow colSpan={5} date={(r.date || "").slice(0, 10)} rokadId={r.settles_rokad_id}
+                  <SettledMarkerRow colSpan={6} date={(r.date || "").slice(0, 10)} rokadId={r.settles_rokad_id}
                     onReopen={async () => { if (await reopenSettled(r.settles_rokad_id, party.name)) setAttempt((a) => a + 1); }} />
                 )}
                 </Fragment>

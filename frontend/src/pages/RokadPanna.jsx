@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, Trash, ArrowDown, ArrowUp, X, PencilSimple, ArrowsLeftRight, Printer, ListNumbers, ArrowCounterClockwise } from "@phosphor-icons/react";
 import { reopenSettled } from "@/components/SettledMarker";
@@ -170,7 +170,26 @@ export default function RokadPanna() {
 
   const modeTouched = useRef(false); // user picked a Mode by hand → account change must not overwrite it
   useEffect(() => { if (!showAdd) modeTouched.current = false; }, [showAdd]);
-  const closeForm = () => { setShowAdd(false); setEditId(null); setForm({ ...emptyForm, date: dateTo }); };
+  const [search, setSearch] = useSearchParams();
+  const navigate = useNavigate();
+  const returnTo = search.get("return");
+  const closeForm = () => {
+    setShowAdd(false); setEditId(null); setForm({ ...emptyForm, date: dateTo });
+    if (returnTo) navigate(returnTo);  // opened from a ledger → go back there
+  };
+
+  // /rokad?edit=<id>[&return=/parties/<pid>] → open that voucher for editing (from Party / Account ledger)
+  useEffect(() => {
+    const id = search.get("edit");
+    if (!id) return;
+    api.get(`/rokad/${id}`).then((r) => {
+      const d = (r.data.date || "").slice(0, 10);
+      if (d) { setDateFrom(d); setDateTo(d); }
+      startEdit(r.data);
+      setSearch((prev) => { const n = new URLSearchParams(prev); n.delete("edit"); return n; }, { replace: true });
+    }).catch(() => toast.error("Rokad entry nahi mili"));
+    // eslint-disable-next-line
+  }, [search]);
 
   const startEdit = (e) => {
     setEditId(e.id);

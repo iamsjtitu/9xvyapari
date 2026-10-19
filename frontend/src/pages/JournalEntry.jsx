@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, Trash, BookOpenText, X, PencilSimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -28,7 +29,23 @@ export default function JournalEntry() {
   const [dateTo, setDateTo] = useState(todayISO());
   const [accountFilter, setAccountFilter] = useState(""); // only vouchers touching this ledger
 
-  const closeForm = () => { setOpen(false); setEditId(null); setForm(blank(dateTo)); };
+  const [search, setSearch] = useSearchParams();
+  const navigate = useNavigate();
+  const returnTo = search.get("return");
+  const closeForm = () => { setOpen(false); setEditId(null); setForm(blank(dateTo)); if (returnTo) navigate(returnTo); };
+
+  // /journal?edit=<id>[&return=...] → open that voucher for editing (from a ledger)
+  useEffect(() => {
+    const id = search.get("edit");
+    if (!id) return;
+    api.get(`/journal/${id}`).then((r) => {
+      const d = (r.data.date || "").slice(0, 10);
+      if (d) { setDateFrom(d); setDateTo(d); }
+      startEdit(r.data);
+      setSearch((prev) => { const n = new URLSearchParams(prev); n.delete("edit"); return n; }, { replace: true });
+    }).catch(() => toast.error("Journal entry nahi mili"));
+    // eslint-disable-next-line
+  }, [search]);
   const openNew = () => { setEditId(null); setForm(blank(dateTo)); setOpen(true); };
   const monthRange = () => { const d = new Date(); const y = d.getFullYear(), m = d.getMonth();
     const last = new Date(y, m + 1, 0).getDate(); const mm = String(m + 1).padStart(2, "0");

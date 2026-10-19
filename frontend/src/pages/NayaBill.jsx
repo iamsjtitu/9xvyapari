@@ -106,6 +106,8 @@ export default function NayaBill() {
     setOpen(false);
     setEditId(null);
     setForm(blank(filter === "purchase" ? "purchase" : "sale"));
+    const back = search.get("return");
+    if (back) navigate(back);  // opened from a ledger → go back there
   };
 
   // /bills?edit=<id> → open that bill in edit mode (used by Bill View page)
