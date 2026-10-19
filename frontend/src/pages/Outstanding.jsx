@@ -29,7 +29,7 @@ export default function Outstanding() {
     api.get("/reports/outstanding", { params: { as_on: asOn, side, sort, min_amount: Number(minAmount) || 0, hide_settled: hideSettled } })
       .then((r) => setData(r.data))
       .catch((err) => toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message));
-  }, [asOn, side, sort, minAmount]);
+  }, [asOn, side, sort, minAmount, hideSettled]);
 
   const quick = [
     { l: "Aaj", d: todayISO(), tid: "os-quick-today" },

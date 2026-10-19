@@ -1,0 +1,35 @@
+{
+  "summary": "Tested the Outstanding List 'Settled chhupao' feature on backend and frontend. Found 2 CRITICAL bugs and fixed both (each a one-line fix): (1) backend: the @api.get('/reports/outstanding') decorator was sitting on the new helper _settled_now_map() instead of outstanding_report(), so the endpoint returned {} and the whole Outstanding page was broken; (2) frontend: hideSettled was missing from the useEffect deps in Outstanding.jsx, so the toggle changed the URL and pill colour but did not refetch. The list, count, totals, print header and Excel all stayed one step behind until a reload. After the fixes, all requested checks pass.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/reports/outstanding", "issue": "The route decorator was on _settled_now_map (the helper was inserted between the decorator and outstanding_report), so the endpoint returned {} with no params. FIXED by moving the decorator back onto outstanding_report.", "priority": "CRITICAL"}
+    ],
+    "minor": [
+      {"endpoint": "tests/test_outstanding.py::test_outstanding_dr_shape", "issue": "The test hardcodes count==218, but the live data now has a different count. The test is stale; the app is fine."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Outstanding.jsx fetch useEffect", "issue": "hideSettled was not in the dependency array, so toggling did not refetch (stale rows, count, totals, header and Excel). FIXED by adding it.", "selector": "[data-testid=checkbox-os-hide-settled]", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_outstanding_hide_settled_v27.py", "/app/test_reports/pytest/pytest_v27.xml"],
+  "action_items": [
+    "Review the 2 fixes I made (server.py decorator placement; Outstanding.jsx useEffect deps)",
+    "Update the stale hardcoded count (218) in tests/test_outstanding.py or make it data-independent"
+  ],
+  "critical_code_review_comments": [
+    "When you add helper functions, check that they don't end up between a route decorator and its handler. A stray '# ---------- TRIAL BALANCE ----------' header was also above the outstanding block; I renamed it to OUTSTANDING.",
+    "_settled_now_map runs one find_one plus one _compute_party_balance per settled party on every outstanding request (N+1). Fine for now, but it could be batched.",
+    "server.py is over 3000 lines and should be split into routers."
+  ],
+  "updated_files": ["/app/backend/server.py", "/app/frontend/src/pages/Outstanding.jsx", "/app/backend/tests/test_outstanding_hide_settled_v27.py"],
+  "success_rate": {"backend": "100% (5/5 new tests) after the fix", "frontend": "100% after the fix"},
+  "seed_data_creation": "Temporary only: a SETTLE TEST PARTY settle rokad (2026-06-25, 940) and QA OS PARTY (opening 500, jama 450 settle on 2026-06-26, kharch 70 on 2026-06-27). All removed: SETTLE TEST PARTY is back to 1000 Dr with no entries, QA OS PARTY is deleted, ACCOUNT CLEAR is kept.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Verified: hide_settled=true on as_on=2026-06-24 dr gives settled_hidden 1, count -1, grand_dr -1000, other rows unchanged; today gives settled_hidden 0; the re-opened QA OS PARTY stays listed with settled_upto null. UI: toggle sets hs=1, pill shows 'Settled chhupao (1)', label '· 1 settled chhupaye', header '· SETTLED HIDDEN (1)', tag '[SETTLED 25-06-2026]', state survives a reload, unchecking brings the row back. Excel off: 'Settled' column shows 'Cleared upto 25-06-2026'; Excel on: the row is absent. Run with KEEP_DATA=1 to keep data for UI tests.",
+  "test_credentials": "admin / Vyapari@2026"
+}

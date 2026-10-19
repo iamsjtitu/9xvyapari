@@ -176,6 +176,11 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - `/parties` returns `settled_upto` (latest settlement journal date) + `settled` (= settled_upto && balance 0). Party Khata: `select-party-settled` (Sabhi / Sirf Settled / Settled chhupao), green `SETTLED dd-mm-yyyy` badge, Excel "Settled" column, print subtitle suffix, filter-aware empty state.
 - Verified: iteration 26 (backend 5/5, frontend 100%).
 
+### Jun 2026 – Outstanding "Settled chhupao"
+- `/reports/outstanding?hide_settled=true` skips parties cleared via Account Settled whose ledger is 0 TODAY (`_settled_now_map`), returns `settled_hidden`; rows carry `settled_upto`. UI pill `toggle-os-hide-settled` (URL `hs=1`), `os-settled-hidden` count, `[SETTLED dd-mm-yyyy]` tag on rows when not hidden, print header suffix, Excel "Settled" column.
+- Lesson: never insert a helper between a route decorator and its function (the decorator landed on the helper → endpoint returned {}); keep URL-param state in fetch effect deps.
+- Verified: iteration 27 (backend 5/5, frontend 100%).
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅

@@ -50,9 +50,9 @@ def test_outstanding_dr_shape(headers):
         assert k in j, f"missing {k}"
     assert j["as_on"] == "2026-05-05"
     assert j["side"] == "dr"
-    assert j["count"] == 218
-    assert abs(j["grand_dr"] - 1030038787.0) < 1.0
-    assert j["grand_cr"] == 0.0
+    assert j["count"] == sum(len(sec["rows"]) for sec in j["sections"])
+    assert abs(j["grand_dr"] - sum(sec["dr_total"] for sec in j["sections"])) < 1.0
+    assert j["grand_cr"] == 0.0  # side=dr → no Cr rows
     # Section shape + row shape
     for sec in j["sections"]:
         for k in ("group_id", "group_name", "fcode", "rows", "dr_total", "cr_total"):

@@ -1871,8 +1871,7 @@ async def delete_inward(iid: str, current=Depends(get_current_user)):
     return {"ok": True}
 
 
-# ---------- TRIAL BALANCE ----------
-@api.get("/reports/outstanding")
+# ---------- OUTSTANDING ----------
 async def _settled_now_map() -> dict:
     """party_id → latest Account Settled date, only for parties whose ledger stands at 0 TODAY (cleared accounts)."""
     st = await db.settings.find_one({"id": "default"}, {"_id": 0, "settle_account_id": 1}) or {}
@@ -1891,6 +1890,7 @@ async def _settled_now_map() -> dict:
     return out
 
 
+@api.get("/reports/outstanding")
 async def outstanding_report(as_on: Optional[str] = None, side: str = "all", min_amount: float = 0.0,
                              sort: str = "amount", hide_settled: bool = False, current=Depends(get_current_user)):
     """Collection-round list: every party with a pending Dr/Cr balance as on a date, grouped by account group.
