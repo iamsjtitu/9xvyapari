@@ -162,6 +162,11 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - `POST /rokad/{id}/reopen` deletes the settlement journal and un-flags the rokad (400 if not settled). Reopen buttons in Rokad list (`rokad-reopen-<id>`), ledger marker (`ledger-reopen-<id>`), report (`ac-reopen-<jid>`) via shared `reopenSettled()` confirm helper. Re-settle = edit entry and tick again.
 - Verified: iteration 21 (backend 6/6 new + 12/12 regression, frontend 100%).
 
+### Jun 2026 – Full "Create Party Khata" window from entry forms · ledger V.no badges removed
+- `components/KhataModal.jsx` = shared Naya/Edit Khata form (Group*, Code auto-suggest, Naam, Type, Alt name, Place, Phone, Address, GSTIN/PAN/CST/MPST, Opening bal/qty, Rate). Used by Party Khata page, and by Rokad/Bill: "+ Add 'X' as new party" no longer auto-creates — it opens this window with the name prefilled; on Save the party is selected in the calling field (Bill: party/buyer/agent). ESC + single-key shortcuts are swallowed (window capture) so the entry form underneath is untouched; Cash/Bank-group ledgers are not selected as Party.
+- Party/account ledger rows: no more "V.1/V.2" rokad voucher badges (only Bill no. / Journal no. badges remain). DOS statement keeps its Vch/Ref column.
+- Verified: iteration 22 + 23 (frontend).
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅

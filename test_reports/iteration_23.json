@@ -1,0 +1,20 @@
+{
+  "summary": "Retest of the KhataModal fixes from iteration_22 (frontend only, Playwright at 1920x1080). FIX 1 (shortcut leak) PASS: on /parties, Edit Khata stays intact after clicking the title and pressing 'a', and '/' does not focus the page search. On /rokad, with the khata window open over a Receipt 500 entry, clicking the title and pressing p/r/a does nothing. After Cancel the type is still Receipt and the amount is still 500. Typing inside Naam/Place works. ESC closes only the khata window and the Rokad form stays open. FIX 2 (centring) PASS: the form's centre x is exactly 960 (viewport 1920) on /parties and /rokad. Edge case: with the 'CASH & BANK BALANCE' group, the toast 'Cash/Bank group ka ledger hai — Party field me nahi aata' shows and party_id is not set, but the typed name stays in the party input (minor). With the normal group SALES PARTY, the new party is selected. Created parties TEST QA CASHGRP and TEST QA NORMALGRP were deleted. QA SHORTCUT 1 was never saved.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RokadPanna onKhataSaved (cash/bank guard)", "issue": "After a ledger is saved in a CASH/BANK group, party_id stays empty, but form.party_name keeps the typed text (e.g. 'TEST QA CASHGRP'). The Party input therefore is not empty. If the user then saves the entry, it is posted with a free-text party_name and party_id=''. Fix: in the cash/bank branch, also call setForm(f => ({...f, party_id:'', party_name:''})).", "selector": "[data-testid=select-party]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": ["In RokadPanna.onKhataSaved, clear form.party_name in the cash/bank group branch so the Party field is really empty (optional, low priority)"],
+  "critical_code_review_comments": ["KhataModal: the window capture-phase keydown handler is correct. It runs before the bubble-phase useKeyboardShortcuts listeners, so stopPropagation is enough to block them. It also lets Ctrl/Alt/Meta combos and in-field typing through."],
+  "updated_files": ["/app/test_reports/iteration_23.json"],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "95% (all fix checks pass; 1 minor edge-case gap)"},
+  "seed_data_creation": "None kept. Temporary parties TEST QA CASHGRP and TEST QA NORMALGRP were created and then deleted via the API.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Rokad flow: btn-add-entry -> btn-type-jama -> input-amount -> fill select-party -> click select-party-create opens modal-party. Cash/bank group id: 'CASH & BANK BALANCE' (f2e7dd8a-...); normal group: SALES PARTY (15870770-...). Receipt-active check: btn-type-jama has class 'bg-jama-bg'."
+}
