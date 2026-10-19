@@ -129,7 +129,12 @@ export default function JournalEntry() {
 
   const del = async (id) => {
     if (!window.confirm("Delete this entry?")) return;
-    await api.delete(`/journal/${id}`);
+    try {
+      await api.delete(`/journal/${id}`);
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
+      return;
+    }
     toast.success("Deleted"); load();
   };
 

@@ -123,7 +123,13 @@ def make_staff_router(db, get_current_user, now_iso, compute_party_balance, next
         return st
 
     async def _cash_account(cash_account_id: Optional[str]) -> dict:
-        acc = await db.accounts.find_one({"id": cash_account_id}, {"_id": 0, "id": 1, "name": 1}) if cash_account_id else None
+        # cash/bank ledgers live in parties (CASH & BANK group) or the legacy accounts collection
+        acc = None
+        if cash_account_id:
+            acc = await db.parties.find_one({"id": cash_account_id}, {"_id": 0, "id": 1, "name": 1}) \
+                or await db.accounts.find_one({"id": cash_account_id}, {"_id": 0, "id": 1, "name": 1})
+            if not acc:
+                raise HTTPException(404, "Chuna hua Cash/Bank account nahi mila")
         if not acc:
             acc = await default_cash_account()
         if not acc:

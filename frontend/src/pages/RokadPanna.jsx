@@ -252,7 +252,12 @@ export default function RokadPanna() {
     const entry = entries.find((x) => x.id === id);
     const msg = entry?.contra_id ? "Yeh Transfer entry hai — dono accounts se hat jayegi. Delete karein?" : "Delete this entry?";
     if (!window.confirm(msg)) return;
-    await api.delete(`/rokad/${id}`);
+    try {
+      await api.delete(`/rokad/${id}`);
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
+      return;
+    }
     toast.success(entry?.contra_id ? "Transfer (dono legs) delete hua" : "Entry delete ki gayi");
     load();
     loadSummary();

@@ -1,0 +1,50 @@
+{
+  "summary": "Retest of the iteration_36 fixes (Staff Attendance & Payments). 7 of the 8 fixes work in both the backend and the UI: future-date guard, bulk ignoring unknown ids, salary lock on rokad/journal edit and delete, totals split into paid/credited, same-date ledger order, jline testids and bottom-right toasts. One critical bug is left: the cash/bank account the user picks is ignored. If you pick a bank ledger (302 HDFC or 304 AXIS) in the Advance form or the Salary Pay dialog, the rokad entry is still saved as 301 CASH IN HAND. I also fixed two frontend bugs: a delete error on the Rokad or Journal page crashed the page instead of showing a toast. Results: pytest 26 of 27 passed (test_staff_v36 18/18; new test_staff_v37 8/9). All QA data has been cleaned up.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/staff/advance and POST /api/staff/salary/pay (staff.py _cash_account)", "issue": "_cash_account() looks up cash_account_id only in db.accounts. The dropdown now sends party ids from the CASH & BANK group (302 HDFC, 304 AXIS ...), which are not in db.accounts. So the lookup always falls back to _default_cash_account() = 301 CASH IN HAND. Reproduced in the API (advance with 304 AXIS saved as CASH IN HAND) and in the UI (Pay dialog with 302 HDFC M M TRADERS selected saved the rokad as CASH IN HAND with V.No. from the 301 series). The bank choice is silently ignored, so cash and bank balances end up wrong.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RokadPanna.del / JournalEntry.del", "issue": "FIXED BY TESTER: the delete handler called api.delete without try/catch. With the new salary lock (400), deleting a salary row from /rokad or /journal crashed the page with an 'Uncaught runtime error' overlay instead of showing the 'Yeh Staff Salary ki entry hai…' toast. Added try/catch with toast.error. Retest passed: the toast shows, the row stays and there is no overlay.", "selector": "rokad-del-<id>, journal-del-<id>", "priority": "HIGH (fixed)"}
+    ],
+    "integration_issues": [
+      {"flow": "Staff Advance / Salary Pay with a bank account", "issue": "The selected bank ledger is not saved; the backend falls back to 301 CASH IN HAND (see backend critical issue).", "affected_selectors": ["adv-account", "pay-account"]}
+    ],
+    "design_issues": [
+      {"screen": "Global toasts", "issues": ["Bottom-right toasts slightly cover the floating chat/help round button in the bottom-right corner. Minor."]}
+    ]
+  },
+  "passed_checks": [
+    "PUT /staff/attendance with 2030-01-01 returns 400; bulk with a future date returns 400; bulk with an unknown id gives marked 0, and unknown + known gives marked 1",
+    "PUT and DELETE /rokad/{salary rokad} and PUT and DELETE /journal/{salary jv} return 400 with 'Staff Salary'; the entries still exist",
+    "DELETE /staff/salary/{id} removes both the rokad and the journal entry (API, and the UI sal-unpay button)",
+    "totals: paid_count/paid_net count only cash-paid salaries; credited_count/credited_net count the credit-only ones; net = paid_net + credited_net",
+    "UI: adv-account and pay-account list 301 CASH IN HAND (selected by default), 302/303/304/306/307 banks and the old 'Cash IN Hand' account",
+    "UI: an advance with the default account shows 'Cash · CASH IN HAND' (301)",
+    "UI stale month: 13 fast prev/next clicks on attendance, salary and advance; the grid always matched the picker month (attendance cells all 2026-05, last day 31)",
+    "UI Salary cards: 'PAID (1) · credited 1', sal-total-net ₹6,200 (cash only), sal-total-credited '+ ₹6,600.00 credited (dena baaki)'",
+    "UI rokad lock: delete and edit-save both show the lock toast and the row stays (after the try/catch fix for delete)",
+    "UI journal lock: journal-del shows the lock toast; edit + Ctrl+S shows the lock toast; the jline-debit-0 and jline-credit-1 testids exist",
+    "UI staff ledger: on the same date the journal Cr 6,600 (balance 6,200 CR) comes before the payment Dr 6,200 (balance 0). It never shows 7,000. The ledger journal and rokad trash buttons show the lock toast",
+    "Toasts appear bottom-right (x 1540-1896, bottom of the viewport)"
+  ],
+  "test_report_links": ["/app/backend/tests/test_staff_v37.py", "/app/backend/tests/test_staff_v36.py", "/app/backend/tests/seed_v37_ui.py", "/app/test_reports/pytest/pytest_v37.xml"],
+  "action_items": [
+    "HIGH: In staff.py _cash_account(), resolve cash_account_id from db.parties first (id, name), then db.accounts, then the default. Same as the Rokad create path. Then re-run tests/test_staff_v37.py::test_advance_with_bank_ledger.",
+    "Optional: move the toaster offset so it does not cover the floating bottom-right button."
+  ],
+  "critical_code_review_comments": [
+    "staff.py _cash_account only queries db.accounts, while fetchCashAccounts returns parties as well. The frontend and backend no longer agree on what an account id is.",
+    "Other delete handlers that call api.delete without try/catch could crash the same way when the backend returns 400. Audit the other pages for 'await api.delete' outside try."
+  ],
+  "updated_files": ["/app/frontend/src/pages/RokadPanna.jsx", "/app/frontend/src/pages/JournalEntry.jsx", "/app/backend/tests/test_staff_v37.py", "/app/backend/tests/seed_v37_ui.py"],
+  "success_rate": {"backend": "96% (26/27)", "frontend": "~92% (all retest items pass except the bank-account selection being saved)"},
+  "seed_data_creation": "Temporary TEST_QA37 staff, ledgers, attendance, salaries and rokad entries were created and then fully removed (verified: no QA staff, parties, rokad, journal or salary history left).",
+  "test_credentials": "admin / Vyapari@2026",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest tests/test_staff_v36.py tests/test_staff_v37.py. Only test_advance_with_bank_ledger should fail until _cash_account is fixed. seed_v37_ui.py seed|clean creates 2 staff with 22 P in 2026-09 for UI tests (ids are saved in /tmp/v37_seed.json). MonthPicker testids are adv-month-*, att-month-*, sal-month-* (-prev/-next/-input). The pay-account options load asynchronously, so wait for 'option' to be attached. Accept window.confirm dialogs."
+}
