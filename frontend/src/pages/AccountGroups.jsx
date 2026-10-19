@@ -4,6 +4,7 @@ import { Plus, PencilSimple, Trash, X, TreeStructure } from "@phosphor-icons/rea
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
+import { backdropClose } from "@/lib/backdrop";
 
 const NATURES = [
   { v: "asset", l: "Asset (सम्पत्ति)", color: "#1B5E20" },
@@ -144,7 +145,7 @@ export default function AccountGroups() {
       </div>
 
       {editing && (
-        <div className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4" onClick={() => setEditing(null)}>
+        <div className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4" {...backdropClose(() => setEditing(null))}>
           <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="card-flat w-full max-w-lg p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="font-heading font-semibold text-lg">{editing.id ? "Edit Group" : "Naya Group"}</div>

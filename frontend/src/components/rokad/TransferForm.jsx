@@ -3,6 +3,7 @@ import api, { formatApiErrorDetail, inr } from "@/lib/api";
 import { ArrowsLeftRight, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
+import { backdropClose } from "@/lib/backdrop";
 
 const EMPTY = { date: "", from_account_id: "", to_account_id: "", amount: "", description: "", voucher_no: "", chq_no: "", mode: "Bank" };
 
@@ -46,7 +47,7 @@ export const TransferForm = ({ accounts, date, contraId, onClose, onSaved }) => 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4" onClick={onClose} data-testid="transfer-modal">
+    <div className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4" {...backdropClose(onClose)} data-testid="transfer-modal">
       <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="card-flat w-full max-w-lg p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">

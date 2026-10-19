@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api, { inr, formatApiErrorDetail } from "@/lib/api";
 import { toast } from "sonner";
 import { ListNumbers, X, Eye, Check, Warning } from "@phosphor-icons/react";
+import { backdropClose } from "@/lib/backdrop";
 
 // Renumber one cash/bank a/c's vouchers date-wise (1, 2, 3 … in date order). Preview first, then apply.
 export const RenumberVouchersDialog = ({ account, fyStart, fyEnd, onClose, onDone }) => {
@@ -37,7 +38,7 @@ export const RenumberVouchersDialog = ({ account, fyStart, fyEnd, onClose, onDon
 
   if (!account) return null;
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 grid place-items-start p-4 overflow-y-auto print:hidden" onClick={onClose} data-testid="renumber-dialog">
+    <div className="fixed inset-0 z-50 bg-black/40 grid place-items-start p-4 overflow-y-auto print:hidden" {...backdropClose(onClose)} data-testid="renumber-dialog">
       <div className="card-flat w-full max-w-2xl p-6 my-4 mx-auto" onClick={(e) => e.stopPropagation()} data-enter-scope>
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-start gap-3">

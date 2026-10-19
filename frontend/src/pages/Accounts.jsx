@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { LedgerInUseDialog, inUseInfo } from "@/components/LedgerInUseDialog";
+import { backdropClose } from "@/lib/backdrop";
 
 const EMPTY = { name: "", group_id: "", opening_balance: 0, phone: "", address: "", notes: "" };
 
@@ -150,7 +151,7 @@ export default function Accounts() {
       <LedgerInUseDialog info={inUse} onClose={() => setInUse(null)} />
 
       {editing && (
-        <div className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4" onClick={() => setEditing(null)}>
+        <div className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4" {...backdropClose(() => setEditing(null))}>
           <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="card-flat w-full max-w-lg p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="font-heading font-semibold text-lg">{editing.id ? "Edit Account" : "Naya Account"}</div>

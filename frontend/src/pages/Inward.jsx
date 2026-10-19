@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useTableNav } from "@/hooks/useTableNav";
+import { backdropClose } from "@/lib/backdrop";
 
 const EMPTY = {
   date: todayISO(),
@@ -213,7 +214,7 @@ export default function Inward() {
       </div>
 
       {open && (
-        <div className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4" {...backdropClose(() => setOpen(false))}>
           <form onSubmit={save} onClick={(e) => e.stopPropagation()} className="card-flat w-full max-w-2xl p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">

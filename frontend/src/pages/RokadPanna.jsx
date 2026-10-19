@@ -10,6 +10,7 @@ import { DayBookSheet } from "@/components/rokad/DayBookSheet";
 import { VoucherSearch } from "@/components/rokad/VoucherSearch";
 import { RenumberVouchersDialog } from "@/components/rokad/RenumberVouchersDialog";
 import { VoucherSlip } from "@/components/rokad/VoucherSlip";
+import PartyAutocomplete from "@/components/PartyAutocomplete";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 
 // Mode follows the ACCOUNT name only (group "CASH & BANK BALANCE" must not force "Bank" on CASH IN HAND)
@@ -75,6 +76,22 @@ export default function RokadPanna() {
       setAccounts([...partyCash, ...oldAcc]);
     });
   }, []);
+
+  // Parties for the Party field (cash/bank ledgers are accounts, not parties)
+  const partyOptions = useMemo(() => parties.filter((p) => !/cash|bank/i.test(p.group_name || "")), [parties]);
+  // "+ Add '<name>' as new party" from inside the entry form — entry data stays as it is
+  const createParty = async (name) => {
+    const cleaned = String(name || "").trim();
+    if (!cleaned) return;
+    try {
+      const { data } = await api.post("/parties", { name: cleaned });
+      setParties((prev) => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+      setForm((f) => ({ ...f, party_id: data.id, party_name: data.name }));
+      toast.success(`Party "${data.name}" ban gayi aur select ho gayi`);
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
+    }
+  };
 
   // Page-level keyboard shortcuts
   useKeyboardShortcuts([
@@ -715,25 +732,17 @@ export default function RokadPanna() {
               </div>
 
               <div>
-                <label className="lbl">Party (Optional)</label>
-                <select
-                  className="input-dense"
-                  value={form.party_id}
-                  onChange={(e) => {
-                    const p = parties.find((x) => x.id === e.target.value);
-                    setForm({
-                      ...form,
-                      party_id: e.target.value,
-                      party_name: p ? p.name : "",
-                    });
-                  }}
-                  data-testid="select-party"
-                >
-                  <option value="">— Koi nahi —</option>
-                  {parties.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
+                <label className="lbl">Party (Optional) <span className="normal-case tracking-normal text-muted2">— naam likho, nayi party yahin ban jayegi</span></label>
+                <PartyAutocomplete
+                  value={form.party_name}
+                  selectedId={form.party_id}
+                  options={partyOptions}
+                  onPick={(p) => setForm((f) => ({ ...f, party_id: p.id, party_name: p.name }))}
+                  onChangeText={(t) => setForm((f) => ({ ...f, party_name: t, party_id: f.party_id && t.trim().toLowerCase() === (parties.find((x) => x.id === f.party_id)?.name || "").trim().toLowerCase() ? f.party_id : "" }))}
+                  onCreate={createParty}
+                  placeholder="Party ka naam likhein (auto suggest)..."
+                  testId="select-party"
+                />
                 <LedgerBalanceHint ledgerId={form.party_id} className="mt-1" testId="rokad-party-balance" />
               </div>
 

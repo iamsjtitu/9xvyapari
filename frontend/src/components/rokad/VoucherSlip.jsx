@@ -5,6 +5,7 @@ import { Printer, FilePdf, X } from "@phosphor-icons/react";
 import { inr } from "@/lib/api";
 import { amountInWords } from "@/lib/words";
 import { triggerPrint } from "@/lib/exports";
+import { backdropClose } from "@/lib/backdrop";
 
 const fmtDate = (iso) => (iso ? iso.slice(0, 10).split("-").reverse().join("-") : "");
 
@@ -31,7 +32,7 @@ export const VoucherSlip = ({ entry, onClose }) => {
   );
 
   return createPortal(
-    <div className="slip-overlay fixed inset-0 z-50 bg-black/50 grid place-items-center p-4" onClick={onClose} data-testid="voucher-slip">
+    <div className="slip-overlay fixed inset-0 z-50 bg-black/50 grid place-items-center p-4" {...backdropClose(onClose)} data-testid="voucher-slip">
       <div className="bg-white rounded-sm shadow-2xl w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-khaki print:hidden">
           <div className="font-heading font-semibold">{title} · V.{entry.voucher_no || "—"}</div>

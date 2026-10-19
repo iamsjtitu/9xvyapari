@@ -1,5 +1,6 @@
 import { inr } from "@/lib/api";
 import { Prohibit, X } from "@phosphor-icons/react";
+import { backdropClose } from "@/lib/backdrop";
 
 const LABELS = { rokad: "Rokad entries", bills: "Bills", journal: "Journal entries", dos_journal: "DOS (purani) entries", inward: "Inward entries" };
 
@@ -8,7 +9,7 @@ export const LedgerInUseDialog = ({ info, onClose }) => {
   if (!info) return null;
   const counts = Object.entries(info.counts || {}).filter(([, n]) => n > 0);
   return (
-    <div className="fixed inset-0 bg-black/40 grid place-items-center z-[60] p-4" onClick={onClose} data-testid="ledger-in-use-dialog">
+    <div className="fixed inset-0 bg-black/40 grid place-items-center z-[60] p-4" {...backdropClose(onClose)} data-testid="ledger-in-use-dialog">
       <div className="card-flat w-full max-w-lg p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-start gap-3">

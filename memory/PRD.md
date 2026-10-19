@@ -142,6 +142,9 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - `components/rokad/VoucherSlip.jsx`: DOS-style RECEIPT / PAYMENT / CONTRA voucher slip (firm, FY, No., Date, A/C, Mode, Party, Chq, Amount, amount in words via `lib/words.js` Indian system, Narration, RECEIVED/PAID box, 3 signature lines). Rendered via portal; `body.print-slip` + CSS hides `#root` in print so only the slip prints (`triggerPrint()` → Electron PDF preview / window.print). Entry points: printer icon on every Rokad row (`rokad-slip-{id}`) and "Slip" in Voucher search results.
 - Electron chooser.html: ↑/↓/Home/End move the highlighted "Pichle Folder" (also fills the path box), Enter starts the highlighted folder, Delete = ✕ forget. Verified in Playwright with a mocked bridge.
 
+### Jun 2026 – Modal closing on text drag-select (user video)
+- Cause: backdrop `onClick={onClose}`; dragging to select text in an input and releasing over the backdrop fires `click` on the overlay → modal closed. Fix: `lib/backdrop.js` `backdropClose(onClose)` → closes only if mousedown AND mouseup/click both landed on the backdrop itself (flag stored in `dataset`). Applied to all 7 backdrop-closing overlays (Accounts, AccountGroups, Inward, TransferForm, RenumberVouchersDialog, VoucherSlip, LedgerInUseDialog). Verified via Playwright drag gesture.
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅
