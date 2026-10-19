@@ -89,7 +89,8 @@ export default function RokadPanna() {
   const createParty = (name) => { const cleaned = String(name || "").trim(); if (cleaned) setNewKhata({ id: null, name: cleaned }); };
   const onKhataSaved = (data) => {
     setParties((prev) => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
-    setForm((f) => ({ ...f, party_id: data.id, party_name: data.name }));
+    if (/cash|bank/i.test(data.group_name || "")) toast.info(`"${data.name}" Cash/Bank group ka ledger hai — Party field me nahi aata`);
+    else setForm((f) => ({ ...f, party_id: data.id, party_name: data.name }));
     setNewKhata(null);
   };
 

@@ -1,0 +1,33 @@
+{
+  "summary": "Frontend-only test of the new 'Create Party Khata' window flow (Rokad + Bill + Party Khata page) and the ledger V.no badge change. Every requested flow works. Rokad: '+ Add' by click AND by Enter opens KhataModal titled 'Naya Party Khata (entry ke liye)' with the name prefilled, and nothing is POSTed until Save. Picking a group auto-fills the code (3302). Save Khata shows the toast 'Khata \"QA KHATA ROKAD 1\" ban gaya', closes only the khata window, keeps the Rokad form (amount 500, note) and selects the new party (hint ₹250 Dr). Saving the entry works, and GET /api/parties confirms group, place, phone and opening_balance 250. ESC, Cancel, X and a plain backdrop click each close only the khata window, and the amount stays intact. Drag-select released outside keeps the window open. Saving without a Group shows the native 'required' message and sends no POST. A duplicate name gives the toast 'Party \"SETTLE TEST PARTY\" pehle se hai' and the window stays open. Bill: the Seller, Buyer and Agent '+ Add' each open 'Naya Party Khata (bill ke liye)', and the saved party lands in the right field. Lot no, truck no and date stay unchanged, and ESC keeps the bill open. Party Khata page: new (code 609, name uppercased), edit (prefilled, Place change saved and list refreshes), ESC closes the modal, and the 'a' key opens a new khata. Ledger: rokad/cash rows have no V.n badge or ledger-vno element, the journal row shows the J00002 badge (temporary JV created through the API and then deleted), and the bill row shows 'Bill P00004'. Found 1 medium keyboard-shortcut bug and 1 layout issue.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PartyKhata page + KhataModal", "issue": "Page shortcuts stay active while the khata modal is open. With Edit Khata open, click a non-input spot (e.g. the title) and press 'a': startNew() swaps the form for a blank 'Naya Khata / Ledger', and all unsaved edits are lost.", "selector": "[data-testid=modal-party-title]", "priority": "MEDIUM"},
+      {"component": "RokadPanna + KhataModal", "issue": "Same root cause. With the khata window open over the Rokad form and focus on a non-input spot, pressing 'p' (or 'r'/'a') runs the Rokad page shortcut. The type of the entry underneath silently changes to Payment/Kharch.", "selector": "[data-testid=modal-party]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "KhataModal (all pages)", "issues": ["The backdrop uses 'grid place-items-start', so the dialog sits at the top-LEFT, over the sidebar, instead of centred horizontally. Use e.g. 'grid justify-items-center items-start' (or place-items-start + mx-auto on the form)."]},
+      {"screen": "PartyLedger", "issues": ["The 'Opening Balance (B/F)' row's balance has no Dr/Cr suffix, while the other rows show CR/DR (minor)."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Stop page-level single-key shortcuts from running while KhataModal is open. Option 1: in KhataModal's capture-phase window keydown handler, call stopImmediatePropagation() for plain non-modifier keys whose target is not an input. Option 2: on PartyKhata, register the 'a'/'/' shortcuts only when !editing; on RokadPanna/NayaBill, skip the shortcuts when newKhata is set.",
+    "Centre KhataModal horizontally (replace place-items-start with justify-items-center items-start).",
+    "Optional edge case: RokadPanna.onKhataSaved selects the new party even when the user picks the CASH & BANK group, which partyOptions filters out. Consider blocking or warning on that group in the entry-context khata."
+  ],
+  "critical_code_review_comments": [
+    "KhataModal: ESC is handled in the window capture phase with stopImmediatePropagation, which works. Other keys are not isolated (see the ui_bugs above).",
+    "PartyAutocomplete.handleCreate awaits onCreate, which is now sync. That's fine, but the 'creating' state is effectively unused.",
+    "The NayaBill onKhataSaved closure reads newKhata.fieldKey from render state. That works because the modal stays open until save, but passing fieldKey through onSaved would be more robust."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "95% - all requested flows pass; 1 medium shortcut-leak bug + 1 layout issue"},
+  "test_credentials": "admin / Vyapari@2026 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Temporary QA KHATA ROKAD 1, QA KHATA BILL 1/BUYER/AGENT and QA KHATA PAGE 1 parties, one rokad entry and one journal J00002 were all deleted afterwards. SETTLE TEST PARTY and ACCOUNT CLEAR are untouched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "KhataModal flows verified on /rokad, /bills?type=sale and /parties. Login automation: fill input-username/input-password and click btn-submit; after login the URL is the dashboard. Only the 'Cash IN Hand' account exists in /accounts. The only seeded journal (J00001) points to orphan account ids, so to test journal badges create a temporary JV between parties through POST /api/journal {date,narration,lines:[{account_id,account_name,debit,credit}]}. When verifying the shortcut fix, click the modal title (non-input) and then press 'a' / 'p'."
+}

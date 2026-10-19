@@ -29,10 +29,14 @@ export const KhataModal = ({ khata, onClose, onSaved, title }) => {
     api.get("/account-groups").then((r) => { const d = r.data; d.sort((a, b) => (a.fcode || 0) - (b.fcode || 0)); setGroups(d); }).catch(() => {});
   }, [open, khata]);
 
-  // ESC closes only this dialog — never the entry form underneath it
+  // ESC closes only this dialog; single-key page shortcuts (a / p / r …) must not reach the page underneath
   useEffect(() => {
     if (!open) return;
-    const h = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); onClose(); } };
+    const h = (e) => {
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); onClose(); return; }
+      const inField = /^(INPUT|SELECT|TEXTAREA)$/.test(e.target?.tagName || "");
+      if (!inField && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) { e.stopPropagation(); e.stopImmediatePropagation(); }
+    };
     window.addEventListener("keydown", h, true);
     return () => window.removeEventListener("keydown", h, true);
   }, [open, onClose]);
@@ -72,7 +76,7 @@ export const KhataModal = ({ khata, onClose, onSaved, title }) => {
   const setUpper = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value.toUpperCase() }));
 
   return (
-    <div className="fixed inset-0 bg-black/40 grid place-items-start z-[60] p-4 overflow-y-auto" {...backdropClose(onClose)} data-testid="modal-party">
+    <div className="fixed inset-0 bg-black/40 grid justify-items-center items-start z-[60] p-4 overflow-y-auto" {...backdropClose(onClose)} data-testid="modal-party">
       <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="card-flat w-full max-w-3xl my-6 p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="font-heading font-semibold text-lg" data-testid="modal-party-title">{title || (isEdit ? "Edit Khata" : "Naya Khata / Ledger")}</div>
