@@ -77,9 +77,13 @@ export function useGlobalSave() {
       e.preventDefault();   // never the browser's "Save page as"
       setTimeout(() => {
         if (e.handledByShortcut) return;
-        const overlays = document.querySelectorAll(".fixed.inset-0");
-        const top = overlays[overlays.length - 1];
-        const form = top?.querySelector("form") || document.activeElement?.closest?.("form");
+        // the form the cursor is in wins (stacked modals); else the top-most overlay (highest z-index) that holds a form
+        let form = document.activeElement?.closest?.("form");
+        if (!form) {
+          const overlays = [...document.querySelectorAll(".fixed.inset-0")]
+            .sort((a, b) => (parseInt(getComputedStyle(b).zIndex, 10) || 0) - (parseInt(getComputedStyle(a).zIndex, 10) || 0));
+          form = overlays.map((o) => o.querySelector("form")).find(Boolean);
+        }
         if (form && typeof form.requestSubmit === "function") form.requestSubmit();
       }, 0);
     };

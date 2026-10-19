@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 41: tested F5/F6 global voucher shortcuts, global Ctrl+S fallback, and the new Rokad Invoice No. (inv_no) field end-to-end. Backend: 8/8 pytest pass. Frontend: everything requested works, with ONE bug: pressing Ctrl+S inside the 'Naya Party Khata' child window (opened from the Rokad form) submits the PARENT Rokad form, not the party form.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "useGlobalSave (hooks/useKeyboardShortcuts.js) + RokadPanna KhataModal", "issue": "Ctrl+S with focus inside 'Naya Party Khata (entry ke liye)' (modal-party, z-[60], opened by typing a new party name in the Rokad form + Enter) submits the Rokad form instead of the khata form. Result: POST /rokad saved with an UNLINKED party (party_id='', party_name='TEST_ZZQ41 NEW'), the Rokad modal closes, and the khata window is left open by itself. Reproduced. Cause: useGlobalSave picks the last '.fixed.inset-0' in DOM order. KhataModal is rendered at RokadPanna line ~503, BEFORE the Rokad modal (~670), so the Rokad overlay is 'last' even though KhataModal sits on top visually (z-60). The code also prefers the overlay's form over document.activeElement.closest('form').", "selector": "[data-testid='modal-party'] inside /rokad", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_checks": [
+    "F5 on Dashboard → /rokad, modal-add-rokad open, Payment (kharch) active, ?new= removed from the URL, no reload (window marker kept)",
+    "F6 on Dashboard → Receipt (jama) active; F5 with focus in the /parties search input still works",
+    "With the form open (amount 123, party, inv) F5 → kharch and F6 → jama; amount, party and INV are kept",
+    "Data safety: F5 with the Journal form open or the Bill form open → nothing happens (same URL, modal stays open)",
+    "Ctrl+S in the Rokad amount input → 'Entry add ki gayi', modal closes, row shows; empty amount → 'Amount daalein' toast, no POST; no modal → no request",
+    "Journal Ctrl+S → exactly 1 POST /journal (rows 0→1). Bill Ctrl+S on an empty form → only the bill's own validation ('Party select karein'), no POST. Staff modal: empty → no POST (HTML required); filled → exactly 1 POST /staff",
+    "input-inv-no shows; edit pre-fills it; changing it to INV-77B saves; the list shows rokad-inv-<id> 'INV INV-77B'",
+    "Voucher search: placeholder 'V.No. / INV No.'; 'inv-77b' → result 'V.1 · INV INV-77B'; searching by V.No. still works",
+    "Slip header 'PAYMENT VOUCHER · V.1 · INV INV-77B'; slip-inv = INV-77B; Print/PDF buttons call print",
+    "Rokad Excel: both sheets have an 'INV No.' column, and the value is in the Payments sheet. Day Book sheet shows 'TEST PARTY41 · INV INV-77B'",
+    "Party ledger and cash-account ledger: badges V.1 / INV INV-77B; Statement shows 'PAYMENT PAID · CASH IN HAND · INV INV-77B' with VCH/REF = 1; Ledger Excel has an 'INV No.' column with the value",
+    "Regression: Esc closes the Rokad modal; keys a/r/p open the form (p = kharch, r = jama); Alt+D → /journal; the ? help lists F5/F6 under Universal shortcuts"
+  ],
+  "not_tested": ["Account Clear Register rokad_inv display (optional item, only checked in code review)", "Inward Ctrl+S"],
+  "test_report_links": ["/app/backend/tests/test_inv_no_v41.py", "/app/test_reports/pytest/pytest_v41.xml"],
+  "action_items": [
+    "Fix useGlobalSave target selection: first use document.activeElement?.closest('form') if it lies inside an open overlay. Otherwise choose the overlay with the highest computed z-index, or render KhataModal after the Rokad modal. Retest: Rokad form → type a new party name → Enter → in modal-party press Ctrl+S → the khata should save, not the rokad entry."
+  ],
+  "critical_code_review_comments": [
+    "useGlobalSave: selecting overlays with '.fixed.inset-0' in DOM order is fragile for stacked modals (see the bug above). It is also coupled to Tailwind class names.",
+    "voucherOpen: F5/F6 on /rokad while ANOTHER /rokad overlay is open (Voucher Slip, KhataModal, Transfer) still navigates and opens/switches the Rokad form underneath. Low risk but inconsistent with the data-safety rule.",
+    "F5 while editing an existing entry on /rokad only changes the type and keeps editId. Probably intended, but worth noting."
+  ],
+  "updated_files": ["/app/backend/tests/test_inv_no_v41.py"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "~95% (1 bug: Ctrl+S in the stacked create-party modal)"},
+  "seed_data_creation": "Created and then deleted: party TEST PARTY41, 2 rokad entries, 1 journal, staff TEST_STAFF41 (and its ledger). Nothing left behind.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login admin/Vyapari@2026; preview date 2026-10-19. Party autocomplete option testid: select-party-opt-<partyId> (use dispatch_event('mousedown')). Typing a new party name + Enter in the Rokad form opens modal-party. Excel files can be saved from Playwright to /tmp and parsed locally with openpyxl.",
+  "rca of the issue": "Repro: /rokad → 'a' → amount 7 → type a new party name in select-party → Enter → modal-party opens → click an input in it → Ctrl+S → POST /rokad fires ('Entry add ki gayi'), modal-add-rokad closes, modal-party stays open. RCA: useGlobalSave uses overlays[overlays.length-1], which is DOM order, not stacking order, and ignores the focused element's form."
+}

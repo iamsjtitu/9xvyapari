@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api, { formatApiErrorDetail } from "@/lib/api";
@@ -64,7 +64,6 @@ const sections = [
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [settings, setSettings] = useState(null);
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -107,8 +106,9 @@ export default function Layout() {
   // Global shortcuts
   useGlobalSave();   // Ctrl+S → save the open form (pages with their own Ctrl+S win)
   const voucherOpen = (type) => {
-    // another page's modal is open → don't throw its data away
-    if (!location.pathname.startsWith("/rokad") && document.querySelector(".fixed.inset-0")) return;
+    // any other modal open (Bill/Journal form, Voucher Slip, Create Party, Transfer…) → don't throw its data away
+    const others = [...document.querySelectorAll(".fixed.inset-0")].filter((o) => o.dataset.testid !== "modal-add-rokad");
+    if (others.length) return;
     navigate(`/rokad?new=${type}`);
   };
   useKeyboardShortcuts([
@@ -120,7 +120,7 @@ export default function Layout() {
     helpOpen ? { key: "Escape", action: () => setHelpOpen(false), allowInInputs: true } : null,
     { ctrl: true, key: "/", action: () => setHelpOpen((v) => !v),
       allowInInputs: true, description: "Show keyboard help" },
-  ], [navigate, helpOpen, location.pathname]);
+  ], [navigate, helpOpen]);
 
   return (
     <div className="h-screen flex paper-bg" data-testid="app-shell">
