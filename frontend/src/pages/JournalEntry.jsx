@@ -6,8 +6,8 @@ import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 
-const blank = () => ({
-  date: todayISO(),
+const blank = (date = todayISO()) => ({
+  date,
   narration: "",
   ref: "",
   lines: [
@@ -23,8 +23,15 @@ export default function JournalEntry() {
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(blank());
+  const [dateFrom, setDateFrom] = useState(todayISO()); // default: aaj ki entries (Rokad jaisa)
+  const [dateTo, setDateTo] = useState(todayISO());
 
-  const closeForm = () => { setOpen(false); setEditId(null); setForm(blank()); };
+  const closeForm = () => { setOpen(false); setEditId(null); setForm(blank(dateTo)); };
+  const openNew = () => { setEditId(null); setForm(blank(dateTo)); setOpen(true); };
+  const monthRange = () => { const d = new Date(); const y = d.getFullYear(), m = d.getMonth();
+    const last = new Date(y, m + 1, 0).getDate(); const mm = String(m + 1).padStart(2, "0");
+    setDateFrom(`${y}-${mm}-01`); setDateTo(`${y}-${mm}-${String(last).padStart(2, "0")}`); };
+  const rangeLabel = !dateFrom && !dateTo ? "Sabhi entries" : dateFrom === dateTo ? `Date ${dateFrom}` : `${dateFrom || "…"} se ${dateTo || "…"} tak`;
   const startEdit = (j) => {
     setForm({
       date: (j.date || "").slice(0, 10), narration: j.narration || "", ref: j.ref || "", voucher_no: j.voucher_no,
@@ -35,8 +42,9 @@ export default function JournalEntry() {
     setOpen(true);
   };
 
-  const load = async () => setEntries((await api.get("/journal")).data);
-  useEffect(() => { load(); }, []);
+  const load = async () => setEntries((await api.get("/journal", { params: {
+    ...(dateFrom ? { date_from: dateFrom } : {}), ...(dateTo ? { date_to: dateTo } : {}) } })).data);
+  useEffect(() => { load(); }, [dateFrom, dateTo]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     Promise.all([api.get("/accounts"), api.get("/parties")]).then(([a, p]) => {
       setAccounts(a.data); setParties(p.data);
@@ -97,12 +105,11 @@ export default function JournalEntry() {
 
   // Keyboard shortcuts
   useKeyboardShortcuts([
-    { key: "a", action: () => { setEditId(null); setForm(blank()); setOpen(true); },
-      description: "Add new journal" },
+    { key: "a", action: openNew, description: "Add new journal" },
     { ctrl: true, key: "s", action: () => open && save(),
       allowInInputs: true, description: "Save journal" },
     open ? { key: "Escape", action: () => closeForm(), allowInInputs: true, description: "Close modal" } : null,
-  ], [open]);
+  ], [open, dateTo]);
 
   return (
     <div className="space-y-5" data-testid="page-journal">
@@ -113,7 +120,7 @@ export default function JournalEntry() {
           <div className="text-muted2 text-sm mt-1">Double-entry: Debit = Credit. Bina cash ke adjustments / transfers.</div>
         </div>
         <div className="flex items-end gap-2">
-          <ExportBar filename="journal-entries" sheets={[{
+          <ExportBar filename={`journal-entries_${dateFrom || "all"}_${dateTo || "all"}`} title={`Journal Voucher Register · ${rangeLabel}`} sheets={[{
             name: "Journal Register",
             columns: [
               { key: "voucher_no", label: "V.No.", width: 10 },
@@ -125,14 +132,31 @@ export default function JournalEntry() {
             ],
             rows: entries,
           }]} />
-          <button className="btn-primary" onClick={() => { setEditId(null); setForm(blank()); setOpen(true); }} data-testid="btn-new-journal">
+          <button className="btn-primary" onClick={openNew} data-testid="btn-new-journal">
             <Plus size={16} weight="bold" /> Nayi Journal <span className="kbd ml-1">D</span>
           </button>
         </div>
       </div>
 
+      <div className="card-flat p-3 flex flex-wrap items-end gap-3 print:hidden" data-testid="journal-filters">
+        <div>
+          <label className="lbl">From</label>
+          <input type="date" className="input-dense" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} data-testid="input-date-from" />
+        </div>
+        <div>
+          <label className="lbl">To</label>
+          <input type="date" className="input-dense" value={dateTo} onChange={(e) => setDateTo(e.target.value)} data-testid="input-date-to" />
+        </div>
+        <button className={dateFrom === todayISO() && dateTo === todayISO() ? "btn-primary" : "btn-outline"}
+          onClick={() => { setDateFrom(todayISO()); setDateTo(todayISO()); }} title="Aaj ki entries" data-testid="journal-quick-today">Today</button>
+        <button className="btn-outline" onClick={monthRange} title="Is mahine ki entries" data-testid="journal-quick-month">Is Mahina</button>
+        <button className={!dateFrom && !dateTo ? "btn-primary" : "btn-outline"}
+          onClick={() => { setDateFrom(""); setDateTo(""); }} title="Sabhi entries (koi date filter nahi)" data-testid="journal-quick-all">Sab</button>
+        <div className="text-xs text-muted2 ml-auto font-mono-data" data-testid="journal-range-label">{rangeLabel} · {entries.length} voucher</div>
+      </div>
+
       <FoxProPrintHeader title="JOURNAL VOUCHER REGISTER"
-        subtitle={`Total ${entries.length} vouchers`} />
+        subtitle={`${rangeLabel} · Total ${entries.length} vouchers`} />
 
       <div className="card-flat overflow-hidden">
         <table className="dense w-full" data-testid="table-journal">
@@ -148,7 +172,9 @@ export default function JournalEntry() {
           </thead>
           <tbody>
             {entries.length === 0 ? (
-              <tr><td colSpan={6} className="py-10 text-center text-muted2">Koi journal entry nahi.</td></tr>
+              <tr><td colSpan={6} className="py-10 text-center text-muted2" data-testid="journal-empty">
+                {rangeLabel} me koi journal entry nahi. <button className="underline hover:text-terracotta" onClick={() => { setDateFrom(""); setDateTo(""); }}>Sabhi dikhayein</button>
+              </td></tr>
             ) : entries.map((j) => (
               <tr key={j.id} data-testid={`journal-row-${j.id}`}>
                 <td className="font-mono-data text-terracotta">{j.voucher_no}</td>

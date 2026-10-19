@@ -124,6 +124,9 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 ### Jun 2026 – Entry Sound (FoxPro beep)
 - `lib/sound.js`: Web Audio (no files) — `beepOk` soft ascending chirp (880→1318 Hz), `beepError` low square buzz; `installSoundHooks()` (App.js) wraps sonner `toast.success`/`toast.error` app-wide + native `invalid` form events → every save beeps, every error/validation buzzes. Burst de-dupe (120 ms), audio unlock on first gesture. Preference in localStorage `vyapari.sound` (device-level, default ON). `components/SoundSettingsCard.jsx` in Settings: ON/OFF switch + "Save beep sunein / Error buzz sunein" test buttons. Verified via instrumented AudioContext in Playwright (buzz on login error, 0 sounds when OFF, persists).
 
+### Jun 2026 – Journal date filter
+- JournalEntry page: From/To date filter bar (default aaj, Rokad jaisa) + Today / Is Mahina / Sab chips, range label with count, empty-state link "Sabhi dikhayein"; `/journal?date_from&date_to` already supported. New journal default date = selected To date; print header + Excel filename/title carry the range.
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅
