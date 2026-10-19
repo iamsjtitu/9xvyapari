@@ -420,6 +420,7 @@ label.lbl {
 .db-row .iv { width: 64px; }
 .db-row .am { width: 112px; }
 .db-bold { font-weight: 700; background: #f6f2e8; }
+.db-daytotal { border-top: 1px solid #000; }
 .db-closing { border-top: 1px solid #000; }
 .db-account { margin-top: 10px; break-inside: avoid; }
 .db-t.dos-total { margin-top: 2px; }
