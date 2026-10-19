@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useParams, Link, useSearchParams, useOutletContext } from "react-router-dom";
 import api, { inr, todayISO } from "@/lib/api";
-import { ArrowLeft, Receipt, Notebook, BookOpen, BookOpenText, Wallet, Printer } from "@phosphor-icons/react";
+import { ArrowLeft, Receipt, Notebook, BookOpen, BookOpenText, Wallet, Printer, CheckCircle } from "@phosphor-icons/react";
 import { ExportBar } from "@/components/ExportBar";
 import { PartyStatement } from "@/components/PartyStatement";
 import { LoadState } from "@/components/LoadState";
+import { SettledMarkerRow, SettledBadge, reopenSettled } from "@/components/SettledMarker";
 
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
 
@@ -37,7 +38,7 @@ function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = 
   journal.forEach((j, i) => rows.push({
     kind: "journal", id: `${j.id}-${i}`, date: j.date, vno: j.voucher_no || "",
     label: `Journal${j.narration ? " · " + j.narration : ""}${j.other ? " | vs " + j.other : ""}`,
-    debit: j.debit, credit: j.credit,
+    debit: j.debit, credit: j.credit, settles_rokad_id: j.settles_rokad_id || null,
   }));
   dos_journal.forEach((j) => {
     const sgnLabel = { SR: "Sale Reg", PR: "Purchase Reg", CB: "Cash Book", JR: "Journal" }[j.sgn] || j.sgn || "DOS";
@@ -147,7 +148,7 @@ export default function PartyLedger() {
       {/* Print output = DOS statement (always); on screen only when toggled */}
       <div className={view === "statement" ? "" : "hidden print:block"}>
         <PartyStatement firmName={settings?.firm_name} party={party} rows={enriched} opening={opening}
-          closing={party.balance} dateFrom={dateFrom} asOn={asOn} />
+          closing={party.balance} dateFrom={dateFrom} asOn={asOn} settledUpto={data.settled_upto} />
       </div>
 
       <div className={view === "statement" ? "hidden" : "space-y-5 print:hidden"}>
@@ -161,6 +162,7 @@ export default function PartyLedger() {
               {party.phone && <span className="font-mono-data mr-3">Ph: {party.phone}</span>}
               {party.address && <span>{party.address}</span>}
             </div>
+            {data.settled_upto && <SettledBadge date={data.settled_upto} className="mt-2" />}
           </div>
           <div className="text-right">
             <div className="section-title">Closing as on {fmtDate(asOn)}</div>
@@ -211,7 +213,8 @@ export default function PartyLedger() {
               <tr><td colSpan={5} className="py-10 text-center text-muted2">Is period me koi transaction nahi.</td></tr>
             ) : (
               enriched.map((r) => (
-                <tr key={`${r.kind}-${r.id}`}>
+                <Fragment key={`${r.kind}-${r.id}`}>
+                <tr>
                   <td className="font-mono-data text-muted2 whitespace-nowrap">{fmtDate((r.date || "").slice(0, 10))}</td>
                   <td>
                     <div className="flex items-center gap-2">
@@ -239,6 +242,11 @@ export default function PartyLedger() {
                     ₹ {inr(Math.abs(r.balance))} {r.balance < 0 && <span className="text-[10px] ml-1 text-jama">CR</span>}
                   </td>
                 </tr>
+                {r.settles_rokad_id && (
+                  <SettledMarkerRow colSpan={5} date={(r.date || "").slice(0, 10)} rokadId={r.settles_rokad_id}
+                    onReopen={async () => { if (await reopenSettled(r.settles_rokad_id)) setAttempt((a) => a + 1); }} />
+                )}
+                </Fragment>
               ))
             )}
           </tbody>

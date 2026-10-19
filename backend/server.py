@@ -825,6 +825,70 @@ async def update_rokad(rid: str, body: RokadIn, current=Depends(get_current_user
     return merged
 
 
+@api.post("/rokad/{rid}/reopen")
+async def reopen_rokad(rid: str, current=Depends(get_current_user)):
+    """Undo Account Settled on an entry: remove the adjustment journal so the party's baki comes back."""
+    rok = await db.rokad.find_one({"id": rid}, {"_id": 0})
+    if not rok:
+        raise HTTPException(404, "Entry nahi mili")
+    if not rok.get("settle") and not rok.get("settle_journal_id"):
+        raise HTTPException(400, "Yeh entry settled nahi hai")
+    removed = abs(float(rok.get("settled_amount") or 0))
+    await db.journal.delete_many({"settles_rokad_id": rid})
+    await db.rokad.update_one({"id": rid}, {"$set": {"settle": False, "updated_at": now_iso()},
+                                            "$unset": {"settle_journal_id": "", "settled_amount": ""}})
+    return {"ok": True, "removed_amount": removed, "party_id": rok.get("party_id"), "party_name": rok.get("party_name", "")}
+
+
+@api.get("/reports/account-clear")
+async def account_clear_report(date_from: Optional[str] = None, date_to: Optional[str] = None, current=Depends(get_current_user)):
+    """Everything posted to the Account Clear ledger (auto settlements + manual journals) in a date range."""
+    for d in (date_from, date_to):
+        if d and not _is_date(d):
+            raise HTTPException(400, "Date YYYY-MM-DD format me do")
+    st = await db.settings.find_one({"id": "default"}, {"_id": 0}) or {}
+    sid = st.get("settle_account_id")
+    if not sid:
+        return {"ledger": None, "date_from": date_from, "date_to": date_to, "rows": [], "count": 0,
+                "total_off": 0.0, "total_back": 0.0, "net": 0.0, "firm_name": st.get("firm_name", "")}
+    led = await db.parties.find_one({"id": sid}, {"_id": 0, "id": 1, "name": 1}) or {"id": sid, "name": st.get("settle_account_name", "")}
+    q: dict = {"lines.account_id": sid}
+    rng = {}
+    if date_from: rng["$gte"] = date_from
+    if date_to: rng["$lte"] = date_to
+    if rng: q["date"] = rng
+    rows, total_off, total_back = [], 0.0, 0.0
+    rokad_ids = set()
+    async for j in db.journal.find(q, {"_id": 0}).sort([("date", 1), ("created_at", 1)]):
+        mine = [ln for ln in j.get("lines", []) if ln.get("account_id") == sid]
+        others = [ln for ln in j.get("lines", []) if ln.get("account_id") != sid]
+        dr = sum(float(ln.get("debit") or 0) for ln in mine)
+        cr = sum(float(ln.get("credit") or 0) for ln in mine)
+        amt = round(dr - cr, 2)
+        if abs(amt) < 0.005:
+            continue
+        side = "off" if amt > 0 else "back"   # Dr Account Clear = party ka baki chhoda (written off); Cr = humne apna dena chhoda
+        if side == "off": total_off += amt
+        else: total_back += -amt
+        rid = j.get("settles_rokad_id")
+        if rid: rokad_ids.add(rid)
+        rows.append({"journal_id": j["id"], "date": (j.get("date") or "")[:10], "voucher_no": j.get("voucher_no", ""),
+                     "party_id": others[0].get("account_id") if others else None,
+                     "party_name": ", ".join(o.get("account_name", "") for o in others) or "—",
+                     "amount": abs(amt), "side": side, "narration": j.get("narration", ""),
+                     "rokad_id": rid, "auto": bool(rid)})
+    if rokad_ids:
+        vmap = {r["id"]: r async for r in db.rokad.find({"id": {"$in": list(rokad_ids)}}, {"_id": 0, "id": 1, "voucher_no": 1, "cash_account_name": 1, "amount": 1, "type": 1})}
+        for r in rows:
+            rk = vmap.get(r.get("rokad_id"))
+            if rk:
+                r["rokad_vno"] = rk.get("voucher_no", ""); r["cash_account_name"] = rk.get("cash_account_name", "")
+                r["rokad_amount"] = rk.get("amount"); r["rokad_type"] = rk.get("type")
+    return {"ledger": led, "date_from": date_from, "date_to": date_to, "rows": rows, "count": len(rows),
+            "total_off": round(total_off, 2), "total_back": round(total_back, 2), "net": round(total_off - total_back, 2),
+            "firm_name": st.get("firm_name", "")}
+
+
 @api.delete("/rokad/{rid}")
 async def delete_rokad(rid: str, current=Depends(get_current_user)):
     existing = await db.rokad.find_one({"id": rid}, {"_id": 0, "contra_id": 1})
@@ -1018,8 +1082,16 @@ async def _journal_rows(pid: str, upto: dict) -> list:
                 other = ", ".join(x.get("account_name", "") for x in j.get("lines", []) if x.get("account_id") != pid)
                 journal.append({"id": j["id"], "date": j.get("date"), "voucher_no": j.get("voucher_no", ""),
                                 "narration": j.get("narration", ""), "other": other,
-                                "debit": float(ln.get("debit") or 0), "credit": float(ln.get("credit") or 0)})
+                                "debit": float(ln.get("debit") or 0), "credit": float(ln.get("credit") or 0),
+                                "settles_rokad_id": j.get("settles_rokad_id"), "auto": j.get("auto")})
     return journal
+
+
+async def _settled_upto(pid: str, as_on: Optional[str]) -> Optional[str]:
+    """Date of the latest Account Settled adjustment for this party (as on date)."""
+    q = {"settles_rokad_id": {"$exists": True}, "lines.account_id": pid, **_upto(as_on)}
+    j = await db.journal.find(q, {"_id": 0, "date": 1}).sort("date", -1).limit(1).to_list(1)
+    return (j[0].get("date") or "")[:10] if j else None
 
 
 async def _account_ledger(acc: dict, as_on: Optional[str], date_from: Optional[str], upto: dict) -> dict:
@@ -1082,7 +1154,8 @@ async def party_ledger(pid: str, as_on: Optional[str] = None, date_from: Optiona
         day_before = (datetime.fromisoformat(date_from).date() - timedelta(days=1)).isoformat()
         opening = await _compute_party_balance(pid, opening, day_before)
     return {"party": party, "as_on": as_on, "date_from": date_from, "opening": opening, "bills": bills, "rokad": rokads,
-            "cash_rokad": cash_rokad, "journal": journal, "dos_journal": dos_journal}
+            "cash_rokad": cash_rokad, "journal": journal, "dos_journal": dos_journal,
+            "settled_upto": await _settled_upto(pid, as_on)}
 
 
 # ---------- ACCOUNT GROUPS ----------

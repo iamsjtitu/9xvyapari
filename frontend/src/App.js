@@ -28,6 +28,7 @@ import Settings from "@/pages/Settings";
 import YearEnd from "@/pages/YearEnd";
 import OpeningBalance from "@/pages/OpeningBalance";
 import Outstanding from "@/pages/Outstanding";
+import AccountClearReport from "@/pages/AccountClearReport";
 import Inward from "@/pages/Inward";
 import TrialBalance from "@/pages/TrialBalance";
 import ImportDBF from "@/pages/ImportDBF";
@@ -94,6 +95,7 @@ function App() {
             <Route path="year-end" element={<YearEnd />} />
             <Route path="opening-balance" element={<OpeningBalance />} />
             <Route path="outstanding" element={<Outstanding />} />
+            <Route path="account-clear" element={<AccountClearReport />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

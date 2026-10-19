@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
-import { Plus, Trash, ArrowDown, ArrowUp, X, PencilSimple, ArrowsLeftRight, Printer, ListNumbers } from "@phosphor-icons/react";
+import { Plus, Trash, ArrowDown, ArrowUp, X, PencilSimple, ArrowsLeftRight, Printer, ListNumbers, ArrowCounterClockwise } from "@phosphor-icons/react";
+import { reopenSettled } from "@/components/SettledMarker";
 import { toast } from "sonner";
 import { ExportBar } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -303,6 +304,13 @@ export default function RokadPanna() {
                   >
                     <Trash size={14} />
                   </button>
+                  {e.settle_journal_id && (
+                    <button className="btn-ghost p-1.5 text-jama" title="Reopen — settlement hatao, party ka baki wapas aayega"
+                      onClick={async () => { if (await reopenSettled(e.id, e.party_name)) { load(); loadSummary(); } }}
+                      data-testid={`rokad-reopen-${e.id}`}>
+                      <ArrowCounterClockwise size={14} weight="bold" />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))

@@ -6,7 +6,7 @@ const drcr = (n) => `${inr(Math.abs(n))} ${n < 0 ? "Cr" : n > 0 ? "Dr" : "  "}`;
 const refOf = (r) => r.voucher_no || r.ref_no || r.bill_no || "";
 
 // DOS-style printable ledger statement: opening → entries → totals → closing, one page
-export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFrom, asOn }) => {
+export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFrom, asOn, settledUpto }) => {
   const totalDr = rows.reduce((t, r) => t + (r.debit || 0), 0);
   const totalCr = rows.reduce((t, r) => t + (r.credit || 0), 0);
   const period = dateFrom ? `${fmtDate(dateFrom)} To ${fmtDate(asOn)}` : `Upto ${fmtDate(asOn)}`;
@@ -22,6 +22,7 @@ export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFr
           {party.place ? ` · ${party.place}` : ""}
         </div>
         <div>Period : <b>{period}</b></div>
+        {settledUpto && <div className="dos-settled-tag" data-testid="stmt-settled-upto">✔ ACCOUNT CLEARED UPTO {fmtDate(settledUpto)}</div>}
       </div>
       <div className="dos-stmt-row dos-head mt-2">
         <span className="dt">Date</span><span className="pt">Particulars</span><span className="rf">Vch/Ref</span>
@@ -35,13 +36,22 @@ export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFr
       {rows.length === 0 ? (
         <div className="dos-stmt-row"><span className="dt"></span><span className="pt">-- is period me koi entry nahi --</span></div>
       ) : rows.map((r, i) => (
-        <div className="dos-stmt-row" key={`${r.kind}-${r.id}-${i}`}>
-          <span className="dt">{fmtDate((r.date || "").slice(0, 10))}</span>
-          <span className="pt" title={r.label}>{r.label}</span>
-          <span className="rf">{refOf(r)}</span>
-          <span className="am">{r.debit ? inr(r.debit) : ""}</span>
-          <span className="am">{r.credit ? inr(r.credit) : ""}</span>
-          <span className="bl">{drcr(r.balance)}</span>
+        <div key={`${r.kind}-${r.id}-${i}`}>
+          <div className="dos-stmt-row">
+            <span className="dt">{fmtDate((r.date || "").slice(0, 10))}</span>
+            <span className="pt" title={r.label}>{r.label}</span>
+            <span className="rf">{refOf(r)}</span>
+            <span className="am">{r.debit ? inr(r.debit) : ""}</span>
+            <span className="am">{r.credit ? inr(r.credit) : ""}</span>
+            <span className="bl">{drcr(r.balance)}</span>
+          </div>
+          {r.settles_rokad_id && (
+            <div className="dos-stmt-row dos-settled" data-testid="stmt-settled-row">
+              <span className="dt"></span>
+              <span className="pt">*** ACCOUNT CLEARED UPTO {fmtDate((r.date || "").slice(0, 10))} — LEDGER 0 ***</span>
+              <span className="rf"></span><span className="am"></span><span className="am"></span><span className="bl">0.00</span>
+            </div>
+          )}
         </div>
       ))}
       <div className="dos-stmt-row dos-total" data-testid="stmt-total-row">
