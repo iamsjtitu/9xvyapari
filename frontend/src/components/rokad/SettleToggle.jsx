@@ -86,8 +86,16 @@ export const SettleToggle = ({ form, onChange, editEntry }) => {
   if (!form.party_id) return null;
   const amount = Number(form.amount) || 0;
   const editing = !!editEntry?.id;
-  // In edit mode the stored balance already includes this entry (+ its old adjustment) → show the stored figure instead
-  const rem = editing ? (editEntry.settled_amount ?? null) : bal == null ? null : (form.type === "jama" ? bal - amount : bal + amount);
+  const effect = (type, amt) => (type === "jama" ? -amt : amt); // rokad effect on party balance (Dr +ve)
+  let rem = null;
+  if (bal != null) {
+    let base = bal;
+    if (editing && (editEntry.date || "").slice(0, 10) <= form.date) {
+      // as-on balance already holds the old entry + its old adjustment → strip both before previewing
+      base = bal + Number(editEntry.settled_amount || 0) - effect(editEntry.type, Number(editEntry.amount) || 0);
+    }
+    rem = base + effect(form.type, amount);
+  }
   const configured = !!settings?.settle_account_id;
   const fmtRem = (v) => `₹ ${inr(Math.abs(v))} ${v > 0 ? "Dr" : v < 0 ? "Cr" : ""}`.trim();
 

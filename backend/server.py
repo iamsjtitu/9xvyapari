@@ -727,8 +727,7 @@ async def create_rokad(body: RokadIn, current=Depends(get_current_user)):
             doc["cash_account_name"] = doc.get("cash_account_name") or cash["name"]
     if not (doc.get("voucher_no") or "").strip() and doc.get("cash_account_id"):
         doc["voucher_no"] = await _next_voucher(doc["cash_account_id"])  # auto V.No. per cash a/c
-    if doc.get("settle"):
-        await _settle_account()  # fail early with a clear message if not configured
+    await _settle_targets(doc)  # validate Account Settled BEFORE anything is written
     doc["id"] = str(uuid.uuid4())
     doc["created_at"] = now_iso()
     await db.rokad.insert_one(doc.copy())
@@ -749,19 +748,39 @@ async def _settle_account() -> dict:
     return led
 
 
-async def _apply_settlement(rok: dict) -> Optional[dict]:
-    """(Re)build the settlement journal for a rokad entry. Returns the journal summary or None."""
-    rid = rok["id"]
-    await db.journal.delete_many({"settles_rokad_id": rid})  # recompute from scratch (edit / un-tick)
-    if not rok.get("settle") or not rok.get("party_id"):
-        await db.rokad.update_one({"id": rid}, {"$unset": {"settle_journal_id": "", "settled_amount": ""}})
+async def _settle_targets(rok: dict) -> Optional[tuple]:
+    """Validate an Account Settled request → (party, clear_ledger), or None when settle is off."""
+    if not rok.get("settle"):
         return None
+    if not rok.get("party_id"):
+        raise HTTPException(400, "Account Settled ke liye party chunna zaroori hai")
     party = await db.parties.find_one({"id": rok["party_id"]}, {"_id": 0, "id": 1, "name": 1, "opening_balance": 1})
     if not party:
         raise HTTPException(400, "Account Settled sirf party ledger ke saath ho sakta hai")
     led = await _settle_account()
     if led["id"] == party["id"]:
         raise HTTPException(400, "Party aur 'Account Clear' ledger ek hi nahi ho sakte")
+    return party, led
+
+
+async def _next_journal_vno() -> str:
+    cur = db.journal.find({"voucher_no": {"$regex": "^J\\d+$"}}, {"_id": 0, "voucher_no": 1})
+    mx = 0
+    async for j in cur:
+        try: mx = max(mx, int(j["voucher_no"][1:]))
+        except ValueError: pass
+    return f"J{mx + 1:05d}"
+
+
+async def _apply_settlement(rok: dict) -> Optional[dict]:
+    """(Re)build the settlement journal for a rokad entry. Returns the journal summary or None."""
+    rid = rok["id"]
+    await db.journal.delete_many({"settles_rokad_id": rid})  # recompute from scratch (edit / un-tick)
+    targets = await _settle_targets(rok)
+    if not targets:
+        await db.rokad.update_one({"id": rid}, {"$unset": {"settle_journal_id": "", "settled_amount": ""}})
+        return None
+    party, led = targets
     rem = round(await _compute_party_balance(party["id"], float(party.get("opening_balance") or 0), rok["date"]), 2)
     if abs(rem) < 0.005:
         await db.rokad.update_one({"id": rid}, {"$set": {"settled_amount": 0}, "$unset": {"settle_journal_id": ""}})
@@ -777,7 +796,7 @@ async def _apply_settlement(rok: dict) -> Optional[dict]:
     narr = f"Account cleared upto {d[2]}-{d[1]}-{d[0]} · {party['name']} · baki ₹{amt:,.2f} {'Dr' if rem > 0 else 'Cr'} → {led['name']}"
     j = {"id": str(uuid.uuid4()), "date": rok["date"], "narration": narr, "lines": lines, "total": amt,
          "ref": f"Rokad V.{rok.get('voucher_no') or ''}".strip(), "settles_rokad_id": rid,
-         "voucher_no": f"J{(await db.journal.count_documents({}) + 1):05d}", "created_at": now_iso(), "auto": "settle"}
+         "voucher_no": await _next_journal_vno(), "created_at": now_iso(), "auto": "settle"}
     await db.journal.insert_one(j.copy())
     j.pop("_id", None)
     await db.rokad.update_one({"id": rid}, {"$set": {"settle_journal_id": j["id"], "settled_amount": amt if rem > 0 else -amt}})
@@ -799,8 +818,9 @@ async def update_rokad(rid: str, body: RokadIn, current=Depends(get_current_user
             doc["cash_account_id"] = cash["id"]
             doc["cash_account_name"] = doc.get("cash_account_name") or cash["name"]
     doc["updated_at"] = now_iso()
-    await db.rokad.update_one({"id": rid}, {"$set": doc})
     merged = {**existing, **doc}
+    await _settle_targets(merged)  # validate before writing
+    await db.rokad.update_one({"id": rid}, {"$set": doc})
     merged["settlement"] = await _apply_settlement(merged)
     return merged
 
@@ -1186,7 +1206,7 @@ async def create_journal(body: JournalIn, current=Depends(get_current_user)):
     total = _validate_journal(body)
     doc = body.model_dump()
     doc["id"] = str(uuid.uuid4())
-    doc["voucher_no"] = f"J{(await db.journal.count_documents({}) + 1):05d}"
+    doc["voucher_no"] = await _next_journal_vno()
     doc["total"] = total
     doc["created_at"] = now_iso()
     await db.journal.insert_one(doc.copy())

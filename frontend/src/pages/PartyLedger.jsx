@@ -90,7 +90,9 @@ export default function PartyLedger() {
     { l: "FY Start", d: settings?.fy_start, tid: "ledger-quick-fystart" },
     { l: "FY End", d: settings?.fy_end, tid: "ledger-quick-fyend" },
   ].filter((q) => q.d);
-  const balColor = party.balance > 0 ? "#B71C1C" : party.balance < 0 ? "#1B5E20" : "#595959";
+  const balColor = isAccount
+    ? (party.balance < 0 ? "#B71C1C" : party.balance > 0 ? "#1A1A1A" : "#595959")  // cash/bank: Dr = paisa haath me, Cr (overdrawn) = red
+    : (party.balance > 0 ? "#B71C1C" : party.balance < 0 ? "#1B5E20" : "#595959");
   const periodText = dateFrom ? `${fmtDate(dateFrom)} → ${fmtDate(asOn)}` : `upto ${fmtDate(asOn)}`;
 
   return (
@@ -210,7 +212,7 @@ export default function PartyLedger() {
             ) : (
               enriched.map((r) => (
                 <tr key={`${r.kind}-${r.id}`}>
-                  <td className="font-mono-data text-muted2 whitespace-nowrap">{r.date}</td>
+                  <td className="font-mono-data text-muted2 whitespace-nowrap">{fmtDate((r.date || "").slice(0, 10))}</td>
                   <td>
                     <div className="flex items-center gap-2">
                       {KIND_ICON[r.kind]}

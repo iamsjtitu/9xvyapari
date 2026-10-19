@@ -265,7 +265,7 @@ export default function RokadPanna() {
                       </span>
                     )}
                     {e.settle_journal_id && (
-                      <span className="kbd !text-[9px] !px-1 !py-0 text-jama border-jama/40" title={`Account Settled · ₹${inr(Math.abs(e.settled_amount || 0))} Account Clear me`} data-testid={`rokad-settled-badge-${e.id}`}>
+                      <span className="kbd !text-[10px] !px-1.5 !py-0 font-semibold text-white !bg-jama !border-jama" title={`Account Settled · ₹${inr(Math.abs(e.settled_amount || 0))} Account Clear me`} data-testid={`rokad-settled-badge-${e.id}`}>
                         SETTLED
                       </span>
                     )}
@@ -656,6 +656,7 @@ export default function RokadPanna() {
                     className="input-dense"
                     value={form.date}
                     onChange={(e) => setForm({ ...form, date: e.target.value })}
+                    data-testid="rokad-form-date"
                   />
                 </div>
               </div>

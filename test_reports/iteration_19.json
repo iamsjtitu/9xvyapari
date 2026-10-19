@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 19: tested Account Settled (backend + UI), Settings link card, clicking an account row on the Accounts page to open its ledger, and regressions (inline party create, POST /parties 422/409, modals not closing on drag-select). Backend: 10/11 pytest pass. One bug found: when settle validation fails, the rokad entry is already saved and stays in the DB even though the API returns 400. Dr flow passes (940 against a 1000 opening leaves 60 → ACCOUNT CLEAR, J voucher, narration 'Account cleared upto 12-06-2026', balance 0). Editing to 900 gives 100 with still ONE journal. Unticking removes the journal (balance 100). Re-ticking then deleting removes the journal too (balance 1000). Cr side passes (-500 opening, kharch 480 → 20 Cr, Dr Party / Cr ACCOUNT CLEAR). Rokad list doc has settle/settle_journal_id/settled_amount. Party create: '' and '   ' → 422; 'cash in hand' → 409 'CASH IN HAND pehle se hai'; lower-case and padded duplicates → 409. Frontend all PASS: settle-box and settle-info show '₹ 60.00 Dr → ACCOUNT CLEAR … Account cleared upto 15-06-2026'. Save shows both toasts ('Account Settled: ₹60.00 Dr → ACCOUNT CLEAR · ledger 0 · Journal J00002' and 'Entry add ki gayi'). The SETTLED badge shows on the row. Edit opens with the box pre-ticked and settle-existing shown. The party ledger shows the receipt and the journal row, closing ₹0.00. Deleting from the UI also removes the journal. Settings: switching to another ledger and back persists after reload; final state is ACCOUNT CLEAR. Accounts page: row click, name link and book icon all go to /parties/<id> 'Account Ledger' with running balance; 'Wapas' goes back to /accounts; edit and delete do not navigate. Note: the Accounts collection has only 1 account ('Cash IN Hand'). TITU (TITU SINDHIKELA) is a PARTY, so it is not listed on the Accounts page; clicking it in Party Khata opens its ledger correctly. Inline party create works by both click and Enter: amount and date are kept and the entry saves. Drag-select safety works on the Rokad, Accounts edit and Parties add modals (drag-release keeps the modal open; a plain backdrop click closes it).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/rokad (settle:true)", "issue": "The rokad doc is inserted BEFORE _apply_settlement validates. So the 400 'Party aur Account Clear ledger ek hi nahi ho sakte' (and the 'sirf party ledger' 400 when party_id is an accounts id) still leaves the rokad entry saved. The user sees an error, retries, and gets duplicate cash entries. Reproduced: test_settle_party_is_clear_ledger found 1 orphan.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "PUT /api/rokad/{id} (settle:true)", "issue": "Same ordering problem: db.rokad.update_one($set doc) runs before _apply_settlement. If settlement validation raises 400, the edit is still saved with settle:true but no journal."},
+      {"endpoint": "_apply_settlement voucher_no", "issue": "voucher_no = 'J%05d' % (count_documents+1) is count-based. After any journal is deleted, a new one can reuse an existing J number, giving duplicate journal voucher numbers. Use max(voucher_no)+1 or a counter."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PartyLedger", "issues": ["Entry dates show as ISO 'YYYY-MM-DD' (2026-06-15) while the opening row and the closing label use DD-MM-YYYY. Inconsistent.", "Account ledger (Cash IN Hand): a positive Dr closing balance is shown in red, which reads as negative/Cr."]},
+      {"screen": "RokadPanna list", "issues": ["The SETTLED badge is very small (9px) and low contrast."]},
+      {"screen": "Rokad form", "issues": ["Date input has no data-testid.", "In edit mode settle-info shows the stored settled_amount and does not recompute when the amount is changed before saving, so the preview is stale (the backend recomputes correctly)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_settle_v19.py", "/app/backend/tests/test_party_inline_v18.py", "/app/test_reports/pytest/pytest_v19.xml"],
+  "action_items": [
+    "HIGH: In create_rokad, run all settlement validations before insert_one (check party exists in parties and party_id != settle_account_id). Otherwise, roll back the inserted rokad when _apply_settlement raises. Do the same in update_rokad before $set.",
+    "Make the settlement journal voucher_no unique (max+1 / counter), not count_documents+1.",
+    "Optional: use DD-MM-YYYY for entry dates in PartyLedger rows; recompute settle-info in edit mode when the amount changes."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 2900+ lines; split it into routers (rokad/settlement, parties, journal, settings).",
+    "_apply_settlement deletes the old journal and recomputes the balance as on the rokad date. Settled rokads for the same party on the same date or later are not re-settled when an earlier entry changes. This is acceptable but should be documented.",
+    "Accounts page only lists the accounts collection (1 record). Party ledgers like TITU live on Party Khata. If the user expects TITU on Accounts (Khate), consider clarifying or merging the lists."
+  ],
+  "updated_files": ["/app/backend/tests/test_settle_v19.py"],
+  "success_rate": {"backend": "91% (10/11)", "frontend": "100%"},
+  "seed_data_creation": "Deleted pre-existing settled rokad bdbef1c2 (2026-06-10) for SETTLE TEST PARTY, as allowed, so the 1000 Dr opening gives 60 Dr. All QA parties/rokads/journals cleaned up. SETTLE TEST PARTY (balance 1000 Dr, no entries) and the ACCOUNT CLEAR link remain.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest tests/test_settle_v19.py with REACT_APP_BACKEND_URL exported. test_settle_party_is_clear_ledger asserts no orphan rokad after the 400 and is expected to pass once the fix lands. The rokad list defaults to today's date (system date is 2026-10-19), so set input-date-from/to to see entries on other dates. Party autocomplete testid 'select-party', options 'select-party-opt-<id>', create footer 'select-party-create'. Rokad delete uses window.confirm.",
+  "test_credentials": "admin / Vyapari@2026"
+}
