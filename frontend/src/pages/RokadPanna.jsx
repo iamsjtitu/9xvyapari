@@ -13,6 +13,7 @@ import { RenumberVouchersDialog } from "@/components/rokad/RenumberVouchersDialo
 import { VoucherSlip } from "@/components/rokad/VoucherSlip";
 import PartyAutocomplete from "@/components/PartyAutocomplete";
 import { SettleToggle } from "@/components/rokad/SettleToggle";
+import { KhataModal } from "@/components/KhataModal";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 import { backdropClose } from "@/lib/backdrop";
 
@@ -83,18 +84,13 @@ export default function RokadPanna() {
 
   // Parties for the Party field (cash/bank ledgers are accounts, not parties)
   const partyOptions = useMemo(() => parties.filter((p) => !/cash|bank/i.test(p.group_name || "")), [parties]);
-  // "+ Add '<name>' as new party" from inside the entry form — entry data stays as it is
-  const createParty = async (name) => {
-    const cleaned = String(name || "").trim();
-    if (!cleaned) return;
-    try {
-      const { data } = await api.post("/parties", { name: cleaned });
-      setParties((prev) => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
-      setForm((f) => ({ ...f, party_id: data.id, party_name: data.name }));
-      toast.success(`Party "${data.name}" ban gayi aur select ho gayi`);
-    } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
-    }
+  // "+ Add '<name>' as new party" from inside the entry form → opens the full Khata window; entry data stays as it is
+  const [newKhata, setNewKhata] = useState(null);
+  const createParty = (name) => { const cleaned = String(name || "").trim(); if (cleaned) setNewKhata({ id: null, name: cleaned }); };
+  const onKhataSaved = (data) => {
+    setParties((prev) => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+    setForm((f) => ({ ...f, party_id: data.id, party_name: data.name }));
+    setNewKhata(null);
   };
 
   // Page-level keyboard shortcuts
@@ -440,6 +436,7 @@ export default function RokadPanna() {
       </div>
 
       {slip && <VoucherSlip entry={slip} onClose={() => setSlip(null)} />}
+      <KhataModal khata={newKhata} onClose={() => setNewKhata(null)} onSaved={onKhataSaved} title="Naya Party Khata (entry ke liye)" />
       {renumber && selectedBank && (
         <RenumberVouchersDialog account={selectedBank} fyStart={settings?.fy_start} fyEnd={settings?.fy_end}
           onClose={() => setRenumber(false)} onDone={load} />

@@ -230,9 +230,9 @@ export default function PartyLedger() {
                       ) : (
                         <span>{r.label}</span>
                       )}
-                      {r.kind !== "dos" && r.vno ? (
-                        <span className="kbd !text-[10px] !px-1.5 !py-0 whitespace-nowrap" title={r.kind === "bill" ? "Bill No." : r.kind === "journal" ? "Journal Voucher No." : "Rokad Voucher No. (cash a/c ka running number)"}
-                          data-testid={`ledger-vno-${r.id}`}>V.{r.vno}</span>
+                      {(r.kind === "bill" || r.kind === "journal") && r.vno ? (
+                        <span className="kbd !text-[10px] !px-1.5 !py-0 whitespace-nowrap" title={r.kind === "bill" ? "Bill No." : "Journal Voucher No."}
+                          data-testid={`ledger-vno-${r.id}`}>{r.kind === "bill" ? `Bill ${r.vno}` : r.vno}</span>
                       ) : null}
                     </div>
                   </td>

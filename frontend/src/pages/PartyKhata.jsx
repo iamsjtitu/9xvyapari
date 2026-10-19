@@ -1,33 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { inr, formatApiErrorDetail } from "@/lib/api";
-import { Plus, PencilSimple, Trash, X, MagnifyingGlass } from "@phosphor-icons/react";
+import { Plus, PencilSimple, Trash, MagnifyingGlass } from "@phosphor-icons/react";
+import { KhataModal } from "@/components/KhataModal";
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useTableNav } from "@/hooks/useTableNav";
 import { LedgerInUseDialog, inUseInfo } from "@/components/LedgerInUseDialog";
-import { backdropClose } from "@/lib/backdrop";
 
-const EMPTY = {
-  code: "",
-  name: "",
-  alt_name: "",
-  group_id: "",
-  group_name: "",
-  type: "both",
-  place: "",
-  phone: "",
-  address: "",
-  address2: "",
-  gstin: "",
-  pan: "",
-  cstno: "",
-  mpstno: "",
-  opening_balance: 0,
-  opening_qty: 0,
-  rate: 0,
-};
 
 export default function PartyKhata() {
   const [parties, setParties] = useState([]);
@@ -35,7 +16,6 @@ export default function PartyKhata() {
   const [q, setQ] = useState("");
   const [filterGroup, setFilterGroup] = useState("");
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState(EMPTY);
 
   const load = async () => {
     const { data } = await api.get("/parties");
@@ -49,65 +29,8 @@ export default function PartyKhata() {
     });
   }, []);
 
-  const submit = async (e) => {
-    e.preventDefault();
-    try {
-      const payload = {
-        ...form,
-        opening_balance: parseFloat(form.opening_balance || 0),
-        opening_qty: parseFloat(form.opening_qty || 0),
-        rate: parseFloat(form.rate || 0),
-        code: form.code ? parseInt(form.code) : null,
-      };
-      if (editing?.id) await api.put(`/parties/${editing.id}`, payload);
-      else await api.post("/parties", payload);
-      toast.success("Ledger saved");
-      setEditing(null); setForm(EMPTY); load();
-    } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
-    }
-  };
-
-  const startNew = async () => {
-    setEditing({ id: null });
-    setForm(EMPTY);
-  };
-
-  const onGroupChange = async (group_id) => {
-    const g = groups.find((x) => x.id === group_id);
-    setForm((f) => ({ ...f, group_id, group_name: g?.name || "" }));
-    if (!group_id || editing?.id) return;
-    // fetch next code suggestion
-    try {
-      const { data } = await api.get(`/account-groups/${group_id}/next-code`);
-      if (data.next_code) {
-        setForm((f) => ({ ...f, group_id, group_name: g.name, code: String(data.next_code) }));
-      }
-    } catch {}
-  };
-
-  const startEdit = (p) => {
-    setEditing(p);
-    setForm({
-      code: p.code || "",
-      name: p.name || "",
-      alt_name: p.alt_name || "",
-      group_id: p.group_id || "",
-      group_name: p.group_name || "",
-      type: p.type || "both",
-      place: p.place || "",
-      phone: p.phone || "",
-      address: p.address || "",
-      address2: p.address2 || "",
-      gstin: p.gstin || "",
-      pan: p.pan || "",
-      cstno: p.cstno || "",
-      mpstno: p.mpstno || "",
-      opening_balance: p.opening_balance || 0,
-      opening_qty: p.opening_qty || 0,
-      rate: p.rate || 0,
-    });
-  };
+  const startNew = () => setEditing({ id: null });
+  const startEdit = (p) => setEditing(p);
 
   const [inUse, setInUse] = useState(null);
   const del = async (id) => {
@@ -283,131 +206,7 @@ export default function PartyKhata() {
         </table>
       </div>
 
-      {editing !== null && (
-        <div
-          className="fixed inset-0 bg-black/40 grid place-items-start z-50 p-4 overflow-y-auto"
-          {...backdropClose(() => setEditing(null))}
-          data-testid="modal-party"
-        >
-          <form
-            onSubmit={submit}
-            onClick={(e) => e.stopPropagation()}
-            className="card-flat w-full max-w-3xl my-6 p-5"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="font-heading font-semibold text-lg">
-                {editing.id ? "Edit Khata" : "Naya Khata / Ledger"}
-              </div>
-              <button type="button" className="btn-ghost p-1.5" onClick={() => setEditing(null)}><X size={16} /></button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-              <div className="md:col-span-3">
-                <label className="lbl">Group *</label>
-                <select required className="input-dense" value={form.group_id}
-                  onChange={(e) => onGroupChange(e.target.value)} data-testid="select-party-group">
-                  <option value="">— Group chunein —</option>
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>{g.fcode}–{g.lcode} · {g.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="md:col-span-2">
-                <label className="lbl">Code</label>
-                <input type="number" className="input-dense num" value={form.code}
-                  onChange={(e) => setForm({ ...form, code: e.target.value })}
-                  data-testid="input-party-code" />
-              </div>
-              <div className="md:col-span-5">
-                <label className="lbl">Naam *</label>
-                <input required autoFocus className="input-dense" value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value.toUpperCase() })}
-                  data-testid="input-party-name" />
-              </div>
-              <div className="md:col-span-2">
-                <label className="lbl">Type</label>
-                <select className="input-dense" value={form.type}
-                  onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                  <option value="customer">Customer</option>
-                  <option value="supplier">Supplier</option>
-                  <option value="both">Both</option>
-                </select>
-              </div>
-
-              <div className="md:col-span-5">
-                <label className="lbl">Alt Name (GL_NAME1)</label>
-                <input className="input-dense" value={form.alt_name}
-                  onChange={(e) => setForm({ ...form, alt_name: e.target.value })} />
-              </div>
-              <div className="md:col-span-3">
-                <label className="lbl">Place (GL_PLACE)</label>
-                <input className="input-dense" value={form.place}
-                  onChange={(e) => setForm({ ...form, place: e.target.value })} />
-              </div>
-              <div className="md:col-span-4">
-                <label className="lbl">Phone</label>
-                <input className="input-dense" value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-              </div>
-
-              <div className="md:col-span-6">
-                <label className="lbl">Address 1</label>
-                <input className="input-dense" value={form.address}
-                  onChange={(e) => setForm({ ...form, address: e.target.value })} />
-              </div>
-              <div className="md:col-span-6">
-                <label className="lbl">Address 2</label>
-                <input className="input-dense" value={form.address2}
-                  onChange={(e) => setForm({ ...form, address2: e.target.value })} />
-              </div>
-
-              <div className="md:col-span-3">
-                <label className="lbl">GSTIN (F_G_L_NO)</label>
-                <input className="input-dense" value={form.gstin}
-                  onChange={(e) => setForm({ ...form, gstin: e.target.value.toUpperCase() })} />
-              </div>
-              <div className="md:col-span-3">
-                <label className="lbl">PAN</label>
-                <input className="input-dense" value={form.pan}
-                  onChange={(e) => setForm({ ...form, pan: e.target.value.toUpperCase() })} />
-              </div>
-              <div className="md:col-span-3">
-                <label className="lbl">CST No.</label>
-                <input className="input-dense" value={form.cstno}
-                  onChange={(e) => setForm({ ...form, cstno: e.target.value })} />
-              </div>
-              <div className="md:col-span-3">
-                <label className="lbl">MP State Tax</label>
-                <input className="input-dense" value={form.mpstno}
-                  onChange={(e) => setForm({ ...form, mpstno: e.target.value })} />
-              </div>
-
-              <div className="md:col-span-4">
-                <label className="lbl">Opening Balance (₹)</label>
-                <input type="number" step="0.01" className="input-dense num" value={form.opening_balance}
-                  onChange={(e) => setForm({ ...form, opening_balance: e.target.value })}
-                  data-testid="input-opening-balance" />
-                <div className="text-[10px] text-muted2 mt-1">+ve = party humein dena hai. −ve = humein party ko dena hai.</div>
-              </div>
-              <div className="md:col-span-4">
-                <label className="lbl">Opening Qty</label>
-                <input type="number" step="0.001" className="input-dense num" value={form.opening_qty}
-                  onChange={(e) => setForm({ ...form, opening_qty: e.target.value })} />
-              </div>
-              <div className="md:col-span-4">
-                <label className="lbl">Default Rate</label>
-                <input type="number" step="0.01" className="input-dense num" value={form.rate}
-                  onChange={(e) => setForm({ ...form, rate: e.target.value })} />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 mt-5 border-t border-khaki pt-4">
-              <button type="button" className="btn-outline" onClick={() => setEditing(null)}>Cancel</button>
-              <button type="submit" className="btn-primary" data-testid="btn-save-party">Save Khata</button>
-            </div>
-          </form>
-        </div>
-      )}
+      <KhataModal khata={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />
       <LedgerInUseDialog info={inUse} onClose={() => setInUse(null)} />
     </div>
   );

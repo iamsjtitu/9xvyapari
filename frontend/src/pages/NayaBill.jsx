@@ -5,6 +5,7 @@ import { Plus, Trash, Receipt, X, MagnifyingGlass, PencilSimple } from "@phospho
 import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import PartyAutocomplete from "@/components/PartyAutocomplete";
+import { KhataModal } from "@/components/KhataModal";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useTableNav } from "@/hooks/useTableNav";
@@ -339,28 +340,16 @@ export default function NayaBill() {
     [items]
   );
 
-  // Inline create-party handler — POSTs to /parties, adds to local options,
-  // and returns the new party (consumer's onPick is called separately).
-  const createParty = async (name, fieldKey) => {
-    const cleaned = String(name || "").trim();
-    if (!cleaned) return;
-    try {
-      const { data } = await api.post("/parties", { name: cleaned });
-      setParties((prev) => [...prev, data].sort((a, b) =>
-        (a.name || "").localeCompare(b.name || "")
-      ));
-      // Auto-select in the calling field
-      if (fieldKey === "party") {
-        setForm((f) => ({ ...f, party_id: data.id, party_name: data.name }));
-      } else if (fieldKey === "buyer") {
-        setForm((f) => ({ ...f, buyer_id: data.id, buyer_name: data.name }));
-      } else if (fieldKey === "agent") {
-        setForm((f) => ({ ...f, agent_id: data.id, agent_name: data.name }));
-      }
-      toast.success(`Party "${data.name}" add ho gayi`);
-    } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
-    }
+  // "+ Add '<name>'" → opens the full Khata window; the saved party is selected in the calling field
+  const [newKhata, setNewKhata] = useState(null);
+  const createParty = (name, fieldKey) => { const cleaned = String(name || "").trim(); if (cleaned) setNewKhata({ id: null, name: cleaned, fieldKey }); };
+  const onKhataSaved = (data) => {
+    setParties((prev) => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+    const k = newKhata?.fieldKey;
+    if (k === "party") setForm((f) => ({ ...f, party_id: data.id, party_name: data.name }));
+    else if (k === "buyer") setForm((f) => ({ ...f, buyer_id: data.id, buyer_name: data.name }));
+    else if (k === "agent") setForm((f) => ({ ...f, agent_id: data.id, agent_name: data.name }));
+    setNewKhata(null);
   };
 
   // All parties available in every party field — user filters via typing.
@@ -853,6 +842,7 @@ export default function NayaBill() {
           </div>
         </div>
       )}
+      <KhataModal khata={newKhata} onClose={() => setNewKhata(null)} onSaved={onKhataSaved} title="Naya Party Khata (bill ke liye)" />
     </div>
   );
 }
