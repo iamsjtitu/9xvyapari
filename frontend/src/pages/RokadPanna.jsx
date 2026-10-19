@@ -183,7 +183,7 @@ export default function RokadPanna() {
   const navigate = useNavigate();
   const returnTo = search.get("return");
   const closeForm = () => {
-    setShowAdd(false); setEditId(null); setForm({ ...emptyForm, date: dateTo });
+    setShowAdd(false); setEditId(null); setForm({ ...emptyForm, type: readLastUsed()?.type || "jama", date: dateTo }); // re-read: just-saved type
     if (returnTo) navigate(returnTo);  // opened from a ledger → go back there
   };
 

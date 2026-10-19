@@ -1,0 +1,25 @@
+{
+  "summary": "Frontend retest of Rokad last-used TYPE memory (/rokad, admin/Vyapari@2026). localStorage now saves {cash_account_id, mode, type} correctly; after a page reload, 'Nayi Entry' and 'a' open with the last saved type, and 'r'/'p' still force their own type. Edit shows each entry's own type. The select-mode testid exists. BUG: when you click 'Nayi Entry' again right after saving, WITHOUT reloading, the form shows the PREVIOUS type, not the one just saved. This was reproduced both ways (save Payment -> reopen shows Receipt; save Receipt -> reopen shows Payment). Account and mode memory work without a reload. QA entries were cleaned up.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RokadPanna closeForm / emptyForm", "issue": "Stale closure: emptyForm.type = readLastUsed()?.type is evaluated at render time. submit() calls saveLastUsed(...) and then closeForm(), and closeForm sets form to the emptyForm captured in that same render, which still holds the OLD type. The 'Nayi Entry' button only patches date (setForm(f=>({...f,date}))), so it reopens with the stale type until the page reloads. Account/mode are unaffected because cash_account_id is reset to '' and the open-effect re-reads localStorage.", "selector": "[data-testid='btn-add-entry'], [data-testid='btn-type-kharch']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "RokadPanna.jsx closeForm(): read the type fresh, e.g. setForm({ ...emptyForm, type: readLastUsed()?.type || 'jama', date: dateTo }). Alternatively, set the type in the btn-add-entry onClick and in the 'a' shortcut: setForm(f => ({...f, type: readLastUsed()?.type || 'jama', date: dateTo})). Then retest: save Payment -> click Nayi Entry immediately -> Payment should be selected."
+  ],
+  "critical_code_review_comments": [
+    "emptyForm is rebuilt on every render and calls localStorage + JSON.parse each time. Consider a makeEmptyForm() function that is called lazily from closeForm and when the form opens."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "skipped", "frontend": "~85% (12/14 checks; both failures come from the same stale-type-after-save bug)"},
+  "seed_data_creation": "None. QA_T34 entries (12 Payment and 13 Receipt on HDFC 302 / Cheque) were created and deleted.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Results: open1 (empty LS) -> jama/CASH/Cash. Save kharch HDFC Cheque -> LS {HDFC,Cheque,kharch} OK. Immediate reopen -> type=jama (BUG), HDFC/Cheque OK. After reload -> kharch/HDFC/Cheque OK. Keys: r->jama, p->kharch, a->kharch OK. Nayi Entry after r+Escape -> kharch OK. Save jama -> immediate reopen showed kharch (BUG); after reload jama OK. Edit rec->jama, edit pay->kharch OK. Click on page body before pressing shortcuts. Delete needs dialog accept.",
+  "rca of the issue": "Repro: /rokad -> Nayi Entry -> Payment, HDFC, Cheque, 12 -> Save -> click Nayi Entry -> Receipt is highlighted. Cause: closeForm uses the render-time emptyForm, whose type was read from localStorage before saveLastUsed ran. Fix: read readLastUsed() inside closeForm or in the open handlers."
+}
