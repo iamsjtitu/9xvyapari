@@ -44,7 +44,7 @@ export default function RokadPanna() {
   const [slip, setSlip] = useState(null);                   // rokad entry → DOS voucher slip print
   const emptyForm = {
     date: todayISO(),
-    type: "jama",
+    type: readLastUsed()?.type || "jama",   // last saved Type (Receipt/Payment) comes back; r / p shortcuts still override
     amount: "",
     party_id: "",
     party_name: "",
@@ -221,7 +221,7 @@ export default function RokadPanna() {
       }
       const { data } = editId ? await api.put(`/rokad/${editId}`, payload) : await api.post("/rokad", payload);
       toast.success(editId ? "Entry update ho gayi" : "Entry add ki gayi");
-      saveLastUsed({ cash_account_id: payload.cash_account_id, mode: payload.mode });
+      saveLastUsed({ cash_account_id: payload.cash_account_id, mode: payload.mode, type: payload.type });
       if (data?.settlement?.journal_id) {
         toast.success(`Account Settled: ₹${inr(data.settlement.amount)} ${data.settlement.side} → ${data.settlement.ledger} · ledger 0 · Journal ${data.settlement.voucher_no}`, { duration: 7000 });
       } else if (payload.settle && data?.settlement?.note) {
@@ -717,6 +717,7 @@ export default function RokadPanna() {
                     className="input-dense"
                     value={form.mode}
                     onChange={(e) => { modeTouched.current = true; setForm({ ...form, mode: e.target.value }); }}
+                    data-testid="select-mode"
                   >
                     <option>Cash</option>
                     <option>UPI</option>

@@ -1,0 +1,25 @@
+{
+  "summary": "Frontend-only test of Rokad 'remember last Cash/Bank account + Mode'. All 16 checks PASS: (1) with localStorage cleared, a new entry defaults to 301 CASH IN HAND / Cash, V.No=1. (2) Saving a cash entry stores {cash_account_id, mode:'Cash'} in 'vyapari.rokad.lastUsed'. (3) Changing the account to 302 HDFC M M TRADERS. auto-sets Mode=Bank; switching to Cheque and saving stores {HDFC, Cheque}. (4) Reopening 'Nayi Entry' shows HDFC/Cheque, V.No auto-filled ('2'). (5) Same after a page reload. (6) The 'r' and 'p' shortcuts both open with HDFC/Cheque, and the Jama/Kharch type is set correctly. (7) Account filter wins: AXIS filter → AXIS/Bank (V.No 1); CASH filter → CASH/Cash; HDFC filter (same as last-used) → HDFC/Cheque. Clearing the filter brings back HDFC/Cheque. (8) Editing the cash entry shows CASH/Cash (its own values). Cancel → a new entry still shows HDFC/Cheque, so memory is not overwritten. (9) Saving the edit updates memory to {CASH, Cash} → a new entry shows CASH/Cash. QA entries deleted through the UI.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Rokad modal", "issues": ["Mode <select> has no data-testid (tests had to use nth select). Please add data-testid='select-mode'."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": ["(Low) Add data-testid='select-mode' to the Mode select in RokadPanna.jsx (~line 716)."],
+  "critical_code_review_comments": [
+    "RokadPanna.jsx is 822 lines (>700); consider splitting the entry modal into its own component.",
+    "Pre-existing: the account list shows both '301 · CASH IN HAND' (party) and the legacy 'Cash IN Hand' (accounts collection), which could confuse users. Not related to this feature.",
+    "Behaviour note (OK): in a new form, changing the account resets the remembered Mode to the account's default, because modeTouched is false. This is expected."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "test_credentials": "admin / Vyapari@2026",
+  "seed_data_creation": "No QA account created (already 7 cash/bank accounts). Two QA rokad entries (QA_LU_CASH ₹12, QA_LU_HDFC ₹11) created and deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Cash/bank account ids: CASH IN HAND 301=3811380b-f2ca-407b-9478-e77b69909c25, HDFC M M 302=4831c910-34a4-49e4-8ad8-52049e96d646, AXIS 304=f2db8037-37fb-4cf1-a307-28fce859909d. Direct curl POST /api/rokad is blocked by the CSRF check; create entries through the UI. Delete uses window.confirm (accept the dialog). After testing, localStorage lastUsed = CASH/Cash."
+}
