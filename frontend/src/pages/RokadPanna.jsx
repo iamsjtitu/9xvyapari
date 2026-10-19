@@ -13,6 +13,7 @@ import { RenumberVouchersDialog } from "@/components/rokad/RenumberVouchersDialo
 import { VoucherSlip } from "@/components/rokad/VoucherSlip";
 import PartyAutocomplete from "@/components/PartyAutocomplete";
 import { SettleToggle } from "@/components/rokad/SettleToggle";
+import { InvoiceDupHint, describeDup } from "@/components/rokad/InvoiceDupHint";
 import { KhataModal } from "@/components/KhataModal";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 import { backdropClose } from "@/lib/backdrop";
@@ -38,6 +39,7 @@ export default function RokadPanna() {
   const [parties, setParties] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [invDups, setInvDups] = useState([]);   // same Invoice No. already posted for this party
   const [editId, setEditId] = useState(null);
   const [transfer, setTransfer] = useState(null);          // null | { contraId?: string }
   const [renumber, setRenumber] = useState(false);          // V.No. date-wise renumber dialog (needs a selected a/c)
@@ -185,7 +187,7 @@ export default function RokadPanna() {
   const navigate = useNavigate();
   const returnTo = search.get("return");
   const closeForm = () => {
-    setShowAdd(false); setEditId(null); setForm({ ...emptyForm, type: readLastUsed()?.type || "jama", date: dateTo }); // re-read: just-saved type
+    setShowAdd(false); setEditId(null); setInvDups([]); setForm({ ...emptyForm, type: readLastUsed()?.type || "jama", date: dateTo }); // re-read: just-saved type
     if (returnTo) navigate(returnTo);  // opened from a ledger → go back there
   };
 
@@ -242,6 +244,9 @@ export default function RokadPanna() {
       const payload = { ...form, amount: parseFloat(form.amount || 0) };
       if (!payload.amount || payload.amount <= 0) {
         toast.error("Amount daalein");
+        return;
+      }
+      if (invDups.length && !window.confirm(`Invoice No. "${form.inv_no.trim()}" is party ke liye pehle hi ${invDups.length} entry me hai:\n${invDups.slice(0, 3).map(describeDup).join("\n")}\n\nDouble payment ho sakta hai. Phir bhi save karein?`)) {
         return;
       }
       const { data } = editId ? await api.put(`/rokad/${editId}`, payload) : await api.post("/rokad", payload);
@@ -804,12 +809,13 @@ export default function RokadPanna() {
                 <div>
                   <label className="lbl">Invoice No.</label>
                   <input
-                    className="input-dense font-mono-data"
+                    className={`input-dense font-mono-data ${invDups.length ? "!border-kharch" : ""}`}
                     value={form.inv_no}
                     onChange={(e) => setForm({ ...form, inv_no: e.target.value })}
                     placeholder="Party ka bill / invoice no."
                     data-testid="input-inv-no"
                   />
+                  <InvoiceDupHint partyId={form.party_id} invNo={form.inv_no} excludeId={editId} onResult={setInvDups} />
                 </div>
                 <div>
                   <label className="lbl">Cheque No. (if applicable)</label>

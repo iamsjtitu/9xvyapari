@@ -693,6 +693,19 @@ async def list_rokad(date_from: Optional[str] = None, date_to: Optional[str] = N
     return entries
 
 
+@api.get("/rokad/invoice-check")
+async def rokad_invoice_check(party_id: str, inv_no: str, exclude_id: Optional[str] = None, current=Depends(get_current_user)):
+    """Same Invoice No. already entered for this party? (double-payment guard; case-insensitive, trimmed)"""
+    v = inv_no.strip()
+    if not v or not party_id:
+        return {"duplicates": []}
+    q: dict = {"party_id": party_id, "inv_no": {"$regex": f"^\\s*{re.escape(v)}\\s*$", "$options": "i"}}
+    if exclude_id:
+        q["id"] = {"$ne": exclude_id}
+    rows = await db.rokad.find(q, {"_id": 0, "id": 1, "date": 1, "amount": 1, "type": 1, "voucher_no": 1, "cash_account_name": 1, "inv_no": 1}).sort("date", -1).to_list(20)
+    return {"duplicates": rows}
+
+
 @api.get("/rokad/by-voucher")
 async def rokad_by_voucher(voucher_no: str, cash_account_id: Optional[str] = None, current=Depends(get_current_user)):
     """Voucher lookup: entries carrying this V.No. or Invoice No. (per-account numbering → may hit several accounts)."""
