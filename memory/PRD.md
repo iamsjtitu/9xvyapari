@@ -201,6 +201,11 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - Staff Attendance / Salary: `window.print()` replaced by `ExportBar` (Print → triggerPrint → Electron PDF preview; PDF; Excel sheets per day / per salary row). `detectOrientation`: `/staff/` & `/account-clear` landscape, `body.print-slip` → portrait; StaffSalary inline `@page landscape` style is skipped while the salary slip is open.
 - `hooks/useEscClose.js` (capture-phase Esc → onClose) on Salary PayDialog, StaffMaster form, TransferForm, LedgerInUseDialog (KhataModal/slips already had it). Verified iteration 40 (backend 100%, frontend 100%).
 
+### Jun 2026 – F5/F6 voucher keys · global Ctrl+S · Rokad Invoice No. (iterations 41–42 ✅)
+- Layout: global `F5` → `/rokad?new=kharch` (Payment), `F6` → `/rokad?new=jama` (Receipt); blocked while any overlay other than `modal-add-rokad` is open (data safety). RokadPanna consumes `?new=` (form open → only Type switches, data kept) and strips the param. Help overlay lists F5/F6.
+- `useGlobalSave()` (hooks/useKeyboardShortcuts.js): Ctrl+S → form containing `document.activeElement`, else highest-z-index `.fixed.inset-0` overlay with a form → `requestSubmit()`; page shortcuts mark `e.handledByShortcut` so Bill/Journal/Inward Ctrl+S fire once.
+- `RokadIn.inv_no` (free text) — form field `input-inv-no` after Voucher No. (beside `input-chq-no`); shown in Rokad list (`rokad-inv-<id>`), Rokad Excel (INV No.), Day Book DOS sheet particulars, Voucher Slip (`slip-inv` + header), Party/Account Ledger badges (`ledger-vno-<id>` V.n for rokad rows, `ledger-inv-<id>`), Ledger Excel column, DOS statement (particulars `· INV x`; Vch/Ref now shows V.No. — was blank), Account Clear register (`rokad_inv`). `GET /rokad/by-voucher` matches V.No. OR inv_no (case-insensitive). Test: backend/tests/test_inv_no_v41.py.
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅

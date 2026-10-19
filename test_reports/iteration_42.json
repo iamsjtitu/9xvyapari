@@ -1,0 +1,18 @@
+{
+  "summary": "Frontend-only retest of iteration-41 HIGH bug (Ctrl+S in stacked Naya Party Khata window) plus F5/F6 overlay guard and quick regressions. All items PASS. (1) /rokad -> Nayi Entry -> new party name + Enter -> modal-party opens; Ctrl+S with focus in input-party-name -> only POST /api/parties fired, toast 'Khata ... ban gaya', modal-party closed, Rokad modal stayed open with amount kept and the new party selected; no POST /api/rokad. Repeated with focus blurred (activeElement=BODY) -> same result (highest z-index overlay z-[60] form submitted). Without a group selected, Ctrl+S shows the party form's 'Group chunna zaroori hai' validation toast (correct target). (2) Ctrl+S inside Rokad form alone -> exactly one POST /api/rokad, modal closed, row added. (3) F5/F6 on /rokad: Voucher Slip open -> F5/F6 no-op; Transfer modal open -> F5 no-op; Create-Party window open -> F5/F6 no-op (party name and rokad type unchanged); Rokad modal only -> F5 switches to Kharch, F6 to Jama, amount/desc kept; Dashboard F5 -> /rokad with Payment, F6 -> Receipt. (4) /journal Ctrl+S -> exactly one POST /api/journal, 'Journal saved'; Esc closes modals (stacked: first Esc closes party window only, second closes Rokad); '?' help lists F5/F6 Payment/Receipt voucher.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/cleanup_v42.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "useGlobalSave/voucherOpen rely on the '.fixed.inset-0' class pair to detect overlays; any future modal built with a different class (e.g. shadcn Dialog portal) would be missed by both guards. Consider a shared data-overlay attribute.",
+    "Overlay z-index sort ties (several z-50 overlays) fall back to DOM order; fine today since only KhataModal is z-[60]."
+  ],
+  "updated_files": ["/app/backend/tests/cleanup_v42.py"],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "Created and deleted: parties TEST_ZZQ42 NEW0/NEW1, one rokad entry (Rs 11), journal J00002 (Rs 5). All cleaned up via cleanup_v42.py.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iteration 42 confirms the stacked-modal Ctrl+S fix and F5/F6 guard. Network requests were tracked with page.on('request') to count POSTs. KhataModal group select needs ~1.5s for groups to load before select_option.",
+  "test_credentials": "admin / Vyapari@2026"
+}
