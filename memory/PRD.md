@@ -132,6 +132,9 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - `exportToExcel` sheet option `groupBy: "group"`: group column hidden, per group → merged bold header row "GROUP (n)", rows, bold `Sub-total · GROUP` with `SUBTOTAL(9,…)` formulas, then `GRAND TOTAL` (SUBTOTAL ignores nested subtotals → no double count). Used by Outstanding + Trial Balance (TB's manual total rows removed).
 - Electron chooser: each "Pichle Folders" row has ✕ → confirm → `chooser:forget` IPC → `forgetRecent()` in config.js removes the path from the list only (folder/data untouched; if it was current, falls back to next recent/default). Unit-checked with mocked electron app.
 
+### Jun 2026 – Ledger Excel with running balance
+- PartyLedger Excel: Date · V.No./Ref · Particulars · Debit · Credit · Balance (abs) · Dr/Cr; bold OPENING (B/F) row, running balance after every entry, bold CLOSING row, TOTAL of Debit/Credit; title/subtitle carry party, group, period, opening→closing. `exportToExcel` now supports `rowStyle(row) → "opening" | "closing" | "bold"`. `buildRows` adds `vno` (bill no / rokad V.No. / journal V.No. / DOS ref) and the screen table shows it as a `V.n` chip (replacing inline "[V.n]" text) with a tooltip explaining it is the cash a/c running voucher number.
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅

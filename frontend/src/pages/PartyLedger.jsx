@@ -20,30 +20,30 @@ const KIND_ICON = {
 function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = [] }) {
   const rows = [];
   bills.forEach((b) => rows.push({
-    kind: "bill", id: b.id, date: b.date, ref: b.id,
+    kind: "bill", id: b.id, date: b.date, ref: b.id, vno: b.bill_no || "",
     label: `${b.bill_type === "sale" ? "Sale" : "Purchase"} Bill ${b.bill_no}`,
     debit: b.bill_type === "sale" ? b.total : 0, credit: b.bill_type === "purchase" ? b.total : 0,
   }));
   rokad.forEach((r) => rows.push({
-    kind: "rokad", id: r.id, date: r.date,
-    label: r.description || (r.type === "jama" ? "Payment Received" : "Payment Paid"),
+    kind: "rokad", id: r.id, date: r.date, vno: r.voucher_no || "",
+    label: `${r.description || (r.type === "jama" ? "Payment Received" : "Payment Paid")}${r.cash_account_name ? ` · ${r.cash_account_name}` : ""}`,
     debit: r.type === "kharch" ? r.amount : 0, credit: r.type === "jama" ? r.amount : 0,
   }));
   cash_rokad.forEach((r) => rows.push({
-    kind: "cash", id: r.id, date: r.date,
-    label: `${r.type === "jama" ? "Receipt" : "Payment"} · ${r.party_name || ""}${r.description ? " · " + r.description : ""}${r.voucher_no ? ` [V.${r.voucher_no}]` : ""}`,
+    kind: "cash", id: r.id, date: r.date, vno: r.voucher_no || "",
+    label: `${r.type === "jama" ? "Receipt" : "Payment"} · ${r.party_name || ""}${r.description ? " · " + r.description : ""}`,
     debit: r.type === "jama" ? r.amount : 0, credit: r.type === "kharch" ? r.amount : 0,
   }));
   journal.forEach((j, i) => rows.push({
-    kind: "journal", id: `${j.id}-${i}`, date: j.date,
-    label: `Journal ${j.voucher_no || ""}${j.narration ? " · " + j.narration : ""}${j.other ? " | vs " + j.other : ""}`,
+    kind: "journal", id: `${j.id}-${i}`, date: j.date, vno: j.voucher_no || "",
+    label: `Journal${j.narration ? " · " + j.narration : ""}${j.other ? " | vs " + j.other : ""}`,
     debit: j.debit, credit: j.credit,
   }));
   dos_journal.forEach((j) => {
     const sgnLabel = { SR: "Sale Reg", PR: "Purchase Reg", CB: "Cash Book", JR: "Journal" }[j.sgn] || j.sgn || "DOS";
     const counter = j.other_party_name || "";
     rows.push({
-      kind: "dos", id: `${j.imported_from}-${j.row_index}`, date: j.date,
+      kind: "dos", id: `${j.imported_from}-${j.row_index}`, date: j.date, vno: j.ref_no || "",
       label: `${sgnLabel} · ${j.narration || ""}${counter ? " | vs " + counter : ""}${j.extra ? " (" + j.extra + ")" : ""}`,
       debit: Number(j.debit || 0), credit: Number(j.credit || 0), ref_no: j.ref_no, sgn: j.sgn,
     });
@@ -51,6 +51,8 @@ function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = 
   rows.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   return rows;
 }
+
+const drcr = (n) => (n < 0 ? "Cr" : n > 0 ? "Dr" : "");
 
 export default function PartyLedger() {
   const { id } = useParams();
@@ -116,17 +118,27 @@ export default function PartyLedger() {
             title="DOS-style statement (print layout)" data-testid="btn-toggle-statement">
             <Printer size={14} /> {view === "statement" ? "Ledger View" : "Statement (Print)"}
           </button>
-          <ExportBar filename={`ledger-${party.name.replace(/[^a-z0-9]/gi, "_")}-${dateFrom || "start"}-${asOn}`} sheets={[{
-            name: `Ledger of ${party.name}`,
-            columns: [
-              { key: "date", label: "Date", width: 12 },
-              { key: "label", label: "Narration", width: 40 },
-              { key: "debit", label: "Debit", width: 14, num: true },
-              { key: "credit", label: "Credit", width: 14, num: true },
-              { key: "balance", label: "Balance", width: 14, num: true },
-            ],
-            rows: [{ date: dateFrom || "", label: "OPENING BALANCE", debit: 0, credit: 0, balance: opening }, ...enriched],
-          }]} />
+          <ExportBar filename={`ledger-${party.name.replace(/[^a-z0-9]/gi, "_")}-${dateFrom || "start"}-${asOn}`}
+            title={`Ledger · ${party.name}${party.group_name ? ` (${party.group_name})` : ""} · ${periodText}`}
+            sheets={[{
+              name: `Ledger of ${party.name}`,
+              subtitle: `Opening ₹${inr(Math.abs(opening))} ${drcr(opening)} → Closing ₹${inr(Math.abs(party.balance))} ${drcr(party.balance)} · ${enriched.length} entries`,
+              columns: [
+                { key: "date", label: "Date", width: 12 },
+                { key: "vno", label: "V.No. / Ref", width: 11 },
+                { key: "label", label: "Particulars", width: 46 },
+                { key: "debit", label: "Debit", width: 15, num: true },
+                { key: "credit", label: "Credit", width: 15, num: true },
+                { key: "balance_abs", label: "Balance", width: 15, num: true },
+                { key: "drcr", label: "Dr/Cr", width: 6 },
+              ],
+              rows: [
+                { date: dateFrom || "", vno: "", label: `OPENING BALANCE${dateFrom ? " (B/F)" : ""}`, debit: "", credit: "", balance_abs: Math.abs(opening), drcr: drcr(opening), _style: "opening" },
+                ...enriched.map((r) => ({ ...r, balance_abs: Math.abs(r.balance), drcr: drcr(r.balance) })),
+                { date: asOn, vno: "", label: `CLOSING BALANCE AS ON ${fmtDate(asOn)}`, debit: "", credit: "", balance_abs: Math.abs(party.balance), drcr: drcr(party.balance), _style: "closing" },
+              ],
+              rowStyle: (r) => r._style || null,
+            }]} />
         </div>
       </div>
 
@@ -213,6 +225,10 @@ export default function PartyLedger() {
                       ) : (
                         <span>{r.label}</span>
                       )}
+                      {r.kind !== "dos" && r.vno ? (
+                        <span className="kbd !text-[10px] !px-1.5 !py-0 whitespace-nowrap" title={r.kind === "bill" ? "Bill No." : r.kind === "journal" ? "Journal Voucher No." : "Rokad Voucher No. (cash a/c ka running number)"}
+                          data-testid={`ledger-vno-${r.id}`}>V.{r.vno}</span>
+                      ) : null}
                     </div>
                   </td>
                   <td className="num amount-kharch whitespace-nowrap">{r.debit ? `₹ ${inr(r.debit)}` : "—"}</td>

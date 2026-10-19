@@ -118,7 +118,13 @@ function buildSheet(wb, sh, firm, meta) {
   const firstData = 6;
   let cursor = 6;
 
-  const writeDataRow = (vals, zebra) => {
+  const ROW_STYLES = { // sh.rowStyle(row) → opening / closing / bold rows (ledger B/F, C/F etc.)
+    opening: { bold: true, fill: X.band },
+    closing: { bold: true, fill: X.parchment, top: "medium" },
+    bold: { bold: true, fill: null },
+  };
+  const writeDataRow = (vals, zebra, styleName) => {
+    const st = styleName ? ROW_STYLES[styleName] : null;
     const row = ws.getRow(cursor++);
     vals.forEach((v, i) => {
       const cell = row.getCell(i + 1);
@@ -137,11 +143,14 @@ function buildSheet(wb, sh, firm, meta) {
         cell.alignment = { horizontal: "left", vertical: "middle", wrapText: false };
       }
       if (!cell.font) cell.font = { name: "Calibri", size: 10.5, color: { argb: X.ink } };
-      cell.border = BORDER;
-      if (zebra) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: X.bone } };
+      if (st?.bold) cell.font = { ...cell.font, bold: true };
+      cell.border = st?.top ? { ...BORDER, top: { style: st.top, color: { argb: X.ink } } } : BORDER;
+      if (st?.fill) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: st.fill } };
+      else if (zebra && !st) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: X.bone } };
     });
-    row.height = 18;
+    row.height = st ? 20 : 18;
   };
+  const styleOf = (r) => (typeof sh.rowStyle === "function" ? sh.rowStyle(r) : null);
 
   const writeGroupHeader = (name, count) => {
     const row = ws.getRow(cursor++);
@@ -188,12 +197,12 @@ function buildSheet(wb, sh, firm, meta) {
       while (j < matrix.length && groupOf(sh.rows[j]) === g) j++;
       writeGroupHeader(g, j - i);
       const from = cursor;
-      for (let k = i; k < j; k++) writeDataRow(matrix[k], (k - i) % 2 === 1);
+      for (let k = i; k < j; k++) writeDataRow(matrix[k], (k - i) % 2 === 1, styleOf(sh.rows[k]));
       if (hasSums) writeTotalRow(`Sub-total · ${g || "—"}`, from, cursor - 1, false);
       i = j;
     }
   } else {
-    matrix.forEach((vals, r) => writeDataRow(vals, r % 2 === 1));
+    matrix.forEach((vals, r) => writeDataRow(vals, r % 2 === 1, styleOf(sh.rows[r])));
   }
   const lastData = cursor - 1;
   if (hasSums) writeTotalRow(groupOf ? "GRAND TOTAL" : "TOTAL", firstData, lastData, true);
