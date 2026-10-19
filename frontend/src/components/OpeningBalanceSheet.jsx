@@ -12,7 +12,23 @@ const Line = ({ code, name, dr, cr, cls = "", testId }) => (
   </div>
 );
 
-export const OpeningBalanceSheet = ({ data }) => (
+// breakdown = { ledgerId, rows: [{party_id, party_name, net, last_date, count}] } for the Account Clear ledger;
+// shown only when `expanded` (+ clicked) — on screen and in print. Amounts stay informational (totals use the head only).
+const ClearBreakdown = ({ rows }) => (
+  <div data-testid="ob-clear-breakdown">
+    {rows.map((b) => (
+      <div className="dos-line dos-sub" key={b.party_id || b.party_name} data-testid={`ob-clear-sub-${b.party_id}`}>
+        <span className="c"></span>
+        <span className="n" title={b.party_name}>↳ {b.party_name}{b.last_date ? ` · cleared upto ${fmtDate(b.last_date)}` : ""}{b.count > 1 ? ` (${b.count})` : ""}</span>
+        <span className="d">{amt(b.net)}</span>
+        <span className="k">{amt(-b.net)}</span>
+      </div>
+    ))}
+    {rows.length === 0 && <div className="dos-line dos-sub"><span className="c"></span><span className="n">↳ koi party settlement nahi</span><span className="d"></span><span className="k"></span></div>}
+  </div>
+);
+
+export const OpeningBalanceSheet = ({ data, breakdown, expanded, onToggle }) => (
   <div className="dos-sheet" data-testid="opening-balance-sheet">
     <div className="text-center mb-3 print:hidden">
       <div className="font-bold text-base uppercase tracking-wider" data-testid="ob-firm">{data.firm_name}</div>
@@ -27,10 +43,26 @@ export const OpeningBalanceSheet = ({ data }) => (
         <div key={sec.group_name}>
           <Line code="" name={`-- ${sec.group_name}${sec.fcode ? ` (${sec.fcode}-${sec.lcode})` : ""} --`}
             dr="" cr="" cls="dos-group" testId={`ob-group-${sec.group_name}`} />
-          {sec.rows.map((r, i) => (
-            <Line key={`${r.kind}-${r.code}-${i}`} code={r.code || ""} name={r.name}
-              dr={amt(r.balance)} cr={amt(-r.balance)} />
-          ))}
+          {sec.rows.map((r, i) => {
+            const isClear = breakdown && r.id && r.id === breakdown.ledgerId;
+            if (!isClear) return <Line key={`${r.kind}-${r.code}-${i}`} code={r.code || ""} name={r.name} dr={amt(r.balance)} cr={amt(-r.balance)} />;
+            return (
+              <div key={`${r.kind}-${r.code}-${i}`}>
+                <div className="dos-line" data-testid="ob-clear-row">
+                  <span className="c">{r.code || ""}</span>
+                  <span className="n flex items-center gap-1.5" title={r.name}>
+                    <button type="button" onClick={onToggle} className="print:hidden inline-flex items-center justify-center w-4 h-4 border border-black text-[10px] leading-none font-bold hover:bg-khaki/60"
+                      title={expanded ? "Party-wise breakdown chhupao" : "Party-wise breakdown dikhao"} data-testid="ob-clear-toggle">{expanded ? "−" : "+"}</button>
+                    {r.name}
+                    {expanded && <span className="text-[10px] normal-case text-[#555]">(party-wise)</span>}
+                  </span>
+                  <span className="d">{amt(r.balance)}</span>
+                  <span className="k">{amt(-r.balance)}</span>
+                </div>
+                {expanded && <ClearBreakdown rows={breakdown.rows} />}
+              </div>
+            );
+          })}
           <Line code="" name={`${sec.group_name} TOTAL`} dr={inr(sec.dr_total)} cr={inr(sec.cr_total)} cls="dos-total" />
         </div>
       ))}

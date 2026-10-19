@@ -15,6 +15,8 @@ export default function OpeningBalance() {
   const asOn = params.get("as_on") || todayISO();
   const [data, setData] = useState(null);
   const [years, setYears] = useState([]);
+  const [breakdown, setBreakdown] = useState(null);   // Account Clear → party-wise rows
+  const [showClear, setShowClear] = useState(false);  // "+" clicked → breakdown on screen & print
 
   useEffect(() => {
     api.get("/year-end/history").then((r) => setYears(r.data.years || [])).catch(() => {});
@@ -26,6 +28,25 @@ export default function OpeningBalance() {
       .then((r) => setData(r.data))
       .catch((err) => toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message));
   }, [fyId, asOn]);
+
+  // Party-wise make-up of the Account Clear head (what every party's settlement put there, as on date)
+  useEffect(() => {
+    setBreakdown(null);
+    if (!data?.settle_account_id || !data?.as_on) return;
+    api.get("/reports/account-clear", { params: { date_to: data.as_on } }).then((r) => {
+      const by = new Map();
+      for (const row of r.data.rows || []) {
+        const key = row.party_id || row.party_name;
+        const cur = by.get(key) || { party_id: row.party_id || key, party_name: row.party_name, net: 0, last_date: "", count: 0 };
+        cur.net += row.side === "off" ? row.amount : -row.amount;
+        cur.count += 1;
+        if (row.date > cur.last_date) cur.last_date = row.date;
+        by.set(key, cur);
+      }
+      const rows = [...by.values()].filter((b) => Math.abs(b.net) >= 0.005).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+      setBreakdown({ ledgerId: data.settle_account_id, rows });
+    }).catch(() => {});
+  }, [data]);
 
   const setAsOn = (d) => d && setParams({ as_on: d });
   const quick = [
@@ -45,8 +66,13 @@ export default function OpeningBalance() {
       { key: "credit", label: "Credit", width: 16, num: true },
     ],
     rows: data.sections.flatMap((sec) => [
-      ...sec.rows.map((r) => ({ group: sec.group_name, code: r.code || "", name: r.name,
-        debit: r.balance > 0 ? r.balance : 0, credit: r.balance < 0 ? -r.balance : 0 })),
+      ...sec.rows.flatMap((r) => [
+        { group: sec.group_name, code: r.code || "", name: r.name, debit: r.balance > 0 ? r.balance : 0, credit: r.balance < 0 ? -r.balance : 0 },
+        ...(showClear && breakdown && r.id === breakdown.ledgerId
+          ? breakdown.rows.map((b) => ({ group: sec.group_name, code: "", name: `   ↳ ${b.party_name}${b.last_date ? ` · cleared upto ${fmtDate(b.last_date)}` : ""}`,
+              debit: b.net > 0 ? b.net : 0, credit: b.net < 0 ? -b.net : 0 }))
+          : []),
+      ]),
       { group: `${sec.group_name} TOTAL`, code: "", name: "", debit: sec.dr_total, credit: sec.cr_total },
     ]).concat([{ group: "GRAND TOTAL", code: "", name: "", debit: data.grand_dr, credit: data.grand_cr }]),
   }] : [];
@@ -97,7 +123,7 @@ export default function OpeningBalance() {
         {!data ? (
           <div className="text-muted2 font-heading" data-testid="ob-loading">Opening balances load ho rahe hain...</div>
         ) : (
-          <OpeningBalanceSheet data={data} />
+          <OpeningBalanceSheet data={data} breakdown={breakdown} expanded={showClear} onToggle={() => setShowClear((v) => !v)} />
         )}
       </div>
 

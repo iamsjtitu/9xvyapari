@@ -382,6 +382,9 @@ label.lbl {
 .dos-line .c { width: 44px; flex: none; color: #555; }
 .dos-line .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
 .dos-line .d, .dos-line .k { width: 112px; flex: none; text-align: right; font-variant-numeric: tabular-nums; }
+.dos-line.dos-sub { border-bottom-style: dashed; color: #333; font-size: 0.92em; background: #faf8f2; }
+.dos-line.dos-sub .n { padding-left: 14px; text-transform: none; font-style: italic; }
+.dos-line.dos-sub .d, .dos-line.dos-sub .k { color: #333; }
 .dos-head { font-weight: 700; border-bottom: 1px solid #000; text-transform: uppercase; }
 .dos-group { font-weight: 700; border-bottom: 1px solid #000; margin-top: 10px; padding-top: 2px; break-after: avoid; }
 .dos-total { font-weight: 700; border-top: 1px solid #000; border-bottom: 3px double #000; }

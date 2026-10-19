@@ -1780,10 +1780,10 @@ async def opening_balances(fy_id: Optional[str] = None, as_on: Optional[str] = N
             raise HTTPException(404, "Fiscal year nahi mila")
         as_on, fy_text = fy["new_fy_start"], f"{fy['new_fy_start']} to {fy['new_fy_end']}"
         for r in fy.get("parties", []):
-            ledgers.append({"code": r.get("code") or 0, "name": r.get("name", ""), "group_id": party_group.get(r["id"]),
+            ledgers.append({"id": r["id"], "code": r.get("code") or 0, "name": r.get("name", ""), "group_id": party_group.get(r["id"]),
                             "balance": float(r.get("new_opening") or 0), "kind": "party"})
         for r in fy.get("accounts", []):
-            ledgers.append({"code": r.get("code") or 0, "name": r.get("name", ""), "group_id": acc_group.get(r["id"]),
+            ledgers.append({"id": r["id"], "code": r.get("code") or 0, "name": r.get("name", ""), "group_id": acc_group.get(r["id"]),
                             "balance": float(r.get("new_opening") or 0), "kind": "account"})
     else:
         if as_on and not _is_date(as_on):
@@ -1791,10 +1791,10 @@ async def opening_balances(fy_id: Optional[str] = None, as_on: Optional[str] = N
         as_on = as_on or datetime.now().date().isoformat()  # local date of the machine running the app
         fy_text = f"{s.get('fy_start')} to {s.get('fy_end')}"
         for p in await db.parties.find({}, {"_id": 0}).to_list(20000):
-            ledgers.append({"code": p.get("code") or 0, "name": p.get("name", ""), "group_id": p.get("group_id"),
+            ledgers.append({"id": p["id"], "code": p.get("code") or 0, "name": p.get("name", ""), "group_id": p.get("group_id"),
                             "balance": await _compute_party_balance(p["id"], float(p.get("opening_balance") or 0), as_on), "kind": "party"})
         for a in await db.accounts.find({}, {"_id": 0}).to_list(5000):
-            ledgers.append({"code": a.get("code") or 0, "name": a.get("name", ""), "group_id": a.get("group_id"),
+            ledgers.append({"id": a["id"], "code": a.get("code") or 0, "name": a.get("name", ""), "group_id": a.get("group_id"),
                             "balance": await _compute_account_balance(a["id"], float(a.get("opening_balance") or 0), as_on), "kind": "account"})
 
     ledgers = [l for l in ledgers if abs(l["balance"]) >= 0.005]
@@ -1814,7 +1814,8 @@ async def opening_balances(fy_id: Optional[str] = None, as_on: Optional[str] = N
     grand_cr = round(sum(sec["cr_total"] for sec in sections), 2)
     return {"firm_name": s.get("firm_name") or "9x Vyapari", "as_on": as_on, "fy_text": fy_text, "fy_id": fy_id,
             "sections": sections, "grand_dr": grand_dr, "grand_cr": grand_cr,
-            "difference": round(grand_dr - grand_cr, 2), "count": len(ledgers)}
+            "difference": round(grand_dr - grand_cr, 2), "count": len(ledgers),
+            "settle_account_id": s.get("settle_account_id")}
 
 
 # Add cash_account_id to rokad – update field if not set by client (handled in model fallback)
