@@ -1,0 +1,18 @@
+{
+  "summary": "RETEST of Invoice Duplicate Alert race fix + server-side inv_no trim. All requested flows PASS. Backend: 8/8 pytest (new test_inv_trim_v44.py + regression test_inv_dup_v43.py). Frontend (Playwright, desktop): (1) type 'inv-501' + immediate Ctrl+S -> confirm appeared (fresh invoice-check fired), Cancel -> 0 POST /api/rokad, modal stays open, inv-dup-warning visible; (2) fill 'INV-501' + immediate Save click -> confirm, Accept -> 1 POST, modal closed; (3) reverse race: warning shown for inv-501, changed to INV-777 + immediate Ctrl+S -> NO confirm, saved directly; (4) '  INV-900  ' via UI stored as 'INV-900'; PUT ' INV-901 ' stored 'INV-901' (API); (5) regression: edit excludes itself (only the earlier entry listed, confirm on save), other party with same inv -> no warning/no confirm, no-party entry with inv_no -> no invoice-check request, saved fine. All test parties/entries cleaned up.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_inv_trim_v44.py", "/app/backend/tests/test_inv_dup_v43.py", "/app/test_reports/pytest/pytest_v44.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Minor: submit() calls setInvDups(dups) but the warning box is rendered from InvoiceDupHint's own internal `dups` state, so setInvDups only drives the red input border; the box appears only because the debounced hint finishes ~300ms later. Works in practice (verified), but if desired lift state so submit's fresh result directly renders the box.",
+    "Minor: if the fresh invoice-check request fails (network), save is blocked with an error toast (fail-closed). Acceptable, just noting the behavior."
+  ],
+  "updated_files": ["/app/backend/tests/test_inv_trim_v44.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin / Vyapari@2026 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Temporary parties TEST_RaceA44 / TEST_RaceB44 and their rokad entries + one no-party entry were created and all deleted at the end.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Invoice dup alert fully verified (iter 43 + 44). Preview clock is 2026-10-19; Rokad page defaults to today's date filter. Use page.on('dialog', async_handler) directly (no asyncio import in browser tool). PartyAutocomplete testids: select-party, select-party-opt-{id}."
+}
