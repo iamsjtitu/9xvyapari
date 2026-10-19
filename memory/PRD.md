@@ -171,6 +171,11 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - `/reports/opening-balances` rows now carry `id`; response has `settle_account_id`. Page fetches `/reports/account-clear?date_to=as_on`, aggregates per party (net off−back, cleared-upto date) + an "Opening / other postings" row when head ≠ sum. `OpeningBalanceSheet` renders a `+`/`−` toggle (`ob-clear-toggle`, print:hidden) on the Account Clear row; sub-rows (`ob-clear-sub-<party>`) show on screen, in print and in Excel ONLY when expanded; group/grand totals untouched (head only). Fetch effects guarded against stale responses.
 - Verified: iteration 24 + 25.
 
+### Jun 2026 – Trial Balance "+" breakdown · Party Khata Settled filter
+- `lib/accountClear.js` (aggregateClearRows / fetchClearBreakdown / clearRowLabel) shared by Opening Balance + Trial Balance. Trial Balance: `/reports/trial-balance` rows carry `id`, response `settle_account_id`; `tb-clear-toggle` on the Account Clear row → `tb-clear-sub-<party>` rows (screen/print/Excel only when expanded; Excel sub-rows keep amounts in the name so group subtotals stay head-only; `_sub` rows excluded from Excel group counts).
+- `/parties` returns `settled_upto` (latest settlement journal date) + `settled` (= settled_upto && balance 0). Party Khata: `select-party-settled` (Sabhi / Sirf Settled / Settled chhupao), green `SETTLED dd-mm-yyyy` badge, Excel "Settled" column, print subtitle suffix, filter-aware empty state.
+- Verified: iteration 26 (backend 5/5, frontend 100%).
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅

@@ -195,7 +195,7 @@ function buildSheet(wb, sh, firm, meta) {
       const g = groupOf(sh.rows[i]);
       let j = i;
       while (j < matrix.length && groupOf(sh.rows[j]) === g) j++;
-      writeGroupHeader(g, j - i);
+      writeGroupHeader(g, sh.rows.slice(i, j).filter((r) => !r._sub).length); // detail "_sub" rows don't count
       const from = cursor;
       for (let k = i; k < j; k++) writeDataRow(matrix[k], (k - i) % 2 === 1, styleOf(sh.rows[k]));
       if (hasSums) writeTotalRow(`Sub-total · ${g || "—"}`, from, cursor - 1, false);

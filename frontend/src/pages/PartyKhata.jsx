@@ -143,7 +143,7 @@ export default function PartyKhata() {
             onChange={(e) => setQ(e.target.value)}
             data-testid="input-search-party"
           />
-          <select className="input-dense" style={{ width: 240 }}
+          <select className="input-dense" style={{ width: 240 }} data-testid="select-party-group-filter"
             value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)}>
             <option value="">Sabhi groups</option>
             {groups.map((g) => (
@@ -173,8 +173,10 @@ export default function PartyKhata() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-10 text-center text-muted2">
-                  Koi ledger nahi. <button className="text-terracotta" onClick={startNew}>Add karein</button>
+                <td colSpan={7} className="py-10 text-center text-muted2" data-testid="parties-empty">
+                  {parties.length > 0
+                    ? "Filter / search se koi khata match nahi hua."
+                    : <>Koi ledger nahi. <button className="text-terracotta" onClick={startNew}>Add karein</button></>}
                 </td>
               </tr>
             ) : filtered.map((p, idx) => (

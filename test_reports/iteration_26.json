@@ -1,0 +1,36 @@
+{
+  "summary": "Iteration 26: Trial Balance ACCOUNT CLEAR '+' breakdown (screen/print/Excel) and Party Khata Settled filter + badge + Excel column. Backend 5/5 pytest pass (settle_account_id, row ids, ACCOUNT CLEAR=40 then 90, settled/settled_upto semantics incl. flip to false on -10 and back to true after delete). Frontend: all requested checks pass. Cleanup completed (QA SETTLED B + its entries deleted, RID/RID2 deleted; SETTLE TEST PARTY back to 1000 Dr, settled_upto null, ACCOUNT CLEAR 0).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Trial Balance Excel (expanded)", "issues": ["Group header count includes '↳' sub-rows: 'UNCATEGORIZED (5)' instead of (3) when expanded. Subtotal SUBTOTAL() values remain correct since sub-row Debit/Credit cells are empty."]},
+      {"screen": "Party Khata", "issues": ["When filters exclude everything (e.g. 'Settled chhupao' + search 'SETTLE') empty state says 'Koi ledger nahi. Add karein' — could say 'filter se koi match nahi'.", "Group select has no data-testid (only select-party-settled has one)."]}
+    ]
+  },
+  "verified": [
+    "TB: exactly 1 tb-clear-toggle, '+' initially, 0 tb-clear-sub-* rows before click",
+    "Click '+' -> '−'; first row after tb-clear-row is tb-clear-sub-<QA SETTLED B>: '↳ QA SETTLED B · cleared upto 22-06-2026' 50.00 Dr, then '↳ SETTLE TEST PARTY · cleared upto 21-06-2026' 40.00 Dr",
+    "All Group Totals + GRAND TOTAL + difference line identical before/after expand and after collapse",
+    "'−' collapses (0 sub-rows); print media: toggle hidden, sub-rows visible when expanded, absent when collapsed",
+    "TB Excel downloads in both states; expanded sheet has '   ↳ QA SETTLED B · cleared upto 22-06-2026 · ₹50.00 Dr' rows with Debit/Credit None; collapsed has none",
+    "Party Khata select-party-settled options 'Sabhi khate (530)', 'Sirf Settled (2)', 'Settled chhupao (528)'; default all",
+    "Badges party-settled-badge-<id> 'SETTLED 21-06-2026'/'SETTLED 22-06-2026', Baki sub-label 'SETTLED'",
+    "Only -> 2 rows; Hide -> 528 rows, 0 badges; combines with search and group filter",
+    "Print header subtitle '· SETTLED ONLY' / '· settled hidden'",
+    "Party Excel has 'Settled' column with 'Cleared upto dd-mm-yyyy'"
+  ],
+  "test_report_links": ["/app/backend/tests/test_tb_settled_v26.py", "/app/test_reports/pytest/pytest_v26.xml"],
+  "action_items": ["(Optional/minor) Exclude '↳' sub-rows from Excel group header count", "(Optional) filter-aware empty state on Party Khata; add data-testid to group select"],
+  "critical_code_review_comments": [
+    "list_parties scans every settlement journal on each call and computes balances per party sequentially (530 awaits) — fine now but O(N) round trips; consider aggregation if party count grows.",
+    "Trial Balance shows a large pre-existing 'Difference' (Dr 1,14,94,73,643.81 vs Cr 40,26,43,93,384.00) from imported data — unrelated to this feature."
+  ],
+  "updated_files": ["/app/backend/tests/test_tb_settled_v26.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Created QA SETTLED B + rokad entries for testing; all removed. RID/RID2 for SETTLE TEST PARTY deleted per request.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "test_tb_settled_v26.py needs SETTLE TEST PARTY pre-state (receipt 1000 on 2026-06-20 + payment 40 settle on 2026-06-21); those entries are now deleted, so recreate them before rerunning. KEEP_DATA=1 keeps QA SETTLED B for UI testing."
+}

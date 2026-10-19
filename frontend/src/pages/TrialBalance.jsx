@@ -45,7 +45,7 @@ export default function TrialBalance() {
         { group: sec.group_name, code: r.code || "", name: r.name, debit: r.balance > 0 ? r.balance : 0, credit: r.balance < 0 ? Math.abs(r.balance) : 0 },
         // Account Clear party-wise rows (only when "+" expanded) — amount kept in the name so group subtotals stay head-only
         ...(showClear && breakdown && r.id === breakdown.ledgerId
-          ? breakdown.rows.map((b) => ({ group: sec.group_name, code: "", name: `   ${clearRowLabel(b)} · ₹${inr(Math.abs(b.net))} ${b.net > 0 ? "Dr" : "Cr"}`, debit: "", credit: "" }))
+          ? breakdown.rows.map((b) => ({ group: sec.group_name, code: "", name: `   ${clearRowLabel(b)} · ₹${inr(Math.abs(b.net))} ${b.net > 0 ? "Dr" : "Cr"}`, debit: "", credit: "", _sub: true }))
           : []),
       ])),
       groupBy: "group",
