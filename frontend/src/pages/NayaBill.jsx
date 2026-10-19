@@ -231,6 +231,13 @@ export default function NayaBill() {
     [form]);
   const total = +(subtotal + additions - deductions).toFixed(2);
   const balance = +(total - Number(form.payment_received || 0)).toFixed(2);
+  // Live balance for the party: sale → party owes +balance, purchase → we owe (−balance); minus the original bill when editing
+  const partyDelta = (() => {
+    const eff = (type, bal) => (type === "sale" ? bal : -bal);
+    const orig = editId ? bills.find((b) => b.id === editId) : null;
+    const before = orig && orig.party_id === form.party_id ? eff(orig.bill_type, Number(orig.total || 0) - Number(orig.payment_received || 0)) : 0;
+    return eff(form.bill_type, balance) - before;
+  })();
 
   const save = async () => {
     try {
@@ -575,7 +582,7 @@ export default function NayaBill() {
                     testId="select-bill-party"
                     required
                   />
-                  <LedgerBalanceHint ledgerId={form.party_id} className="mt-1" testId="bill-party-balance" />
+                  <LedgerBalanceHint ledgerId={form.party_id} delta={partyDelta} className="mt-1" testId="bill-party-balance" />
                 </div>
                 <div className="md:col-span-2">
                   <label className="lbl">Buyer Party (Final Customer)</label>

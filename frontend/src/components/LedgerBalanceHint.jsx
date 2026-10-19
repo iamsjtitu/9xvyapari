@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { inr } from "@/lib/api";
-import { Scales } from "@phosphor-icons/react";
+import { Scales, ArrowRight } from "@phosphor-icons/react";
 
-// Shows a ledger's live balance as soon as it is selected (party / cash account)
-export const LedgerBalanceHint = ({ ledgerId, className = "", compact = false, testId = "ledger-balance-hint" }) => {
+// Shows a ledger's live balance as soon as it is selected (party / cash account).
+// `delta` (signed, Dr +ve) = what the entry being typed will do → "abhi ₹X → baad me ₹Y" updates live.
+export const LedgerBalanceHint = ({ ledgerId, delta = 0, className = "", compact = false, testId = "ledger-balance-hint" }) => {
   const [info, setInfo] = useState(null);
 
   useEffect(() => {
@@ -20,18 +21,31 @@ export const LedgerBalanceHint = ({ ledgerId, className = "", compact = false, t
   if (!ledgerId || !info) return null;
   if (info.loading) return <div className={`text-[11px] text-muted2 font-mono-data ${className}`} data-testid={testId}>Balance…</div>;
   const bal = info.balance || 0;
-  const color = bal > 0 ? "#B71C1C" : bal < 0 ? "#1B5E20" : "#595959";
-  const meaning = info.kind === "party" && !/cash|bank/i.test(info.group_name || "")
-    ? (bal > 0 ? "lena hai" : bal < 0 ? "dena hai" : "settled")
-    : (bal >= 0 ? "balance" : "overdrawn");
+  const isParty = info.kind === "party" && !/cash|bank/i.test(info.group_name || "");
+  const colorOf = (b) => (b > 0 ? "#B71C1C" : b < 0 ? "#1B5E20" : "#595959");
+  const meaningOf = (b) => (isParty ? (b > 0 ? "lena hai" : b < 0 ? "dena hai" : "settled") : (b >= 0 ? "balance" : "overdrawn"));
+  const d = Number(delta) || 0;
+  const after = Math.round((bal + d) * 100) / 100;
+  const live = Math.abs(d) >= 0.005;
   return (
-    <div className={`flex items-center gap-1.5 text-[11px] font-mono-data ${className}`} data-testid={testId}>
-      <Scales size={12} color={color} weight="bold" />
+    <div className={`flex flex-wrap items-center gap-1.5 text-[11px] font-mono-data ${className}`} data-testid={testId}>
+      <Scales size={12} color={colorOf(bal)} weight="bold" />
       {!compact && <span className="text-muted2">Abhi ka balance:</span>}
-      <span className="font-semibold" style={{ color }} data-testid={`${testId}-amount`}>
-        ₹ {inr(Math.abs(bal))} {info.dr_cr}
+      <span className="font-semibold" style={{ color: colorOf(bal) }} data-testid={`${testId}-amount`}>
+        ₹ {inr(Math.abs(bal))} {bal < 0 ? "Cr" : bal > 0 ? "Dr" : ""}
       </span>
-      <span className="text-muted2">({meaning})</span>
+      <span className="text-muted2">({meaningOf(bal)})</span>
+      {live && (
+        <>
+          <ArrowRight size={11} className="text-muted2" />
+          <span className="text-muted2">{compact ? "" : "is entry ke baad:"}</span>
+          <span className="font-semibold px-1 rounded-sm bg-[#FFF8E1] border border-[#F0C674]" style={{ color: colorOf(after) }}
+            title="Is amount ke baad ka balance (live)" data-testid={`${testId}-after`}>
+            ₹ {inr(Math.abs(after))} {after < 0 ? "Cr" : after > 0 ? "Dr" : ""}
+          </span>
+          <span className="text-muted2">({meaningOf(after)})</span>
+        </>
+      )}
       {info.kind === "party" && (
         <Link to={`/parties/${ledgerId}`} className="text-terracotta hover:underline ml-1" target="_blank" rel="noreferrer" title="Ledger kholein">
           Ledger

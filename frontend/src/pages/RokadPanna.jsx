@@ -211,6 +211,19 @@ export default function RokadPanna() {
     setShowAdd(true);
   };
 
+  // Live balance: what this entry (as typed) will do to the party / cash ledger — minus the original when editing
+  const liveDelta = useMemo(() => {
+    const amt = Number(form.amount) || 0;
+    const partyEff = (type, a) => (type === "jama" ? -a : a);   // party Dr +ve
+    const cashEff = (type, a) => (type === "jama" ? a : -a);    // cash a/c Dr +ve
+    const orig = editId ? entries.find((x) => x.id === editId) : null;
+    const oAmt = orig ? Number(orig.amount) || 0 : 0;
+    return {
+      party: partyEff(form.type, amt) - (orig && orig.party_id === form.party_id ? partyEff(orig.type, oAmt) : 0),
+      cash: cashEff(form.type, amt) - (orig && orig.cash_account_id === form.cash_account_id ? cashEff(orig.type, oAmt) : 0),
+    };
+  }, [form.amount, form.type, form.party_id, form.cash_account_id, editId, entries]);
+
   const submit = async (e) => {
     e.preventDefault();
     try {
@@ -752,7 +765,7 @@ export default function RokadPanna() {
                       </option>
                     ))}
                   </select>
-                  <LedgerBalanceHint ledgerId={form.cash_account_id} compact className="mt-1" testId="rokad-cash-balance" />
+                  <LedgerBalanceHint ledgerId={form.cash_account_id} delta={liveDelta.cash} compact className="mt-1" testId="rokad-cash-balance" />
                 </div>
                 <div>
                   <label className="lbl">Voucher No.</label>
@@ -789,7 +802,7 @@ export default function RokadPanna() {
                   placeholder="Party ka naam likhein (auto suggest)..."
                   testId="select-party"
                 />
-                <LedgerBalanceHint ledgerId={form.party_id} className="mt-1" testId="rokad-party-balance" />
+                <LedgerBalanceHint ledgerId={form.party_id} delta={liveDelta.party} className="mt-1" testId="rokad-party-balance" />
                 <SettleToggle form={form} onChange={(v) => setForm((f) => ({ ...f, settle: v }))}
                   editEntry={editId ? entries.find((x) => x.id === editId) : null} />
               </div>

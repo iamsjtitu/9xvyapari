@@ -11,7 +11,7 @@ import AppFooter from "@/components/AppFooter";
 import {
   House, Notebook, UsersThree, Package, Receipt, ChartBar, SignOut, Storefront,
   TreeStructure, IdentificationCard, BookOpenText, CloudArrowUp, Calendar, Power,
-  Truck, Scales, Database, Keyboard, CalendarCheck, BookOpen, HandCoins, Broom } from "@phosphor-icons/react";
+  Truck, Scales, Database, Keyboard, CalendarCheck, BookOpen, HandCoins, Broom, Money } from "@phosphor-icons/react";
 
 const sections = [
   {
@@ -29,6 +29,15 @@ const sections = [
       { to: "/outstanding", label: "Outstanding List", key: "L", icon: HandCoins, tid: "nav-outstanding" },
       { to: "/account-clear", label: "Account Clear", key: "W", icon: Broom, tid: "nav-account-clear" },
       { to: "/gst-returns", label: "GST Returns", key: "X", icon: Receipt, tid: "nav-gst" },
+    ],
+  },
+  {
+    title: "Staff Attendance & Payments",
+    items: [
+      { to: "/staff/attendance", label: "Staff Attendance", key: "S", icon: CalendarCheck, tid: "nav-staff-attendance" },
+      { to: "/staff/salary", label: "Staff Salary Payments", key: "V", icon: Money, tid: "nav-staff-salary" },
+      { to: "/staff/advance", label: "Staff Advance", key: "Z", icon: HandCoins, tid: "nav-staff-advance" },
+      { to: "/staff", label: "Staff Master", key: "U", icon: UsersThree, end: true, tid: "nav-staff-master" },
     ],
   },
   {

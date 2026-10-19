@@ -13,10 +13,12 @@ export const TransferForm = ({ accounts, date, contraId, onClose, onSaved }) => 
   const [busy, setBusy] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
+  const [orig, setOrig] = useState(null);  // original transfer when editing → live balance subtracts it
   useEffect(() => {
     if (!contraId) return;
     api.get(`/rokad/transfer/${contraId}`).then((r) => {
       const t = r.data;
+      setOrig({ from_account_id: t.from_account_id, to_account_id: t.to_account_id, amount: Number(t.amount) || 0 });
       setForm({ date: t.date, from_account_id: t.from_account_id, to_account_id: t.to_account_id, amount: String(t.amount),
         description: t.description || "", voucher_no: t.voucher_no || "", chq_no: t.chq_no || "", mode: t.mode || "Bank" });
     }).catch((err) => toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message));
@@ -72,7 +74,7 @@ export const TransferForm = ({ accounts, date, contraId, onClose, onSaved }) => 
               <option value="">— chunein —</option>
               {accounts.map((a) => <option key={a.id} value={a.id} disabled={a.id === form.to_account_id}>{a.code ? `${a.code} · ` : ""}{a.name}</option>)}
             </select>
-            <LedgerBalanceHint ledgerId={form.from_account_id} compact className="mt-1" testId="transfer-from-balance" />
+            <LedgerBalanceHint ledgerId={form.from_account_id} delta={-(amt || 0) + (orig && orig.from_account_id === form.from_account_id ? orig.amount : 0)} compact className="mt-1" testId="transfer-from-balance" />
           </div>
           <div>
             <label className="lbl">To (paisa aaya) — Jama</label>
@@ -80,7 +82,7 @@ export const TransferForm = ({ accounts, date, contraId, onClose, onSaved }) => 
               <option value="">— chunein —</option>
               {accounts.map((a) => <option key={a.id} value={a.id} disabled={a.id === form.from_account_id}>{a.code ? `${a.code} · ` : ""}{a.name}</option>)}
             </select>
-            <LedgerBalanceHint ledgerId={form.to_account_id} compact className="mt-1" testId="transfer-to-balance" />
+            <LedgerBalanceHint ledgerId={form.to_account_id} delta={(amt || 0) - (orig && orig.to_account_id === form.to_account_id ? orig.amount : 0)} compact className="mt-1" testId="transfer-to-balance" />
           </div>
           <div>
             <label className="lbl">V.No. (optional)</label>

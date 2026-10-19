@@ -51,6 +51,15 @@ export default function JournalEntry() {
     const last = new Date(y, m + 1, 0).getDate(); const mm = String(m + 1).padStart(2, "0");
     setDateFrom(`${y}-${mm}-01`); setDateTo(`${y}-${mm}-${String(last).padStart(2, "0")}`); };
   const rangeLabel = !dateFrom && !dateTo ? "Sabhi entries" : dateFrom === dateTo ? `Date ${dateFrom}` : `${dateFrom || "…"} se ${dateTo || "…"} tak`;
+  // Live balance per line: (debit - credit) typed now, minus what the original voucher already posts to that ledger
+  const lineDelta = (l) => {
+    if (!l.account_id) return 0;
+    const now = (Number(l.debit) || 0) - (Number(l.credit) || 0);
+    const orig = editId ? entries.find((e) => e.id === editId) : null;
+    const before = orig ? (orig.lines || []).filter((x) => x.account_id === l.account_id).reduce((t, x) => t + (Number(x.debit) || 0) - (Number(x.credit) || 0), 0) : 0;
+    return now - before;
+  };
+
   const startEdit = (j) => {
     setForm({
       date: (j.date || "").slice(0, 10), narration: j.narration || "", ref: j.ref || "", voucher_no: j.voucher_no,
@@ -290,7 +299,7 @@ export default function JournalEntry() {
                             <option key={o.id} value={o.id}>{o.name} ({o.group})</option>
                           ))}
                         </select>
-                        <LedgerBalanceHint ledgerId={l.account_id} compact className="mt-1" testId={`jline-balance-${idx}`} />
+                        <LedgerBalanceHint ledgerId={l.account_id} delta={lineDelta(l)} compact className="mt-1" testId={`jline-balance-${idx}`} />
                       </td>
                       <td>
                         <input type="number" step="0.01" className="input-dense num" value={l.debit}

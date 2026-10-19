@@ -29,6 +29,10 @@ import YearEnd from "@/pages/YearEnd";
 import OpeningBalance from "@/pages/OpeningBalance";
 import Outstanding from "@/pages/Outstanding";
 import AccountClearReport from "@/pages/AccountClearReport";
+import StaffMaster from "@/pages/StaffMaster";
+import StaffAttendance from "@/pages/StaffAttendance";
+import StaffSalary from "@/pages/StaffSalary";
+import StaffAdvance from "@/pages/StaffAdvance";
 import Inward from "@/pages/Inward";
 import TrialBalance from "@/pages/TrialBalance";
 import ImportDBF from "@/pages/ImportDBF";
@@ -96,6 +100,10 @@ function App() {
             <Route path="opening-balance" element={<OpeningBalance />} />
             <Route path="outstanding" element={<Outstanding />} />
             <Route path="account-clear" element={<AccountClearReport />} />
+            <Route path="staff" element={<StaffMaster />} />
+            <Route path="staff/attendance" element={<StaffAttendance />} />
+            <Route path="staff/salary" element={<StaffSalary />} />
+            <Route path="staff/advance" element={<StaffAdvance />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

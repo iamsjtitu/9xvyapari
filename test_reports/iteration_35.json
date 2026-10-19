@@ -1,0 +1,27 @@
+{
+  "summary": "RETEST of the Rokad 'remember last TYPE' stale-closure fix from iteration_34 (frontend only). Fixed: closeForm() now re-reads localStorage (vyapari.rokad.lastUsed.type), so 'Nayi Entry' or the 'a' key right after saving, with no reload, shows the type just saved. All 10 checks passed.",
+  "results": [
+    "Save Payment (kharch, 13), then Nayi Entry without reload -> Payment: PASS",
+    "'a' key after that -> Payment: PASS",
+    "Save Receipt (jama, 13), then Nayi Entry -> Receipt: PASS; 'a' key -> Receipt: PASS",
+    "'p' key forces Payment, 'r' key forces Receipt: PASS",
+    "Last saved type was jama: press 'p', then Escape, then Nayi Entry -> Receipt (the last saved type, not the type 'p' set): PASS",
+    "Cancel path 1: last saved jama, open, switch to kharch, Cancel, reopen -> Receipt: PASS",
+    "Cancel path 2: last saved kharch, open, switch to jama, Cancel, reopen -> Payment; 'a' key -> Payment: PASS",
+    "localStorage after the run: lastUsed = {cash_account_id, mode: Cash, type: kharch}"
+  ],
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "RokadPanna.jsx is 823 lines (over the 700-line guideline); consider splitting the add/edit modal into its own component."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "skipped", "frontend": "100%"},
+  "test_credentials": "admin / Vyapari@2026",
+  "seed_data_creation": "6 QA entries (description QA_it35, amount 13) were created over 2 runs and all were deleted through DELETE /api/rokad/{id}. A check afterwards found 0 QA_it35 entries left.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Rokad type memory: the 'Nayi Entry' button and the 'a' key reuse the form state that closeForm() resets from localStorage 'vyapari.rokad.lastUsed'. The 'r'/'p' keys force the type. Cancel/Escape do not change the saved type. Click the page body (e.g. mouse at 5,700) before pressing shortcut keys. Clean up through the API rather than the UI delete button: deleting in the UI opens a confirm dialog, and the first run timed out during UI cleanup."
+}

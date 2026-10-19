@@ -2893,6 +2893,9 @@ async def desktop_shutdown(request: Request):
     return {"ok": True}
 
 
+from staff import make_staff_router  # noqa: E402  (needs the helpers above)
+api.include_router(make_staff_router(db, get_current_user, now_iso, _compute_party_balance, _next_voucher, _next_journal_vno, _is_date, _default_cash_account))
+
 app.include_router(api)
 
 # CORS – cookies + credentials require explicit origins
