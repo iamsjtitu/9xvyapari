@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { inr, formatApiErrorDetail, todayISO } from "@/lib/api";
 import { toast } from "sonner";
-import { Money, Printer, Trash, X, CheckCircle } from "@phosphor-icons/react";
+import { Money, Printer, Trash, X, CheckCircle, Receipt } from "@phosphor-icons/react";
+import { SalarySlip } from "@/components/staff/SalarySlip";
 import { FoxProPrintHeader } from "@/components/ExportBar";
 import { backdropClose } from "@/lib/backdrop";
 import { MonthPicker, MODES, thisMonth, monthLabel, StaffPageHeader } from "@/components/staff/common";
@@ -22,7 +23,7 @@ const PayDialog = ({ row, month, monthEnd, onClose, onPaid }) => {
     try {
       const { data } = await api.post("/staff/salary/pay", { staff_id: row.id, month, deduct_advance: deduct, pay_now: form.pay_now, cash_account_id: form.cash_account_id, mode: form.mode, date: form.date, note: form.note });
       toast.success(`${row.name} · ${monthLabel(month)} salary ₹${inr(data.gross)}${deduct ? ` − advance ₹${inr(deduct)}` : ""} = net ₹${inr(data.net)}${data.paid_now ? ` · V.No. ${data.voucher_no}` : " (credit kiya, payment baad me)"}`, { duration: 7000 });
-      onPaid();
+      onPaid(data);
     } catch (err) { toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message); }
     finally { setBusy(false); }
   };
@@ -64,6 +65,7 @@ export default function StaffSalary() {
   const [month, setMonth] = useState(thisMonth());
   const [data, setData] = useState(null);
   const [paying, setPaying] = useState(null);
+  const [slip, setSlip] = useState(null);   // { rec, staff } → DOS salary slip
   const monthRef = useRef(month);
   const load = (m = month) => api.get("/staff/salary", { params: { month: m } })
     .then((r) => setData((cur) => (r.data.month === monthRef.current ? r.data : cur)))   // ignore stale month responses
@@ -119,7 +121,10 @@ export default function StaffSalary() {
                     <td>{p ? <span className="kbd !text-[9px] !px-1 !py-0 !text-white !bg-jama !border-jama" title={`${p.date.split("-").reverse().join("-")}${p.voucher_no ? ` · V.No. ${p.voucher_no}` : ""}`} data-testid={`sal-paid-${r.id}`}>{p.paid_now ? `PAID ${p.date.split("-").reverse().join("-")}` : "CREDITED"}</span>
                       : r.gross > 0 ? <span className="kbd !text-[9px] !px-1 !py-0">PENDING</span> : <span className="text-[10px] text-muted2">attendance nahi</span>}</td>
                     <td className="print:hidden">{p
-                      ? <button className="btn-ghost p-1.5 !text-[#B71C1C]" onClick={() => unpay(r)} title="Salary entry delete" data-testid={`sal-unpay-${r.id}`}><Trash size={14} /></button>
+                      ? <div className="flex gap-1">
+                          <button className="btn-ghost p-1.5" onClick={() => setSlip({ rec: p, staff: r })} title="Salary slip print" data-testid={`sal-slip-${r.id}`}><Receipt size={14} /></button>
+                          <button className="btn-ghost p-1.5 !text-[#B71C1C]" onClick={() => unpay(r)} title="Salary entry delete" data-testid={`sal-unpay-${r.id}`}><Trash size={14} /></button>
+                        </div>
                       : <button className="btn-primary !h-7 text-xs" disabled={r.gross <= 0} onClick={() => setPaying(r)} data-testid={`sal-pay-${r.id}`}>Pay</button>}</td>
                   </tr>
                 );
@@ -135,7 +140,8 @@ export default function StaffSalary() {
           )}
         </table>
       </div>
-      {paying && <PayDialog row={paying} month={month} monthEnd={data.month_end} onClose={() => setPaying(null)} onPaid={() => { setPaying(null); load(); }} />}
+      {paying && <PayDialog row={paying} month={month} monthEnd={data.month_end} onClose={() => setPaying(null)} onPaid={(rec) => { setPaying(null); load(); if (rec) setSlip({ rec, staff: paying }); }} />}
+      {slip && <SalarySlip rec={slip.rec} staff={slip.staff} onClose={() => setSlip(null)} />}
     </div>
   );
 }

@@ -221,6 +221,51 @@ def make_staff_router(db, get_current_user, now_iso, compute_party_balance, next
             n += 1
         return {"ok": True, "marked": n}
 
+    @r.get("/attendance/today")
+    async def attendance_today(current=Depends(get_current_user)):
+        """Dashboard reminder: which active staff have no mark for today."""
+        today = datetime.now().date().isoformat()
+        staff = await db.staff.find({"active": {"$ne": False}}, {"_id": 0, "id": 1, "name": 1}).sort("name", 1).to_list(1000)
+        marked = {a["staff_id"]: a["mark"] async for a in db.attendance.find({"date": today}, {"_id": 0, "staff_id": 1, "mark": 1})}
+        unmarked = [s for s in staff if s["id"] not in marked]
+        return {"date": today, "total": len(staff), "marked": len(staff) - len(unmarked), "unmarked": unmarked,
+                "counts": {k: sum(1 for v in marked.values() if v == k) for k in MARKS}}
+
+    # ---------- monthly cost report ----------
+    @r.get("/report")
+    async def staff_report(month: str, current=Depends(get_current_user)):
+        """Month-wise staff cost: attendance, salary (gross / advance cut / net), advances given, month-end dues."""
+        if not _month_ok(month):
+            raise HTTPException(400, "month YYYY-MM format me do")
+        data = await _salary_rows(month)
+        start, end = f"{month}-01", data["month_end"]
+        staff_by_ledger = {x["ledger_id"]: x for x in data["rows"] if x.get("ledger_id")}
+        adv: dict = {}
+        async for e in db.rokad.find({"party_id": {"$in": list(staff_by_ledger.keys())}, "type": "kharch", "staff_kind": {"$ne": "salary"},
+                                      "salary_payment_id": {"$exists": False}, "date": {"$gte": start, "$lte": end}}, {"_id": 0, "party_id": 1, "amount": 1}):
+            a = adv.setdefault(e["party_id"], {"count": 0, "amount": 0.0}); a["count"] += 1; a["amount"] += float(e.get("amount") or 0)
+        rows, tot = [], {"gross": 0.0, "deduct": 0.0, "net": 0.0, "advance": 0.0, "paid_days": 0.0, "advance_due": 0.0, "salary_due": 0.0}
+        for x in data["rows"]:
+            rec = x.get("paid") or {}
+            a = adv.get(x.get("ledger_id"), {"count": 0, "amount": 0.0})
+            row = {"id": x["id"], "name": x["name"], "ledger_id": x.get("ledger_id"), "salary_type": x.get("salary_type"), "salary": x.get("salary"),
+                   "active": x.get("active", True), "counts": x["counts"], "paid_days": x["paid_days"], "unmarked": x["unmarked"], "per_day": x["per_day"],
+                   "gross": rec.get("gross", 0.0), "deduct": rec.get("advance_deducted", 0.0), "net": rec.get("net", 0.0),
+                   "status": "paid" if rec.get("paid_now") else "credited" if rec else "pending" if x["gross"] > 0 else "none",
+                   "salary_date": rec.get("date", ""), "voucher_no": rec.get("voucher_no", ""), "expected_gross": x["gross"],
+                   "advance_count": a["count"], "advance_amount": round(a["amount"], 2),
+                   "advance_due": x["advance_due"], "salary_due": x["salary_due"]}
+            row["cost"] = round(row["gross"], 2)                      # salary expense booked for the month
+            row["cash_out"] = round(row["net"] + row["advance_amount"], 2)   # actual paisa gone out (salary net + advances)
+            for k in ("gross", "deduct", "net", "paid_days", "advance_due", "salary_due"):
+                tot[k] += row[k]
+            tot["advance"] += row["advance_amount"]
+            rows.append(row)
+        tot = {k: round(v, 2) for k, v in tot.items()}
+        tot["cost"] = tot["gross"]; tot["cash_out"] = round(tot["net"] + tot["advance"], 2)
+        return {"month": month, "label": data["label"], "days": data["days"], "rows": rows, "totals": tot,
+                "firm_name": (await db.settings.find_one({"id": "default"}, {"_id": 0, "firm_name": 1}) or {}).get("firm_name", "")}
+
     # ---------- salary ----------
     async def _salary_rows(month: str) -> dict:
         y, m = (int(x) for x in month.split("-"))

@@ -33,6 +33,7 @@ import StaffMaster from "@/pages/StaffMaster";
 import StaffAttendance from "@/pages/StaffAttendance";
 import StaffSalary from "@/pages/StaffSalary";
 import StaffAdvance from "@/pages/StaffAdvance";
+import StaffReport from "@/pages/StaffReport";
 import Inward from "@/pages/Inward";
 import TrialBalance from "@/pages/TrialBalance";
 import ImportDBF from "@/pages/ImportDBF";
@@ -104,6 +105,7 @@ function App() {
             <Route path="staff/attendance" element={<StaffAttendance />} />
             <Route path="staff/salary" element={<StaffSalary />} />
             <Route path="staff/advance" element={<StaffAdvance />} />
+            <Route path="staff/report" element={<StaffReport />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

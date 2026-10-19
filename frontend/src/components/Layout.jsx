@@ -37,6 +37,7 @@ const sections = [
       { to: "/staff/attendance", label: "Staff Attendance", key: "S", icon: CalendarCheck, tid: "nav-staff-attendance" },
       { to: "/staff/salary", label: "Staff Salary Payments", key: "V", icon: Money, tid: "nav-staff-salary" },
       { to: "/staff/advance", label: "Staff Advance", key: "Z", icon: HandCoins, tid: "nav-staff-advance" },
+      { to: "/staff/report", label: "Monthly Staff Report", key: "Q", icon: ChartBar, tid: "nav-staff-report" },
       { to: "/staff", label: "Staff Master", key: "U", icon: UsersThree, end: true, tid: "nav-staff-master" },
     ],
   },
