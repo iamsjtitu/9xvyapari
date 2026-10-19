@@ -1,0 +1,28 @@
+{
+  "summary": "Tested Opening Balance Sheet ACCOUNT CLEAR '+' party-wise breakdown (backend + UI + print + Excel). Setup: SETTLE TEST PARTY settled 20-06 (leftover 60) and QA CLEAR PARTY B settled 22-06 (leftover 50). Backend: rows carry id, settle_account_id returned, ACCOUNT CLEAR = 110 Dr, account-clear?date_to breakdown sums to the head (5/5 pass, 1 skipped: no closed FY). UI: exactly one toggle (ob-clear-toggle) on ACCOUNT CLEAR row; no ob-clear-breakdown before click; '+' -> '−' shows breakdown as the row's next sibling with sub-rows '↳ SETTLE TEST PARTY · cleared upto 20-06-2026' 60.00 DR and '↳ QA CLEAR PARTY B · cleared upto 22-06-2026' 50.00 DR (60 first); '−' hides it. Group TOTAL (OTHER / UNGROUPED 110.00), grand DR/CR, ledger count (349), DIFFERENCE are identical before/after expand/collapse. Print media: toggle display:none, breakdown visible when expanded, absent when collapsed. Excel downloads in both states; expanded sheet has the 2 '↳' rows, collapsed doesn't. As-on 2026-06-19: ACCOUNT CLEAR row gone, no JS errors. Found one race bug: the sheet can show stale data for a different date than the As-on input.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OpeningBalance.jsx useEffects (opening-balances fetch + account-clear breakdown fetch)", "issue": "Race condition / stale response: no cancel/ignore guard. Reproduced: open /opening-balance (default as_on = today 2026-10-19, slow ~349 ledgers), then right away set As-on to 2026-06-30. URL and input show 2026-06-30, but the sheet header says 'AS ON 19-10-2026' because the older today-request came back last and overwrote the data. The Excel filename/print header then use the wrong date too. The breakdown effect has the same problem (it can show account-clear for a different date_to than the data).", "selector": "[data-testid=opening-balance-sheet]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_ob_clear_breakdown_v24.py", "/app/test_reports/pytest/pytest_v24.xml"],
+  "action_items": [
+    "OpeningBalance.jsx: in both fetch effects add `let alive = true; ... .then(r => alive && setX(...)); return () => { alive = false; }` (or AbortController) so a stale as_on response can't overwrite the newer one.",
+    "Optional: Account Clear sub-rows come only from journal lines. If ACCOUNT CLEAR ever has an opening balance or a rokad posting, the sub-rows won't add up to the head. Consider adding a 'Opening / other' sub-row for the difference."
+  ],
+  "critical_code_review_comments": [
+    "Stale-response race in OpeningBalance.jsx effects (see ui_bugs).",
+    "In FY carry-forward mode (fy_id), the breakdown uses /reports/account-clear?date_to=new_fy_start. That covers all past journals and may not match the carried-forward snapshot balance. Not tested: there is no closed FY.",
+    "account-clear rows with several non-clear lines use others[0].account_id as party_id, so a multi-party manual journal goes under the first party only."
+  ],
+  "updated_files": ["/app/backend/tests/test_ob_clear_breakdown_v24.py"],
+  "success_rate": {"backend": "100% (5/5, 1 skipped)", "frontend": "95% (all requested checks pass; 1 race bug)"},
+  "test_credentials": "admin / Vyapari@2026 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created temporarily and then cleaned up: 2 settle rokad entries + party QA CLEAR PARTY B. SETTLE TEST PARTY is back to 1000 Dr; ACCOUNT CLEAR is kept.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "`python /app/backend/tests/test_ob_clear_breakdown_v24.py setup|cleanup` (with REACT_APP_BACKEND_URL exported) creates/removes the 60+50 Account Clear fixture for UI tests. To reproduce the race: load /opening-balance with no params, then fill input-ob-as-on right away, wait about 6s, and compare the sheet's 'AS ON' header with the input."
+}

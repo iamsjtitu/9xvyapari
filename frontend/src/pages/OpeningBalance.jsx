@@ -23,17 +23,21 @@ export default function OpeningBalance() {
   }, []);
 
   useEffect(() => {
+    let alive = true;
     setData(null);
     api.get("/reports/opening-balances", { params: fyId ? { fy_id: fyId } : { as_on: asOn } })
-      .then((r) => setData(r.data))
-      .catch((err) => toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message));
+      .then((r) => { if (alive) setData(r.data); })
+      .catch((err) => { if (alive) toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message); });
+    return () => { alive = false; };
   }, [fyId, asOn]);
 
   // Party-wise make-up of the Account Clear head (what every party's settlement put there, as on date)
   useEffect(() => {
+    let alive = true;
     setBreakdown(null);
-    if (!data?.settle_account_id || !data?.as_on) return;
+    if (!data?.settle_account_id || !data?.as_on) return undefined;
     api.get("/reports/account-clear", { params: { date_to: data.as_on } }).then((r) => {
+      if (!alive) return;
       const by = new Map();
       for (const row of r.data.rows || []) {
         const key = row.party_id || row.party_name;
@@ -44,8 +48,13 @@ export default function OpeningBalance() {
         by.set(key, cur);
       }
       const rows = [...by.values()].filter((b) => Math.abs(b.net) >= 0.005).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+      // Head minus the journal-based sub-rows (opening balance / direct rokad on the ledger) → one "Opening / other" line
+      const head = data.sections.flatMap((sec) => sec.rows).find((r) => r.id === data.settle_account_id);
+      const other = head ? head.balance - rows.reduce((t, b) => t + b.net, 0) : 0;
+      if (Math.abs(other) >= 0.005) rows.push({ party_id: "other", party_name: "Opening / other postings", net: other, last_date: "", count: 1 });
       setBreakdown({ ledgerId: data.settle_account_id, rows });
     }).catch(() => {});
+    return () => { alive = false; };
   }, [data]);
 
   const setAsOn = (d) => d && setParams({ as_on: d });
