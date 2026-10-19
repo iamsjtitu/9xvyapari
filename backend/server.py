@@ -1219,6 +1219,8 @@ async def update_journal(jid: str, body: JournalIn, current=Depends(get_current_
     existing = await db.journal.find_one({"id": jid}, {"_id": 0})
     if not existing:
         raise HTTPException(404, "Journal entry nahi mili")
+    if existing.get("settles_rokad_id"):
+        raise HTTPException(400, "Yeh Account Settled ka auto journal hai — isse seedha edit nahi kar sakte. Rokad entry edit karein, yeh apne aap dobara banega")
     total = _validate_journal(body)
     doc = body.model_dump()
     doc["total"] = total

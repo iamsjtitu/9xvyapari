@@ -265,7 +265,7 @@ export default function RokadPanna() {
                       </span>
                     )}
                     {e.settle_journal_id && (
-                      <span className="kbd !text-[10px] !px-1.5 !py-0 font-semibold text-white !bg-jama !border-jama" title={`Account Settled · ₹${inr(Math.abs(e.settled_amount || 0))} Account Clear me`} data-testid={`rokad-settled-badge-${e.id}`}>
+                      <span className="kbd !text-[10px] !px-1.5 !py-0 font-semibold !text-white !bg-jama !border-jama" title={`Account Settled · ₹${inr(Math.abs(e.settled_amount || 0))} Account Clear me`} data-testid={`rokad-settled-badge-${e.id}`}>
                         SETTLED
                       </span>
                     )}

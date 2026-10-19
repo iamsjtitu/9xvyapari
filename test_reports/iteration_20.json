@@ -1,0 +1,29 @@
+{
+  "summary": "Retested the 5 fixes from iteration 19. Backend: 12/12 pytest pass (test_settle_v19.py 7/7 plus new test_settle_v20.py 5/5). Settle validation now runs before anything is written for POST (ACCOUNT CLEAR as party, account id as party, no party → 400 with no row created) and for PUT (400, stored entry unchanged, no journal). Journal voucher numbers are max+1 (A, B, delete A, C = A+2) and the settle journal continues the same sequence. Frontend: in Rokad edit mode the settle-info preview updates live (60 Dr → 900 gives 100 Dr → 1000 gives the 'ledger 0' message → save shows toast ₹100.00 Dr). Deleting the entry removes its journal. PartyLedger rows show DD-MM-YYYY. Clicking the Cash IN Hand account opens the Account Ledger, and its Dr closing shows in #1A1A1A (rgb 26,26,26). rokad-form-date testid is present. The SETTLED badge had a readability bug (gray text on green), which I fixed.",
+  "backend_issues": {"critical": [], "minor": [
+    {"endpoint": "_next_journal_vno", "issue": "max+1 still gives the same number again if the latest journal (the max) is deleted. Example: J00002 deleted, so the next journal is J00002 again. This is expected for max+1, but if voucher numbers must never be reused you need a persistent counter."},
+    {"endpoint": "PUT /api/journal/{id}", "issue": "Auto settle journals (auto='settle') can be edited by hand. The next edit of the linked rokad deletes and rebuilds the journal, so the manual change is lost silently. Consider blocking edits on auto journals or showing a warning."}
+  ]},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RokadPanna SETTLED badge", "issue": "FIXED BY TESTER: the unlayered .kbd CSS (color #595959) overrode Tailwind text-white, so the text was gray (89,89,89) on green #1B5E20 and unreadable. Changed to !text-white; now white on green (verified).", "selector": "[data-testid^=rokad-settled-badge-]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_settle_v20.py", "/app/backend/tests/test_settle_v19.py", "/app/test_reports/pytest/pytest_results_v20.xml"],
+  "action_items": [
+    "Optional: SettleToggle edit-mode base adjustment does not check that editEntry.party_id === form.party_id. If the user switches the party in edit mode, the old entry's effect and settled_amount are subtracted from the NEW party's balance, so the preview is wrong (the backend result is still correct). Add a party_id equality check to the strip condition.",
+    "Optional: decide whether journal voucher numbers may be reused after the latest one is deleted (see minor backend note)."
+  ],
+  "critical_code_review_comments": [
+    "SettleToggle.jsx: the strip condition `editing && editEntry.date <= form.date` should also require editEntry.party_id === form.party_id.",
+    "server.py is about 2940 lines and should be split into routers (rokad/journal/settings)."
+  ],
+  "updated_files": ["/app/frontend/src/pages/RokadPanna.jsx (SETTLED badge text-white → !text-white)", "/app/backend/tests/test_settle_v20.py (new)"],
+  "success_rate": {"backend": "100%", "frontend": "100% (after badge contrast fix)"},
+  "seed_data_creation": "None persisted. All test rokad rows and journals were cleaned up. SETTLE TEST PARTY is back to 1000 Dr, and the only journal left is J00001 (pre-existing).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: export REACT_APP_BACKEND_URL=<frontend .env>; pytest test_settle_v19.py test_settle_v20.py (12 tests). Login testids: input-username/input-password/btn-submit. Party autocomplete: fill [data-testid=select-party] then click select-party-opt-<id>. The preview URL worked throughout this run. There is only one doc in /api/accounts (Cash IN Hand, id ff518072-...); the other cash/bank ledgers are parties."
+}

@@ -90,7 +90,7 @@ export const SettleToggle = ({ form, onChange, editEntry }) => {
   let rem = null;
   if (bal != null) {
     let base = bal;
-    if (editing && (editEntry.date || "").slice(0, 10) <= form.date) {
+    if (editing && editEntry.party_id === form.party_id && (editEntry.date || "").slice(0, 10) <= form.date) {
       // as-on balance already holds the old entry + its old adjustment → strip both before previewing
       base = bal + Number(editEntry.settled_amount || 0) - effect(editEntry.type, Number(editEntry.amount) || 0);
     }

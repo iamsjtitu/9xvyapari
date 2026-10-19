@@ -143,7 +143,18 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - Electron chooser.html: ↑/↓/Home/End move the highlighted "Pichle Folder" (also fills the path box), Enter starts the highlighted folder, Delete = ✕ forget. Verified in Playwright with a mocked bridge.
 
 ### Jun 2026 – Modal closing on text drag-select (user video)
-- Cause: backdrop `onClick={onClose}`; dragging to select text in an input and releasing over the backdrop fires `click` on the overlay → modal closed. Fix: `lib/backdrop.js` `backdropClose(onClose)` → closes only if mousedown AND mouseup/click both landed on the backdrop itself (flag stored in `dataset`). Applied to all 7 backdrop-closing overlays (Accounts, AccountGroups, Inward, TransferForm, RenumberVouchersDialog, VoucherSlip, LedgerInUseDialog). Verified via Playwright drag gesture.
+- Cause: backdrop `onClick={onClose}`; dragging to select text in an input and releasing over the backdrop fires `click` on the overlay → modal closed. Fix: `lib/backdrop.js` `backdropClose(onClose)` → closes only if mousedown AND mouseup/click both landed on the backdrop itself (flag stored in `dataset`). Applied to all backdrop-closing overlays (Accounts, AccountGroups, Inward, TransferForm, RenumberVouchersDialog, VoucherSlip, LedgerInUseDialog + RokadPanna, JournalEntry, NayaBill, PartyKhata, GallaMaster). Verified via Playwright drag gesture (iteration 18/19).
+
+### Jun 2026 – Inline party create from Rokad · party validation
+- Rokad party field = `PartyAutocomplete` with "+ Add 'X' as new party" (click / Enter) → POST /parties, selected in place, entered fields kept.
+- Backend `POST /parties`: empty/whitespace name → 422; case-insensitive duplicate → 409 "<NAME> pehle se hai".
+
+### Jun 2026 – Account Settled (leftover → "Account Clear" ledger)
+- Settings: `settle_account_id/_name` (Settings card + inline picker in the Rokad form; "ACCOUNT CLEAR banao & link karo" auto-creates the ledger).
+- `RokadIn.settle`: `_settle_targets()` validates BEFORE insert/update; `_apply_settlement()` deletes any old settlement journal, computes party balance as on entry date, posts Dr AccountClear/Cr Party (or reverse) with narration "Account cleared upto dd-mm-yyyy · <party> · baki ₹X Dr/Cr → <ledger>", `settles_rokad_id`, `auto:"settle"`; rokad gets `settle_journal_id`, `settled_amount`. Edit recomputes, un-tick/delete removes the journal; deleting the journal un-flags the rokad; auto journals cannot be hand-edited (400). Journal voucher numbers now `_next_journal_vno()` = max+1.
+- UI: `SettleToggle` under the party field with live preview of the leftover (also in edit mode), SETTLED badge in the list, toast with amount/journal no.
+- Accounts (Khate) page: row / name / book icon → `/parties/<id>` Account Ledger with running balance; account ledgers colour Dr balance ink (red only when overdrawn); ledger rows show DD-MM-YYYY.
+- Verified: iteration 19 + 20 (backend 12/12 pytest, frontend 100%).
 
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
