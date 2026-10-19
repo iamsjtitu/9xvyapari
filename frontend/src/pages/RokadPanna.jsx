@@ -23,6 +23,11 @@ const modeForAccount = (a) =>
     : /bank|sbi|hdfc|icici|axis|pnb|bob|canara|union|kotak|idbi|yes|indusind|federal|s\/a|c\/a|cc|od/i.test(a?.name || "") ? "Bank"
     : "Cash";
 
+// Remember the Cash/Bank a/c + Mode of the last saved entry → next new entry opens with them
+const LAST_USED_KEY = "vyapari.rokad.lastUsed";
+const readLastUsed = () => { try { return JSON.parse(localStorage.getItem(LAST_USED_KEY) || "null"); } catch { return null; } };
+const saveLastUsed = (v) => { try { localStorage.setItem(LAST_USED_KEY, JSON.stringify(v)); } catch {} };
+
 export default function RokadPanna() {
   const { settings } = useOutletContext() || {};
   const [view, setView] = useState("list");                // list | daybook (DOS print preview)
@@ -152,9 +157,13 @@ export default function RokadPanna() {
   );
   useEffect(() => {
     if (!showAdd || editId || form.cash_account_id) return;
-    const a = accounts.find((x) => x.id === bankFilter) || defaultCash;
+    // Filtered a/c wins; otherwise the last-used a/c + mode (remembered on save) → else default cash
+    const last = readLastUsed();
+    const lastAcc = last && accounts.find((x) => x.id === last.cash_account_id);
+    const a = accounts.find((x) => x.id === bankFilter) || lastAcc || defaultCash;
     if (!a) return;
-    setForm((f) => ({ ...f, cash_account_id: a.id, cash_account_name: a.name, mode: modeForAccount(a) }));
+    const mode = lastAcc && a.id === lastAcc.id && last.mode ? last.mode : modeForAccount(a);
+    setForm((f) => ({ ...f, cash_account_id: a.id, cash_account_name: a.name, mode }));
     // Auto V.No. (per cash a/c running number) as soon as the form opens
     api.get(`/cash-accounts/${a.id}/next-voucher`)
       .then(({ data }) => setForm((f) => (f.voucher_no || f.cash_account_id !== a.id ? f : { ...f, voucher_no: data.next_voucher || "" })))
@@ -212,6 +221,7 @@ export default function RokadPanna() {
       }
       const { data } = editId ? await api.put(`/rokad/${editId}`, payload) : await api.post("/rokad", payload);
       toast.success(editId ? "Entry update ho gayi" : "Entry add ki gayi");
+      saveLastUsed({ cash_account_id: payload.cash_account_id, mode: payload.mode });
       if (data?.settlement?.journal_id) {
         toast.success(`Account Settled: ₹${inr(data.settlement.amount)} ${data.settlement.side} → ${data.settlement.ledger} · ledger 0 · Journal ${data.settlement.voucher_no}`, { duration: 7000 });
       } else if (payload.settle && data?.settlement?.note) {
