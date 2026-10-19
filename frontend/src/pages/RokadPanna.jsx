@@ -8,6 +8,7 @@ import { ExportBar } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { TransferForm } from "@/components/rokad/TransferForm";
 import { DayBookSheet } from "@/components/rokad/DayBookSheet";
+import { triggerPrint } from "@/lib/exports";
 import { VoucherSearch } from "@/components/rokad/VoucherSearch";
 import { RenumberVouchersDialog } from "@/components/rokad/RenumberVouchersDialog";
 import { VoucherSlip } from "@/components/rokad/VoucherSlip";
@@ -32,6 +33,9 @@ const saveLastUsed = (v) => { try { localStorage.setItem(LAST_USED_KEY, JSON.str
 export default function RokadPanna() {
   const { settings } = useOutletContext() || {};
   const [view, setView] = useState("list");                // list | daybook (DOS print preview)
+  const [pageBreak, setPageBreak] = useState(false);       // daybook: har account alag page par
+  // "Sirf yeh account" → filter + DOS sheet + print (ek account ka day book apne page par)
+  const printOnly = (id) => { setBankFilter(id); setView("daybook"); setTimeout(() => triggerPrint(), 400); };
   const [dateFrom, setDateFrom] = useState(todayISO());
   const [dateTo, setDateTo] = useState(todayISO());
   const [bankFilter, setBankFilter] = useState("");        // "" = all
@@ -329,8 +333,8 @@ export default function RokadPanna() {
                   {e.voucher_no || "—"}
                 </td>
                 <td className="font-mono-data text-xs text-jama whitespace-nowrap" title="Invoice No." data-testid={`rokad-inv-${e.id}`}>{e.inv_no || ""}</td>
-                <td>
-                  <div className="font-medium flex items-center gap-1.5">
+                <td className="cell-grow" title={`${e.party_name || ""}${e.description ? ` · ${e.description}` : ""}`}>
+                  <div className="font-medium flex items-center gap-1.5 min-w-0">
                     {e.contra_id && (
                       <span className="kbd !text-[9px] !px-1 !py-0 text-jama border-jama/40" title="Cash/Bank transfer (contra)" data-testid={`rokad-contra-badge-${e.id}`}>
                         <ArrowsLeftRight size={9} weight="bold" className="inline mr-0.5" />TRANSFER
@@ -341,10 +345,10 @@ export default function RokadPanna() {
                         SETTLED
                       </span>
                     )}
-                    <span>{e.party_name || "—"}</span>
+                    <span className="truncate min-w-0">{e.party_name || "—"}</span>
                   </div>
                   {(e.description || e.cash_account_name) && (
-                    <div className="text-[10px] text-muted2 mt-0.5">
+                    <div className="text-[10px] text-muted2 mt-0.5 truncate">
                       {e.cash_account_name ? `[${e.cash_account_name}] ` : ""}{e.description || ""}
                     </div>
                   )}
@@ -525,8 +529,14 @@ export default function RokadPanna() {
 
       {/* Print output = DOS Day Book (always); on screen only when toggled */}
       <div className={view === "daybook" ? "" : "hidden print:block"}>
+        {view === "daybook" && !bankFilter && (summary?.rows?.length || 0) > 1 && (
+          <label className="print:hidden flex items-center gap-2 text-xs mb-2 cursor-pointer select-none w-fit" data-testid="daybook-pagebreak">
+            <input type="checkbox" className="h-3.5 w-3.5 accent-[#8B2520]" checked={pageBreak} onChange={(e) => setPageBreak(e.target.checked)} data-testid="daybook-pagebreak-checkbox" />
+            Har account alag page par print ho
+          </label>
+        )}
         {summary?.rows?.length ? (
-          <DayBookSheet firmName={settings?.firm_name} dateFrom={dateFrom} dateTo={dateTo}
+          <DayBookSheet firmName={settings?.firm_name} dateFrom={dateFrom} dateTo={dateTo} pageBreak={pageBreak}
             accounts={bankFilter ? summary.rows.filter((r) => r.id === bankFilter) : summary.rows} entries={entries} />
         ) : (
           <div className="card-flat p-5 text-sm text-muted2" data-testid="daybook-empty">Day Book ke liye koi cash/bank account nahi mila.</div>
@@ -593,6 +603,7 @@ export default function RokadPanna() {
                 <th className="num">Kharch</th>
                 {allAccountsSummary.hasOther && <th className="num" title="Journal / DOS entries jo is ledger ko chhoo rahi hain">Journal/Anya</th>}
                 <th className="num">Closing</th>
+                <th className="print:hidden" style={{ width: 44 }}></th>
               </tr>
             </thead>
             <tbody>
@@ -612,6 +623,12 @@ export default function RokadPanna() {
                     data-testid={`acct-closing-${r.id}`}>
                     ₹ {inr(Math.abs(r.closing))} {r.closing < 0 ? "Cr" : "Dr"}
                   </td>
+                  <td className="print:hidden">
+                    <button type="button" className="btn-ghost p-1.5 inline-flex" title="Sirf yeh account print karo (apne page par)"
+                      onClick={(ev) => { ev.stopPropagation(); printOnly(r.id); }} data-testid={`acct-print-${r.id}`}>
+                      <Printer size={14} />
+                    </button>
+                  </td>
                 </tr>
               ))}
               <tr className="bg-parchment/60 font-semibold" data-testid="acct-total-row">
@@ -621,6 +638,7 @@ export default function RokadPanna() {
                 <td className="num font-mono-data amount-kharch">₹ {inr(allAccountsSummary.total.kharch)}</td>
                 {allAccountsSummary.hasOther && <td className="num font-mono-data text-muted2">{allAccountsSummary.total.other > 0 ? "+" : "−"}₹ {inr(Math.abs(allAccountsSummary.total.other))}</td>}
                 <td className="num font-mono-data" data-testid="acct-total-closing">₹ {inr(Math.abs(allAccountsSummary.total.closing))} {allAccountsSummary.total.closing < 0 ? "Cr" : "Dr"}</td>
+                <td className="print:hidden"></td>
               </tr>
             </tbody>
           </table>

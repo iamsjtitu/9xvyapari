@@ -143,7 +143,7 @@ export default function AccountClearReport() {
                     <td className="font-mono-data text-xs text-jama whitespace-nowrap" data-testid={`ac-inv-${r.journal_id}`}>{r.rokad_inv || ""}</td>
                     <td className="num amount-kharch whitespace-nowrap">{r.side === "off" ? `₹ ${inr(r.amount)}` : "—"}</td>
                     <td className="num amount-jama whitespace-nowrap">{r.side === "back" ? `₹ ${inr(r.amount)}` : "—"}</td>
-                    <td className="text-xs text-muted2 max-w-[420px] truncate" title={r.narration}>{r.narration}</td>
+                    <td className="text-xs text-muted2 cell-grow" title={r.narration}>{r.narration}</td>
                     <td>
                       {r.auto && (
                         <button type="button" className="btn-ghost p-1.5 text-jama" title="Reopen — settlement hatao"

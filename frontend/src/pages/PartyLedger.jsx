@@ -261,19 +261,19 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                   <td className="font-mono-data text-xs text-terracotta whitespace-nowrap" title={r.kind === "bill" ? "Bill No." : r.kind === "journal" ? "Journal Voucher No." : r.kind === "dos" ? "DOS Ref" : "Rokad Voucher No."}
                     data-testid={`ledger-vno-${r.id}`}>{r.kind === "bill" && r.vno ? `Bill ${r.vno}` : r.vno || r.ref_no || "—"}</td>
                   <td className="font-mono-data text-xs text-jama whitespace-nowrap" title="Invoice No." data-testid={`ledger-inv-${r.id}`}>{r.inv || ""}</td>
-                  <td>
-                    <div className="flex items-center gap-2">
+                  <td className="cell-grow" title={r.label}>
+                    <div className="flex items-center gap-2 min-w-0">
                       {KIND_ICON[r.kind]}
                       {r.kind === "bill" ? (
-                        <Link to={`/bills/${r.ref}`} className="text-terracotta hover:underline">{r.label}</Link>
+                        <Link to={`/bills/${r.ref}`} className="text-terracotta hover:underline truncate min-w-0">{r.label}</Link>
                       ) : r.kind === "dos" ? (
-                        <span title={`Ref: ${r.ref_no || "—"}`}>
+                        <span className="truncate min-w-0" title={`Ref: ${r.ref_no || "—"}`}>
                           <span className="font-mono-data text-[10px] uppercase text-jama mr-1">{r.sgn || "DOS"}</span>
                           {r.label.replace(/^[A-Za-z ]+· /, "")}
                           {r.ref_no && <span className="text-[10px] text-muted2 font-mono-data ml-1">[#{r.ref_no}]</span>}
                         </span>
                       ) : (
-                        <span>{r.label}</span>
+                        <span className="truncate min-w-0">{r.label}</span>
                       )}
                     </div>
                   </td>

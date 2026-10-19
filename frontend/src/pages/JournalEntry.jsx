@@ -227,9 +227,9 @@ export default function JournalEntry() {
               <tr key={j.id} data-testid={`journal-row-${j.id}`}>
                 <td className="font-mono-data text-terracotta">{j.voucher_no}</td>
                 <td className="font-mono-data">{j.date}</td>
-                <td>
-                  <div>{j.narration || "—"}</div>
-                  {j.ref && <div className="text-xs text-muted2">Ref: {j.ref}</div>}
+                <td className="cell-grow" title={j.narration || ""}>
+                  <div className="truncate">{j.narration || "—"}</div>
+                  {j.ref && <div className="text-xs text-muted2 truncate">Ref: {j.ref}</div>}
                 </td>
                 <td className="text-xs">
                   {j.lines.map((l, i) => (

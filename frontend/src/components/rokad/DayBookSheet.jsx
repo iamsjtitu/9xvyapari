@@ -45,7 +45,7 @@ const Side = ({ rows, title, testId }) => (
   </div>
 );
 
-export const DayBookSheet = ({ firmName, dateFrom, dateTo, accounts, entries }) => {
+export const DayBookSheet = ({ firmName, dateFrom, dateTo, accounts, entries, pageBreak = false }) => {
   const period = dateFrom === dateTo ? `Date: ${fmtDate(dateFrom)}` : `${fmtDate(dateFrom)} To ${fmtDate(dateTo)}`;
   // Accounts with no movement in the period are listed compactly (saves paper on the daily print)
   const hasMove = (a) => entries.some((e) => e.cash_account_id === a.id) || Math.abs(a.other || 0) >= 0.005;
@@ -65,7 +65,7 @@ export const DayBookSheet = ({ firmName, dateFrom, dateTo, accounts, entries }) 
       {active.map((a) => {
         const sides = buildSides(a, entries.filter((e) => e.cash_account_id === a.id), dateFrom === dateTo);
         return (
-          <div className="db-account" key={a.id} data-testid={`daybook-account-${a.id}`}>
+          <div className={`db-account ${pageBreak ? "db-pagebreak" : ""}`} key={a.id} data-testid={`daybook-account-${a.id}`}>
             <div className="dos-group flex justify-between uppercase">
               <span>A/C: {a.code ? `${a.code} · ` : ""}{a.name}{a.group_name ? ` (${a.group_name})` : ""}</span>
               <span>Opening {inr(Math.abs(a.opening))} {a.opening < 0 ? "Cr" : "Dr"} → Closing {inr(Math.abs(a.closing))} {a.closing < 0 ? "Cr" : "Dr"}</span>

@@ -97,6 +97,12 @@ table.dense tbody tr.tbl-row-selected td {
   font-weight: 500;
 }
 table.dense td.num, table.dense th.num { text-align: right; font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+/* Ek line ka niyam: koi bhi cell upar-niche na toote (date, amount, V.No, badges). Lambi text wali cell → .cell-grow (… se katti hai) */
+table.dense th, table.dense td { white-space: nowrap; }
+table.dense td.cell-grow { max-width: 0; overflow: hidden; text-overflow: ellipsis; }
+table.dense td.cell-grow .truncate { display: block; }
+/* phir bhi table chaudi ho jaye toh clip nahi — scroll */
+.card-flat.overflow-hidden:has(table.dense) { overflow-x: auto; }
 
 /* Inputs */
 .input-dense {
@@ -423,6 +429,7 @@ label.lbl {
 .db-daytotal { border-top: 1px solid #000; }
 .db-closing { border-top: 1px solid #000; }
 .db-account { margin-top: 10px; break-inside: avoid; }
+@media print { .db-account.db-pagebreak { break-after: page; } .db-account.db-pagebreak:last-of-type { break-after: auto; } }
 .db-t.dos-total { margin-top: 2px; }
 @media print {
   .db-row .dt { width: 50pt; }
