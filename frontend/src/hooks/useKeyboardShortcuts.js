@@ -47,6 +47,7 @@ export function useKeyboardShortcuts(shortcuts, deps = []) {
         if (keyMatch && ctrlMatch && altMatch && shiftMatch) {
           e.preventDefault();
           e.stopPropagation();
+          e.handledByShortcut = true;   // lets the global Ctrl+S fallback (Layout) stay quiet
           try { sc.action(e); } catch (err) { console.error("Shortcut error:", err); }
           break;
         }
@@ -63,6 +64,26 @@ export function fmtKey(sc) {
   if (sc.ctrl) parts.push("Ctrl");
   if (sc.alt) parts.push("Alt");
   if (sc.shift) parts.push("Shift");
-  parts.push(sc.key.toUpperCase());
+  parts.push(sc.key.length > 1 ? sc.key : sc.key.toUpperCase());
   return parts.join(" + ");
+}
+
+// Ctrl+S fallback: submit the form inside the top-most open modal (or the form the cursor is in).
+// Pages with their own Ctrl+S shortcut mark the event (handledByShortcut) so this stays quiet.
+export function useGlobalSave() {
+  useEffect(() => {
+    const handler = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== "s") return;
+      e.preventDefault();   // never the browser's "Save page as"
+      setTimeout(() => {
+        if (e.handledByShortcut) return;
+        const overlays = document.querySelectorAll(".fixed.inset-0");
+        const top = overlays[overlays.length - 1];
+        const form = top?.querySelector("form") || document.activeElement?.closest?.("form");
+        if (form && typeof form.requestSubmit === "function") form.requestSubmit();
+      }, 0);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 }

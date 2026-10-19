@@ -1,9 +1,9 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { toast } from "sonner";
-import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useKeyboardShortcuts, useGlobalSave } from "@/hooks/useKeyboardShortcuts";
 import ShortcutHelp from "@/components/ShortcutHelp";
 import { LogoutConfirm } from "@/components/LogoutConfirm";
 import { useEscapeBack } from "@/hooks/useEscapeBack";
@@ -64,6 +64,7 @@ const sections = [
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [settings, setSettings] = useState(null);
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -104,14 +105,22 @@ export default function Layout() {
   );
 
   // Global shortcuts
+  useGlobalSave();   // Ctrl+S → save the open form (pages with their own Ctrl+S win)
+  const voucherOpen = (type) => {
+    // another page's modal is open → don't throw its data away
+    if (!location.pathname.startsWith("/rokad") && document.querySelector(".fixed.inset-0")) return;
+    navigate(`/rokad?new=${type}`);
+  };
   useKeyboardShortcuts([
     ...navShortcuts,
+    { key: "F5", action: () => voucherOpen("kharch"), allowInInputs: true, description: "Payment voucher (Kharch)" },
+    { key: "F6", action: () => voucherOpen("jama"), allowInInputs: true, description: "Receipt voucher (Jama)" },
     { key: "?", action: () => setHelpOpen((v) => !v),
       allowInInputs: true, description: "Show keyboard help" },
     helpOpen ? { key: "Escape", action: () => setHelpOpen(false), allowInInputs: true } : null,
     { ctrl: true, key: "/", action: () => setHelpOpen((v) => !v),
       allowInInputs: true, description: "Show keyboard help" },
-  ], [navigate, helpOpen]);
+  ], [navigate, helpOpen, location.pathname]);
 
   return (
     <div className="h-screen flex paper-bg" data-testid="app-shell">

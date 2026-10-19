@@ -7,10 +7,11 @@ const sortByDate = (a, b) => (a.date || "").localeCompare(b.date || "") || Strin
 // One account's T-shaped cash book: JAMA (receipts) left | KHARCH (payments) right.
 // Opening B/F sits on the Jama side (Dr) or Kharch side (Cr/overdraft); Closing C/F balances the other side.
 function buildSides(acct, entries) {
+  const sub = (e) => [e.description && e.party_name ? e.description : "", e.inv_no ? `INV ${e.inv_no}` : ""].filter(Boolean).join(" · ");
   const jama = entries.filter((e) => e.type === "jama").sort(sortByDate)
-    .map((e) => ({ date: e.date, text: e.party_name || e.description || "", sub: e.description && e.party_name ? e.description : "", ref: e.voucher_no || e.chq_no || "", amount: e.amount }));
+    .map((e) => ({ date: e.date, text: e.party_name || e.description || "", sub: sub(e), ref: e.voucher_no || e.chq_no || "", amount: e.amount }));
   const kharch = entries.filter((e) => e.type === "kharch").sort(sortByDate)
-    .map((e) => ({ date: e.date, text: e.party_name || e.description || "", sub: e.description && e.party_name ? e.description : "", ref: e.voucher_no || e.chq_no || "", amount: e.amount }));
+    .map((e) => ({ date: e.date, text: e.party_name || e.description || "", sub: sub(e), ref: e.voucher_no || e.chq_no || "", amount: e.amount }));
   const left = [], right = [];
   if (acct.opening >= 0) left.push({ text: "OPENING BALANCE B/F", amount: acct.opening, bold: true });
   else right.push({ text: "OPENING BALANCE B/F (Cr)", amount: -acct.opening, bold: true });

@@ -38,9 +38,8 @@ export const VoucherSearch = ({ accountId, accountName, onEdit, onTransfer, onSl
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === "Escape" && clear()}
-          placeholder="V.No."
-          inputMode="numeric"
-          title={accountName ? `Sirf ${accountName} me khojega` : "Sabhi cash/bank accounts me khojega"}
+          placeholder="V.No. / INV No."
+          title={accountName ? `Sirf ${accountName} me khojega (V.No. ya Invoice No.)` : "Sabhi cash/bank accounts me khojega (V.No. ya Invoice No.)"}
           data-testid="voucher-search-input"
         />
         {busy ? (
@@ -81,7 +80,7 @@ export const VoucherSearch = ({ accountId, accountName, onEdit, onTransfer, onSl
                         {e.contra_id && (
                           <span className="kbd !text-[9px] !px-1 !py-0 text-jama border-jama/40"><ArrowsLeftRight size={9} weight="bold" className="inline mr-0.5" />TRANSFER</span>
                         )}
-                        <span className="text-xs text-muted2">{e.mode || ""}{e.chq_no ? ` · Chq ${e.chq_no}` : ""}</span>
+                        <span className="text-xs text-muted2">V.{e.voucher_no || "—"}{e.inv_no ? ` · INV ${e.inv_no}` : ""} · {e.mode || ""}{e.chq_no ? ` · Chq ${e.chq_no}` : ""}</span>
                       </div>
                       <div className="font-medium mt-0.5 truncate">{e.party_name || "—"}</div>
                       <div className="text-[11px] text-muted2 truncate">

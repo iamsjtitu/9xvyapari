@@ -53,6 +53,7 @@ export default function RokadPanna() {
     cash_account_id: "",
     cash_account_name: "",
     voucher_no: "",
+    inv_no: "",
     chq_no: "",
     settle: false,
     settle_account_id: "",
@@ -188,6 +189,16 @@ export default function RokadPanna() {
     if (returnTo) navigate(returnTo);  // opened from a ledger → go back there
   };
 
+  // /rokad?new=kharch|jama → open a fresh voucher of that type (F5 = Payment, F6 = Receipt from anywhere in the app)
+  useEffect(() => {
+    const t = search.get("new");
+    if (t !== "jama" && t !== "kharch") return;
+    setForm((f) => ({ ...f, type: t, date: showAdd ? f.date : dateTo }));   // form already open → sirf type badlo, data rahe
+    setShowAdd(true);
+    setSearch((prev) => { const n = new URLSearchParams(prev); n.delete("new"); return n; }, { replace: true });
+    // eslint-disable-next-line
+  }, [search]);
+
   // /rokad?edit=<id>[&return=/parties/<pid>] → open that voucher for editing (from Party / Account ledger)
   useEffect(() => {
     const id = search.get("edit");
@@ -207,7 +218,7 @@ export default function RokadPanna() {
       date: (e.date || "").slice(0, 10), type: e.type, amount: String(e.amount ?? ""),
       party_id: e.party_id || "", party_name: e.party_name || "", description: e.description || "",
       mode: e.mode || "Cash", cash_account_id: e.cash_account_id || "", cash_account_name: e.cash_account_name || "",
-      voucher_no: e.voucher_no || "", chq_no: e.chq_no || "", settle: !!e.settle, settle_account_id: e.settle_account_id || "",
+      voucher_no: e.voucher_no || "", inv_no: e.inv_no || "", chq_no: e.chq_no || "", settle: !!e.settle, settle_account_id: e.settle_account_id || "",
     });
     setShowAdd(true);
   };
@@ -284,7 +295,7 @@ export default function RokadPanna() {
         <thead>
           <tr>
             <th style={{ width: 80 }}>Date</th>
-            <th style={{ width: 50 }}>V.No.</th>
+            <th style={{ width: 70 }}>V.No. / INV</th>
             <th>Party / Vivran</th>
             <th className="num" style={{ width: 110 }}>Amount</th>
             <th style={{ width: 96 }} className="print:hidden"></th>
@@ -303,6 +314,7 @@ export default function RokadPanna() {
                 <td className="font-mono-data text-xs">{(e.date || "").slice(0, 10)}</td>
                 <td className="font-mono-data text-xs text-terracotta">
                   {e.voucher_no || "—"}
+                  {e.inv_no && <div className="text-[10px] text-muted2 whitespace-nowrap" title="Invoice No." data-testid={`rokad-inv-${e.id}`}>INV {e.inv_no}</div>}
                 </td>
                 <td>
                   <div className="font-medium flex items-center gap-1.5">
@@ -382,6 +394,7 @@ export default function RokadPanna() {
               columns: [
                 { key: "date", label: "Date", width: 12 },
                 { key: "voucher_no", label: "V.No.", width: 8 },
+                { key: "inv_no", label: "INV No.", width: 12 },
                 { key: "cash_account_name", label: "Cash A/C", width: 22 },
                 { key: "party_name", label: "Party", width: 28 },
                 { key: "description", label: "Narration", width: 35 },
@@ -395,6 +408,7 @@ export default function RokadPanna() {
               columns: [
                 { key: "date", label: "Date", width: 12 },
                 { key: "voucher_no", label: "V.No.", width: 8 },
+                { key: "inv_no", label: "INV No.", width: 12 },
                 { key: "cash_account_name", label: "Cash A/C", width: 22 },
                 { key: "party_name", label: "Party", width: 28 },
                 { key: "description", label: "Narration", width: 35 },
@@ -786,14 +800,27 @@ export default function RokadPanna() {
                 </div>
               </div>
 
-              <div>
-                <label className="lbl">Cheque No. (if applicable)</label>
-                <input
-                  className="input-dense"
-                  value={form.chq_no}
-                  onChange={(e) => setForm({ ...form, chq_no: e.target.value, mode: e.target.value ? "Cheque" : form.mode })}
-                  placeholder="Cheque number"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="lbl">Invoice No.</label>
+                  <input
+                    className="input-dense font-mono-data"
+                    value={form.inv_no}
+                    onChange={(e) => setForm({ ...form, inv_no: e.target.value })}
+                    placeholder="Party ka bill / invoice no."
+                    data-testid="input-inv-no"
+                  />
+                </div>
+                <div>
+                  <label className="lbl">Cheque No. (if applicable)</label>
+                  <input
+                    className="input-dense"
+                    value={form.chq_no}
+                    onChange={(e) => setForm({ ...form, chq_no: e.target.value, mode: e.target.value ? "Cheque" : form.mode })}
+                    placeholder="Cheque number"
+                    data-testid="input-chq-no"
+                  />
+                </div>
               </div>
 
               <div>

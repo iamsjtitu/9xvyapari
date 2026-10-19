@@ -3,7 +3,8 @@ import { BRAND, appVersionLabel } from "@/lib/brand";
 
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
 const drcr = (n) => `${inr(Math.abs(n))} ${n < 0 ? "Cr" : n > 0 ? "Dr" : "  "}`;
-const refOf = (r) => r.voucher_no || r.ref_no || r.bill_no || "";
+const refOf = (r) => r.vno || r.voucher_no || r.ref_no || r.bill_no || "";
+const particulars = (r) => `${r.label || ""}${r.inv ? ` · INV ${r.inv}` : ""}`;
 
 // DOS-style printable ledger statement: opening → entries → totals → closing, one page
 export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFrom, asOn, settledUpto }) => {
@@ -40,7 +41,7 @@ export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFr
         <div key={`${r.kind}-${r.id}-${i}`}>
           <div className="dos-stmt-row">
             <span className="dt">{fmtDate((r.date || "").slice(0, 10))}</span>
-            <span className="pt" title={r.label}>{r.label}</span>
+            <span className="pt" title={particulars(r)}>{particulars(r)}</span>
             <span className="rf">{refOf(r)}</span>
             <span className="am">{r.debit ? inr(r.debit) : ""}</span>
             <span className="am">{r.credit ? inr(r.credit) : ""}</span>

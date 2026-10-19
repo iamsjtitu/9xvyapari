@@ -237,6 +237,7 @@ class RokadIn(BaseModel):
     counter_account_id: Optional[str] = None
     counter_account_name: Optional[str] = ""
     voucher_no: Optional[str] = ""        # per-cash-account voucher number
+    inv_no: Optional[str] = ""            # party's invoice / bill number (free text, shown next to V.No.)
     chq_no: Optional[str] = ""             # cheque number
     settle: bool = False                   # Account Settled: post the leftover to the "Account Clear" ledger → party = 0 as on date
     settle_account_id: Optional[str] = None  # which linked Account Clear ledger (None → default from Settings)
@@ -694,12 +695,12 @@ async def list_rokad(date_from: Optional[str] = None, date_to: Optional[str] = N
 
 @api.get("/rokad/by-voucher")
 async def rokad_by_voucher(voucher_no: str, cash_account_id: Optional[str] = None, current=Depends(get_current_user)):
-    """Voucher lookup: entries carrying this V.No. (per-account numbering → may hit several accounts)."""
+    """Voucher lookup: entries carrying this V.No. or Invoice No. (per-account numbering → may hit several accounts)."""
     v = voucher_no.strip()
     if not v:
         raise HTTPException(400, "Voucher number daalein")
     variants = {v, v.lstrip("0") or "0"}
-    q = {"voucher_no": {"$in": list(variants)}}
+    q: dict = {"$or": [{"voucher_no": {"$in": list(variants)}}, {"inv_no": {"$regex": f"^{re.escape(v)}$", "$options": "i"}}]}
     if cash_account_id:
         q["cash_account_id"] = cash_account_id
     rows = await db.rokad.find(q, {"_id": 0}).sort([("date", -1), ("created_at", -1)]).to_list(50)
@@ -931,11 +932,12 @@ async def account_clear_report(date_from: Optional[str] = None, date_to: Optiona
                      "amount": abs(amt), "side": side, "narration": j.get("narration", ""),
                      "rokad_id": rid, "auto": bool(rid)})
     if rokad_ids:
-        vmap = {r["id"]: r async for r in db.rokad.find({"id": {"$in": list(rokad_ids)}}, {"_id": 0, "id": 1, "voucher_no": 1, "cash_account_name": 1, "amount": 1, "type": 1})}
+        vmap = {r["id"]: r async for r in db.rokad.find({"id": {"$in": list(rokad_ids)}}, {"_id": 0, "id": 1, "voucher_no": 1, "inv_no": 1, "cash_account_name": 1, "amount": 1, "type": 1})}
         for r in rows:
             rk = vmap.get(r.get("rokad_id"))
             if rk:
                 r["rokad_vno"] = rk.get("voucher_no", ""); r["cash_account_name"] = rk.get("cash_account_name", "")
+                r["rokad_inv"] = rk.get("inv_no", "")
                 r["rokad_amount"] = rk.get("amount"); r["rokad_type"] = rk.get("type")
     return {**empty, "ledger": led, "rows": rows, "count": len(rows),
             "total_off": round(total_off, 2), "total_back": round(total_back, 2), "net": round(total_off - total_back, 2)}

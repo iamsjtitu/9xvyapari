@@ -138,7 +138,7 @@ export default function AccountClearReport() {
                     <td><span className="kbd !text-[10px] !px-1.5 !py-0">{r.voucher_no}</span></td>
                     <td>{r.party_id ? <Link to={`/parties/${r.party_id}`} className="text-terracotta hover:underline" data-testid={`ac-party-link-${r.journal_id}`}>{r.party_name}</Link> : r.party_name}</td>
                     {allView && <td className="text-xs uppercase text-jama" data-testid={`ac-ledger-${r.journal_id}`}>{r.ledger_name}</td>}
-                    <td className="font-mono-data text-muted2">{r.rokad_vno ? `V.${r.rokad_vno}` : <span className="text-[10px] uppercase">{r.auto ? "" : "manual"}</span>}</td>
+                    <td className="font-mono-data text-muted2">{r.rokad_vno ? `V.${r.rokad_vno}` : <span className="text-[10px] uppercase">{r.auto ? "" : "manual"}</span>}{r.rokad_inv ? <div className="text-[10px]">INV {r.rokad_inv}</div> : null}</td>
                     <td className="num amount-kharch whitespace-nowrap">{r.side === "off" ? `₹ ${inr(r.amount)}` : "—"}</td>
                     <td className="num amount-jama whitespace-nowrap">{r.side === "back" ? `₹ ${inr(r.amount)}` : "—"}</td>
                     <td className="text-xs text-muted2 max-w-[420px] truncate" title={r.narration}>{r.narration}</td>

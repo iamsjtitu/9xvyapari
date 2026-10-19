@@ -35,7 +35,7 @@ export const VoucherSlip = ({ entry, onClose }) => {
     <div className="slip-overlay fixed inset-0 z-50 bg-black/50 grid place-items-center p-4" {...backdropClose(onClose)} data-testid="voucher-slip">
       <div className="bg-white rounded-sm shadow-2xl w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-khaki print:hidden">
-          <div className="font-heading font-semibold">{title} · V.{entry.voucher_no || "—"}</div>
+          <div className="font-heading font-semibold">{title} · V.{entry.voucher_no || "—"}{entry.inv_no ? ` · INV ${entry.inv_no}` : ""}</div>
           <div className="flex gap-2">
             <button className="btn-primary" onClick={() => triggerPrint()} data-testid="slip-print"><Printer size={14} /> Print</button>
             <button className="btn-outline" onClick={() => triggerPrint()} data-testid="slip-pdf"><FilePdf size={14} /> PDF</button>
@@ -54,6 +54,7 @@ export const VoucherSlip = ({ entry, onClose }) => {
           <div className="vs-hr" />
           {row("A/C", entry.cash_account_name, "Mode", entry.mode)}
           {row(jama ? "Received From" : "Paid To", entry.party_name, "Chq No", entry.chq_no)}
+          {entry.inv_no ? row("Invoice No.", <span data-testid="slip-inv">{entry.inv_no}</span>) : null}
           {row("Amount", `Rs. ${inr(entry.amount)}`)}
           {row("Rupees", amountInWords(entry.amount))}
           {row("Narration", entry.description)}

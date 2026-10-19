@@ -69,6 +69,8 @@ export default function ShortcutHelp({ open, onClose, shortcuts, navShortcuts })
           <div className="font-heading font-semibold text-ink mb-1">Universal shortcuts</div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1">
             <div className="flex justify-between"><span>Show this help</span><span className="kbd">?</span></div>
+            <div className="flex justify-between"><span>Payment voucher (Kharch) — kahin se bhi</span><span className="kbd">F5</span></div>
+            <div className="flex justify-between"><span>Receipt voucher (Jama) — kahin se bhi</span><span className="kbd">F6</span></div>
             <div className="flex justify-between"><span>Close dialog / modal · Back · Dashboard par Logout?</span><span className="kbd">Esc</span></div>
             <div className="flex justify-between"><span>Next field · last field par Save (FoxPro style)</span><span className="kbd">Enter</span></div>
             <div className="flex justify-between"><span>Textarea me nayi line</span><span className="kbd">Shift + Enter</span></div>

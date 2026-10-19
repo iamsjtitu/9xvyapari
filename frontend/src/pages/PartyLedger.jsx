@@ -27,12 +27,12 @@ function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = 
     debit: b.bill_type === "sale" ? b.total : 0, credit: b.bill_type === "purchase" ? b.total : 0,
   }));
   rokad.forEach((r) => rows.push({
-    kind: "rokad", id: r.id, date: r.date, vno: r.voucher_no || "", created_at: r.created_at || "",
+    kind: "rokad", id: r.id, date: r.date, vno: r.voucher_no || "", inv: r.inv_no || "", created_at: r.created_at || "",
     label: `${r.description || (r.type === "jama" ? "Payment Received" : "Payment Paid")}${r.cash_account_name ? ` · ${r.cash_account_name}` : ""}`,
     debit: r.type === "kharch" ? r.amount : 0, credit: r.type === "jama" ? r.amount : 0,
   }));
   cash_rokad.forEach((r) => rows.push({
-    kind: "cash", id: r.id, date: r.date, vno: r.voucher_no || "",
+    kind: "cash", id: r.id, date: r.date, vno: r.voucher_no || "", inv: r.inv_no || "",
     label: `${r.type === "jama" ? "Receipt" : "Payment"} · ${r.party_name || ""}${r.description ? " · " + r.description : ""}`,
     debit: r.type === "jama" ? r.amount : 0, credit: r.type === "kharch" ? r.amount : 0,
   }));
@@ -160,6 +160,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
               columns: [
                 { key: "date", label: "Date", width: 12 },
                 { key: "vno", label: "V.No. / Ref", width: 11 },
+                { key: "inv", label: "INV No.", width: 12 },
                 { key: "label", label: "Particulars", width: 46 },
                 { key: "debit", label: "Debit", width: 15, num: true },
                 { key: "credit", label: "Credit", width: 15, num: true },
@@ -271,6 +272,12 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                       {(r.kind === "bill" || r.kind === "journal") && r.vno ? (
                         <span className="kbd !text-[10px] !px-1.5 !py-0 whitespace-nowrap" title={r.kind === "bill" ? "Bill No." : "Journal Voucher No."}
                           data-testid={`ledger-vno-${r.id}`}>{r.kind === "bill" ? `Bill ${r.vno}` : r.vno}</span>
+                      ) : null}
+                      {(r.kind === "rokad" || r.kind === "cash") && r.vno ? (
+                        <span className="kbd !text-[10px] !px-1.5 !py-0 whitespace-nowrap" title="Rokad Voucher No." data-testid={`ledger-vno-${r.id}`}>V.{r.vno}</span>
+                      ) : null}
+                      {r.inv ? (
+                        <span className="kbd !text-[10px] !px-1.5 !py-0 whitespace-nowrap text-jama border-jama/40" title="Invoice No." data-testid={`ledger-inv-${r.id}`}>INV {r.inv}</span>
                       ) : null}
                     </div>
                   </td>
