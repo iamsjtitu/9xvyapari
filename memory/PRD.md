@@ -178,10 +178,12 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 
 ### Jun 2026 – Outstanding "Settled chhupao"
 - `/reports/outstanding?hide_settled=true` skips parties cleared via Account Settled whose ledger is 0 TODAY (`_settled_now_map`), returns `settled_hidden`; rows carry `settled_upto`. UI pill `toggle-os-hide-settled` (URL `hs=1`), `os-settled-hidden` count, `[SETTLED dd-mm-yyyy]` tag on rows when not hidden, print header suffix, Excel "Settled" column.
+- Ledger → voucher edit (Jun 2026): pencil column in PartyLedger (`ledger-edit-<kind>-<id>`, print:hidden) → `/rokad?edit=<id>&return=…`, `/journal?edit=…`, `/bills?edit=…`; settlement journal rows open the underlying rokad. Target pages fetch `GET /rokad/{id}` / `GET /journal/{id}` (declared AFTER literal `/rokad/accounts-summary` etc. — path-param routes must come last), set date filters, strip `edit`, and `closeForm` navigates to `return`. Verified iteration 28.
 - Lesson: never insert a helper between a route decorator and its function (the decorator landed on the helper → endpoint returned {}); keep URL-param state in fetch effect deps.
 - Verified: iteration 27 (backend 5/5, frontend 100%).
 
 ### Jun 2026 – Versioning rule (user ask: "version number hamesha build ke baad likho")
+- CI guard (build-desktop.yml "Duplicate build guard"): fails fast if GitHub Release tag v<version> already exists (workflow re-run) or if the current commit is already released under any v* tag (no new changes). Final step writes "✅ Build complete — v<version>" to the job summary + notice.
 - Version = `1.0.<GitHub Actions run_number>` (CI reads MAJOR.MINOR from `electron/package.json` = 1.0 → do NOT bump it; numbering must stay continuous). **Latest user-installed build: v1.0.14** (Jun 2026). Every build via "Save to GitHub" → next number (1.0.15, 1.0.16 …). ALWAYS end user-facing summaries with: "Build ke baad version: v1.0.<N+1>" using the latest known build number; ask the user for the actual number once they build if unsure.
 
 ## Verification (Jun 2026)

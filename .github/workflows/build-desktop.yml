@@ -44,6 +44,29 @@ jobs:
           "APP_VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append
           Write-Host "App version: $v"
 
+      - name: Duplicate build guard (same version / same commit never builds twice)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "v$env:APP_VERSION"
+          $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+          $null = gh release view $tag --json tagName 2>&1
+          $exists = ($LASTEXITCODE -eq 0)
+          $ErrorActionPreference = $prev
+          if ($exists) {
+            Write-Host "::error title=Duplicate build blocked::$tag pehle se GitHub Release me maujood hai - same version dobara build nahi hoga. (Workflow re-run mat karo; naya commit push karo.)"
+            exit 1
+          }
+          $released = git ls-remote --tags origin 2>$null | ForEach-Object {
+            $p = $_ -split "\s+"; [pscustomobject]@{ sha = $p[0]; tag = ($p[1] -replace '^refs/tags/', '') -replace '\^\{\}$', '' }
+          } | Where-Object { $_.sha -eq "${{ github.sha }}" -and $_.tag -like "v*" } | Select-Object -First 1
+          if ($released) {
+            Write-Host "::error title=Duplicate build blocked::Yeh commit ($("${{ github.sha }}".Substring(0,7))) pehle hi $($released.tag) ke roop me release ho chuka hai - koi naya change nahi, build blocked."
+            exit 1
+          }
+          Write-Host "OK: $tag naya hai - build chalu."
+
       - name: Build frontend (desktop mode)
         working-directory: frontend
         env:
@@ -122,3 +145,16 @@ jobs:
             electron/dist/*.exe
             electron/dist/*.zip
             electron/dist/latest.yml
+
+      - name: Build complete → version
+        shell: pwsh
+        run: |
+          $v = $env:APP_VERSION
+          $url = "https://github.com/${{ github.repository }}/releases/tag/v$v"
+          @"
+          ## ✅ Build complete — **9x Vyapari v$v**
+          - Release: $url
+          - Commit: ``$("${{ github.sha }}".Substring(0,7))`` · Branch: ``${{ github.ref_name }}``
+          - Installed apps auto-update to **v$v**; portable users download from the release page.
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          Write-Host "::notice title=Build complete::9x Vyapari v$v ready - $url"

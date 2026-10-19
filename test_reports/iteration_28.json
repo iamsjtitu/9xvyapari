@@ -1,0 +1,39 @@
+{
+  "summary": "Tested 'Edit voucher from Party Ledger' end to end. Found and FIXED one CRITICAL backend regression: the new GET /api/rokad/{rid} was declared above GET /api/rokad/accounts-summary, so it captured that path and returned 404 'Entry nahi mili'. This broke the Rokad page balance table and the CashBankBalances widget. I moved get_rokad below the literal /rokad/* routes. After the fix, the backend passes 9/9 tests. UI: every rokad / journal / settlement / bill flow works (prefill, date filters, edit= stripped, Save/ESC/Cancel return to the ledger, print hides the pencil, plain /rokad and /journal have no navigation). One functional gap remains: saving a BILL opened from the ledger goes to /bills/<id> instead of back to the ledger.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/rokad/accounts-summary", "issue": "Shadowed by the new GET /api/rokad/{rid} (declared earlier in the file), so it returned 404. FIXED by moving get_rokad to just above /summary/dashboard, after all literal /rokad/* GET routes.", "priority": "CRITICAL"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "NayaBill.jsx submit()", "issue": "When the bill is opened from the ledger (?edit&return=), Save calls closeForm() (navigates to return) and then navigate(`/bills/${data.id}`). The user ends up on the Bill View page, not back on the ledger. Cancel and ESC do return correctly.", "selector": "[data-testid=btn-save-bill]", "priority": "MEDIUM"},
+      {"component": "NayaBill.jsx ?edit effect", "issue": "Unlike Rokad and Journal, the edit= param is not removed from the URL after the bill opens, so a reload re-opens the edit modal.", "selector": "[data-testid=modal-bill]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PartyLedger tfoot", "issues": ["The closing row has colSpan 4 plus 1 cell = 5 cells, but the table now has 6 columns, so the pencil column cell is missing (visible gap at the right of the closing row). Add <td className='print:hidden'></td>."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_ledger_edit_v28.py", "/app/test_reports/pytest/pytest_v28.xml"],
+  "action_items": [
+    "NayaBill submit: if search.get('return') exists, skip navigate(`/bills/${data.id}`) so Save returns to the ledger",
+    "NayaBill ?edit effect: remove the edit param after startEdit (same as Rokad and Journal)",
+    "PartyLedger tfoot closing row: add the 6th (print:hidden) cell",
+    "Review my fix: get_rokad route moved in server.py"
+  ],
+  "critical_code_review_comments": [
+    "Path-param routes (/rokad/{rid}) must be declared after literal siblings (/rokad/accounts-summary, /rokad/by-voucher). FastAPI matches routes in declaration order. I added a NOTE comment.",
+    "Editing an earlier rokad (300 to 350) after a settlement leaves the auto settle journal at its old amount (20), so the party is no longer 0 on the settled date (now 30 Cr). The 'ACCOUNT CLEARED' badge still shows. This comes from the existing settle design, but it is now easier to hit because of the ledger edit shortcut. Consider recomputing or flagging stale settlements.",
+    "If one journal has two lines for the same party, the ledger renders duplicate data-testid ledger-edit-journal-<id> values (minor).",
+    "server.py is over 3000 lines and should be split into routers."
+  ],
+  "updated_files": ["/app/backend/server.py", "/app/backend/tests/test_ledger_edit_v28.py"],
+  "success_rate": {"backend": "100% (9/9) after the fix", "frontend": "~92% (the bill Save return-to-ledger fails; all other flows pass)"},
+  "seed_data_creation": "Temporary only: rokad 300 (10-06), journal 'QA manual jrnl' (11-06), rokad 700 settle (12-06, auto settle journal J00003), sale bill S00001 (13-06, 100). All deleted. SETTLE TEST PARTY is back to 1000 Dr with 0 bills, rokad and journal entries. ACCOUNT CLEAR is kept.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run with KEEP_DATA=1 to keep the vouchers (ids in /tmp/qa28.json) for UI tests. Verified: pencil hrefs per kind; the settlement journal pencil goes to /rokad?edit=<settle rokad>; the opening row has no pencil; the pencil is hidden in print media; Rokad and Journal prefill dates, set filters and strip edit=; Save/ESC/Cancel return to /parties/<id>?as_on=2026-06-30&from=; the ledger shows the edited amount (closing 50 Dr) and the edited narration; Bill Cancel/ESC return to the ledger, but Bill Save goes to /bills/<id>. Plain /rokad and /journal ESC/Save stay on the page.",
+  "test_credentials": "admin / Vyapari@2026"
+}

@@ -815,14 +815,6 @@ async def _apply_settlement(rok: dict) -> Optional[dict]:
             "ledger": led["name"], "narration": narr}
 
 
-@api.get("/rokad/{rid}")
-async def get_rokad(rid: str, current=Depends(get_current_user)):
-    doc = await db.rokad.find_one({"id": rid}, {"_id": 0})
-    if not doc:
-        raise HTTPException(404, "Entry nahi mili")
-    return doc
-
-
 @api.put("/rokad/{rid}")
 async def update_rokad(rid: str, body: RokadIn, current=Depends(get_current_user)):
     existing = await db.rokad.find_one({"id": rid}, {"_id": 0})
@@ -1036,6 +1028,15 @@ async def rokad_accounts_summary(date_from: str, date_to: str, current=Depends(g
 
 
 # ---------- REPORTS / SUMMARY ----------
+# NOTE: keep this AFTER every literal /rokad/<name> GET route (e.g. /rokad/accounts-summary) so it does not shadow them
+@api.get("/rokad/{rid}")
+async def get_rokad(rid: str, current=Depends(get_current_user)):
+    doc = await db.rokad.find_one({"id": rid}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Entry nahi mili")
+    return doc
+
+
 @api.get("/summary/dashboard")
 async def dashboard_summary(current=Depends(get_current_user)):
     today = datetime.now(timezone.utc).date().isoformat()

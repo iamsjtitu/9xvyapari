@@ -275,6 +275,7 @@ export default function PartyLedger() {
                 <td className="num font-mono-data" style={{ color: balColor }}>
                   ₹ {inr(Math.abs(party.balance))} {party.balance < 0 ? "Cr" : "Dr"}
                 </td>
+                <td className="print:hidden"></td>
               </tr>
             </tfoot>
           )}

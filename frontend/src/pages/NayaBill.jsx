@@ -55,7 +55,7 @@ const blank = (type = "sale") => ({
 });
 
 export default function NayaBill() {
-  const [search] = useSearchParams();
+  const [search, setSearch] = useSearchParams();
   const initialType = search.get("type") === "purchase" ? "purchase" : "sale";
 
   const [bills, setBills] = useState([]);
@@ -114,7 +114,10 @@ export default function NayaBill() {
   useEffect(() => {
     const id = search.get("edit");
     if (!id) return;
-    api.get(`/bills/${id}`).then((r) => startEdit(r.data)).catch(() => toast.error("Bill nahi mila"));
+    api.get(`/bills/${id}`).then((r) => {
+      startEdit(r.data);
+      setSearch((prev) => { const n = new URLSearchParams(prev); n.delete("edit"); return n; }, { replace: true });
+    }).catch(() => toast.error("Bill nahi mila"));
     // eslint-disable-next-line
   }, [search]);
 
@@ -277,9 +280,10 @@ export default function NayaBill() {
         ? await api.put(`/bills/${editId}`, payload)
         : await api.post("/bills", payload);
       toast.success(editId ? `Bill ${data.bill_no} update ho gaya` : `Bill ${data.bill_no} ban gaya`);
-      closeForm();
+      const fromLedger = !!search.get("return");
+      closeForm();  // navigates back to the ledger when opened from there
       load();
-      navigate(`/bills/${data.id}`);
+      if (!fromLedger) navigate(`/bills/${data.id}`);
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
     }
