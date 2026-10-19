@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { MagnifyingGlass, X, PencilSimple, ArrowsLeftRight, CircleNotch } from "@phosphor-icons/react";
+import { MagnifyingGlass, X, PencilSimple, ArrowsLeftRight, CircleNotch, Printer } from "@phosphor-icons/react";
 import api, { inr } from "@/lib/api";
 
 const fmtDate = (iso) => (iso ? iso.slice(0, 10).split("-").reverse().join("-") : "");
 
 // "V.No. daalte hi us voucher ki details" — per-account numbering, so one number may hit several cash a/cs
-export const VoucherSearch = ({ accountId, accountName, onEdit, onTransfer }) => {
+export const VoucherSearch = ({ accountId, accountName, onEdit, onTransfer, onSlip }) => {
   const [q, setQ] = useState("");
   const [res, setRes] = useState(null); // null | { voucher_no, entries }
   const [busy, setBusy] = useState(false);
@@ -90,11 +90,17 @@ export const VoucherSearch = ({ accountId, accountName, onEdit, onTransfer }) =>
                     </div>
                     <div className="text-right whitespace-nowrap">
                       <div className="font-mono-data text-lg font-medium" style={{ color: jama ? "#1B5E20" : "#B71C1C" }}>₹ {inr(e.amount)}</div>
-                      <button type="button" className="btn-ghost p-1 mt-0.5 text-xs inline-flex items-center gap-1"
-                        onClick={() => { e.contra_id ? onTransfer?.(e.contra_id) : onEdit?.(e); setRes(null); }}
-                        title={e.contra_id ? "Transfer kholein" : "Entry kholein / edit"} data-testid={`voucher-open-${e.id}`}>
-                        <PencilSimple size={12} /> Kholein
-                      </button>
+                      <div className="flex justify-end gap-1 mt-0.5">
+                        <button type="button" className="btn-ghost p-1 text-xs inline-flex items-center gap-1"
+                          onClick={() => { onSlip?.(e); setRes(null); }} title="Voucher slip print" data-testid={`voucher-slip-${e.id}`}>
+                          <Printer size={12} /> Slip
+                        </button>
+                        <button type="button" className="btn-ghost p-1 text-xs inline-flex items-center gap-1"
+                          onClick={() => { e.contra_id ? onTransfer?.(e.contra_id) : onEdit?.(e); setRes(null); }}
+                          title={e.contra_id ? "Transfer kholein" : "Entry kholein / edit"} data-testid={`voucher-open-${e.id}`}>
+                          <PencilSimple size={12} /> Kholein
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

@@ -9,6 +9,7 @@ import { TransferForm } from "@/components/rokad/TransferForm";
 import { DayBookSheet } from "@/components/rokad/DayBookSheet";
 import { VoucherSearch } from "@/components/rokad/VoucherSearch";
 import { RenumberVouchersDialog } from "@/components/rokad/RenumberVouchersDialog";
+import { VoucherSlip } from "@/components/rokad/VoucherSlip";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 
 // Mode follows the ACCOUNT name only (group "CASH & BANK BALANCE" must not force "Bank" on CASH IN HAND)
@@ -30,6 +31,7 @@ export default function RokadPanna() {
   const [editId, setEditId] = useState(null);
   const [transfer, setTransfer] = useState(null);          // null | { contraId?: string }
   const [renumber, setRenumber] = useState(false);          // V.No. date-wise renumber dialog (needs a selected a/c)
+  const [slip, setSlip] = useState(null);                   // rokad entry → DOS voucher slip print
   const emptyForm = {
     date: todayISO(),
     type: "jama",
@@ -218,7 +220,7 @@ export default function RokadPanna() {
             <th style={{ width: 50 }}>V.No.</th>
             <th>Party / Vivran</th>
             <th className="num" style={{ width: 110 }}>Amount</th>
-            <th style={{ width: 36 }} className="print:hidden"></th>
+            <th style={{ width: 96 }} className="print:hidden"></th>
           </tr>
         </thead>
         <tbody>
@@ -257,6 +259,9 @@ export default function RokadPanna() {
                   ₹ {inr(e.amount)}
                 </td>
                 <td className="print:hidden whitespace-nowrap">
+                  <button className="btn-ghost p-1.5" onClick={() => setSlip(e)} title="Voucher slip print" data-testid={`rokad-slip-${e.id}`}>
+                    <Printer size={14} />
+                  </button>
                   <button
                     className="btn-ghost p-1.5"
                     onClick={() => (e.contra_id ? setTransfer({ contraId: e.contra_id }) : startEdit(e))}
@@ -321,7 +326,7 @@ export default function RokadPanna() {
             },
           ]} />
           <VoucherSearch accountId={bankFilter} accountName={selectedBank?.name}
-            onEdit={startEdit} onTransfer={(contraId) => setTransfer({ contraId })} />
+            onEdit={startEdit} onTransfer={(contraId) => setTransfer({ contraId })} onSlip={setSlip} />
           <div>
             <label className="lbl">Cash / Bank A/C</label>
             <select
@@ -401,6 +406,7 @@ export default function RokadPanna() {
         </div>
       </div>
 
+      {slip && <VoucherSlip entry={slip} onClose={() => setSlip(null)} />}
       {renumber && selectedBank && (
         <RenumberVouchersDialog account={selectedBank} fyStart={settings?.fy_start} fyEnd={settings?.fy_end}
           onClose={() => setRenumber(false)} onDone={load} />

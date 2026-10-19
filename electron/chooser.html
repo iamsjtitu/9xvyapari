@@ -23,7 +23,7 @@
     .recent { flex: 1; overflow: auto; border: 1px solid rgba(255,255,255,.1); border-radius: 4px; min-height: 90px; }
     .recent .item { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; font-family: Consolas, monospace; font-size: 12px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,.06); color: rgba(243,239,230,.8); }
     .recent .item:hover { background: rgba(255,255,255,.06); color: #fff; }
-    .recent .item.active { background: rgba(139,37,32,.35); color: #fff; }
+    .recent .item.active { background: rgba(139,37,32,.35); color: #fff; box-shadow: inset 3px 0 0 #ff8a80; }
     .recent .item span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .recent .x { flex: none; background: transparent; color: rgba(243,239,230,.45); border: 1px solid transparent; border-radius: 4px; padding: 2px 8px; font-size: 13px; line-height: 1.2; }
     .recent .x:hover { color: #ff8a80; border-color: rgba(255,138,128,.5); background: rgba(255,138,128,.1); }
@@ -59,7 +59,7 @@
 
     <div class="hint">
       Pen drive ya D: drive ka folder bhi chun sakte ho — software usi folder ka data kholega.
-      Alag firm / alag saal ke liye alag folder rakh sakte ho. Pichle folder ke saamne <b>✕</b> se wo path list se hat jata hai (data safe rehta hai).
+      Alag firm / alag saal ke liye alag folder rakh sakte ho. <b>↑ ↓</b> se folder chunein, <b>Enter</b> se kholein; <b>✕</b> (ya Delete) se path list se hat jata hai (data safe rehta hai).
     </div>
     <div class="err" id="err"></div>
     <button class="primary" id="start">Shuru Karein &nbsp;⏎</button>
@@ -91,10 +91,24 @@
           render(await window.chooser.forget(r));
         };
         if (r === current) d.classList.add("active");
-        d.onclick = () => { current = r; $("path").textContent = r; $("path").title = r; [...box.children].forEach((c) => c.classList.toggle("active", c.dataset.path === r)); };
+        d.onclick = () => select(r);
         d.appendChild(label); d.appendChild(x);
         box.appendChild(d);
       });
+    }
+
+    // highlight + make current; keyboard ↑/↓ moves through "Pichle Folders", Enter starts the highlighted one
+    function select(r) {
+      current = r; $("path").textContent = r; $("path").title = r;
+      [...$("recent").children].forEach((c) => c.classList.toggle("active", c.dataset.path === r));
+      document.querySelector(".recent .item.active")?.scrollIntoView({ block: "nearest" });
+    }
+    function move(step) {
+      const items = [...document.querySelectorAll(".recent .item")];
+      if (!items.length) return;
+      const idx = items.findIndex((c) => c.classList.contains("active"));
+      const next = idx === -1 ? (step > 0 ? 0 : items.length - 1) : Math.min(items.length - 1, Math.max(0, idx + step));
+      select(items[next].dataset.path);
     }
 
     async function start() {
@@ -109,7 +123,14 @@
       if (p) { current = p; $("path").textContent = p; $("path").title = p; }
     };
     $("start").onclick = start;
-    document.addEventListener("keydown", (e) => { if (e.key === "Enter") start(); });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") { e.preventDefault(); move(1); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); move(-1); }
+      else if (e.key === "Home") { e.preventDefault(); move(-999); }
+      else if (e.key === "End") { e.preventDefault(); move(999); }
+      else if (e.key === "Enter") { e.preventDefault(); start(); }          // highlighted / shown folder opens
+      else if (e.key === "Delete") { document.querySelector(".recent .item.active .x")?.click(); }
+    });
 
     window.chooser.state().then(render);
   </script>

@@ -138,6 +138,10 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 ### Jun 2026 – Date-wise voucher renumber
 - `POST /cash-accounts/{id}/renumber-vouchers {date_from?, date_to?, start=1, apply}`: sorts the a/c's rokad entries by (date, created_at, old V.No.), assigns start… ; apply=false → preview (total/changed/sample), apply=true → `*_renumber.vbk` safety backup then updates `voucher_no`. UI: Rokad Panna "V.No. Date-wise" button (visible when a Cash/Bank a/c is selected) → `components/rokad/RenumberVouchersDialog.jsx` (FY default range, start no., Preview table old→new, Apply disabled until preview). Verified API + UI on SBICC account (left at 1..15).
 
+### Jun 2026 – Voucher slip print · chooser keyboard
+- `components/rokad/VoucherSlip.jsx`: DOS-style RECEIPT / PAYMENT / CONTRA voucher slip (firm, FY, No., Date, A/C, Mode, Party, Chq, Amount, amount in words via `lib/words.js` Indian system, Narration, RECEIVED/PAID box, 3 signature lines). Rendered via portal; `body.print-slip` + CSS hides `#root` in print so only the slip prints (`triggerPrint()` → Electron PDF preview / window.print). Entry points: printer icon on every Rokad row (`rokad-slip-{id}`) and "Slip" in Voucher search results.
+- Electron chooser.html: ↑/↓/Home/End move the highlighted "Pichle Folder" (also fills the path box), Enter starts the highlighted folder, Delete = ✕ forget. Verified in Playwright with a mocked bridge.
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅
