@@ -181,8 +181,8 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - Lesson: never insert a helper between a route decorator and its function (the decorator landed on the helper → endpoint returned {}); keep URL-param state in fetch effect deps.
 - Verified: iteration 27 (backend 5/5, frontend 100%).
 
-### Jun 2026 – Versioning rule (user ask: "version number hamesha end me likho")
-- Base version = `electron/package.json` MAJOR.MINOR (now **1.1**); CI builds `<major.minor>.<run_number>` (earlier builds were 1.0.N). `lib/brand.js` fallback mirrors the base for the web preview ("v1.1.0 (web)"). Bump MINOR with every feature batch (both files) and ALWAYS end user-facing summaries with the current version line.
+### Jun 2026 – Versioning rule (user ask: "version number hamesha build ke baad likho")
+- Version = `1.0.<GitHub Actions run_number>` (CI reads MAJOR.MINOR from `electron/package.json` = 1.0 → do NOT bump it; numbering must stay continuous). **Latest user-installed build: v1.0.14** (Jun 2026). Every build via "Save to GitHub" → next number (1.0.15, 1.0.16 …). ALWAYS end user-facing summaries with: "Build ke baad version: v1.0.<N+1>" using the latest known build number; ask the user for the actual number once they build if unsure.
 
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
