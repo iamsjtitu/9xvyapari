@@ -1873,11 +1873,32 @@ async def delete_inward(iid: str, current=Depends(get_current_user)):
 
 # ---------- TRIAL BALANCE ----------
 @api.get("/reports/outstanding")
+async def _settled_now_map() -> dict:
+    """party_id → latest Account Settled date, only for parties whose ledger stands at 0 TODAY (cleared accounts)."""
+    st = await db.settings.find_one({"id": "default"}, {"_id": 0, "settle_account_id": 1}) or {}
+    sid = st.get("settle_account_id")
+    upto: dict = {}
+    async for j in db.journal.find({"settles_rokad_id": {"$exists": True}}, {"_id": 0, "date": 1, "lines.account_id": 1}):
+        for ln in j.get("lines", []):
+            aid = ln.get("account_id")
+            if aid and aid != sid:
+                upto[aid] = max(upto.get(aid, ""), (j.get("date") or "")[:10])
+    out = {}
+    for pid, d in upto.items():
+        p = await db.parties.find_one({"id": pid}, {"_id": 0, "opening_balance": 1})
+        if p is not None and abs(await _compute_party_balance(pid, float(p.get("opening_balance") or 0))) < 0.005:
+            out[pid] = d
+    return out
+
+
 async def outstanding_report(as_on: Optional[str] = None, side: str = "all", min_amount: float = 0.0,
-                             sort: str = "amount", current=Depends(get_current_user)):
+                             sort: str = "amount", hide_settled: bool = False, current=Depends(get_current_user)):
     """Collection-round list: every party with a pending Dr/Cr balance as on a date, grouped by account group.
-    side = dr (lena hai) | cr (dena hai) | all. Cash/bank ledgers excluded."""
+    side = dr (lena hai) | cr (dena hai) | all. Cash/bank ledgers excluded.
+    hide_settled: skip parties that have since been cleared via Account Settled (ledger 0 today)."""
     s = await get_settings(current)
+    settled_now = await _settled_now_map()
+    settled_hidden = 0
     if as_on and not _is_date(as_on):
         raise HTTPException(400, "as_on date YYYY-MM-DD format me do")
     as_on = as_on or datetime.now().date().isoformat()
@@ -1911,6 +1932,9 @@ async def outstanding_report(as_on: Optional[str] = None, side: str = "all", min
             continue
         if (side == "dr" and bal <= 0) or (side == "cr" and bal >= 0):
             continue
+        if hide_settled and p["id"] in settled_now:
+            settled_hidden += 1
+            continue
         lt = last_txn.get(p["id"])
         days = (as_on_date - datetime.fromisoformat(lt).date()).days if lt else None
         g = groups.get(p.get("group_id"), {})
@@ -1919,7 +1943,7 @@ async def outstanding_report(as_on: Optional[str] = None, side: str = "all", min
                                          "fcode": g.get("fcode") or 9999, "rows": [], "dr_total": 0.0, "cr_total": 0.0})
         sec["rows"].append({"id": p["id"], "code": p.get("code") or 0, "name": p.get("name", ""), "place": p.get("place", ""),
                             "phone": p.get("phone", ""), "balance": round(bal, 2), "dr_cr": "Dr" if bal > 0 else "Cr",
-                            "last_txn": lt, "days": days})
+                            "last_txn": lt, "days": days, "settled_upto": settled_now.get(p["id"])})
         if bal > 0:
             sec["dr_total"] += bal
         else:
@@ -1931,7 +1955,8 @@ async def outstanding_report(as_on: Optional[str] = None, side: str = "all", min
         sec["dr_total"], sec["cr_total"] = round(sec["dr_total"], 2), round(sec["cr_total"], 2)
     return {"firm_name": s.get("firm_name") or "9x Vyapari", "as_on": as_on, "side": side, "min_amount": min_amount, "sort": sort,
             "sections": sections, "count": sum(len(x["rows"]) for x in sections),
-            "grand_dr": round(sum(x["dr_total"] for x in sections), 2), "grand_cr": round(sum(x["cr_total"] for x in sections), 2)}
+            "grand_dr": round(sum(x["dr_total"] for x in sections), 2), "grand_cr": round(sum(x["cr_total"] for x in sections), 2),
+            "hide_settled": hide_settled, "settled_hidden": settled_hidden}
 
 
 @api.get("/reports/trial-balance")

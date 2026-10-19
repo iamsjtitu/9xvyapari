@@ -19,13 +19,14 @@ export default function Outstanding() {
   const side = params.get("side") || "dr";
   const sort = params.get("sort") || "amount";
   const minAmount = params.get("min") || "";
+  const hideSettled = params.get("hs") === "1";
   const [data, setData] = useState(null);
 
-  const setP = (next) => setParams({ as_on: asOn, side, sort, min: minAmount, ...next });
+  const setP = (next) => setParams({ as_on: asOn, side, sort, min: minAmount, hs: hideSettled ? "1" : "0", ...next });
 
   useEffect(() => {
     setData(null);
-    api.get("/reports/outstanding", { params: { as_on: asOn, side, sort, min_amount: Number(minAmount) || 0 } })
+    api.get("/reports/outstanding", { params: { as_on: asOn, side, sort, min_amount: Number(minAmount) || 0, hide_settled: hideSettled } })
       .then((r) => setData(r.data))
       .catch((err) => toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message));
   }, [asOn, side, sort, minAmount]);
@@ -72,6 +73,11 @@ export default function Outstanding() {
             <option value="amount">Sort: Amount (bada pehle)</option>
             <option value="name">Sort: Naam (A-Z)</option>
           </select>
+          <label className={`kbd !text-[11px] px-2 py-1 cursor-pointer whitespace-nowrap hover:bg-khaki/60 inline-flex items-center gap-1.5 ${hideSettled ? "!bg-jama !text-white !border-jama" : ""}`}
+            title="Jo khate baad me Account Settled se clear ho chuke (aaj ledger 0) unhe vasooli list se hatao" data-testid="toggle-os-hide-settled">
+            <input type="checkbox" className="h-3 w-3 accent-[#1B5E20]" checked={hideSettled} onChange={(e) => setP({ hs: e.target.checked ? "1" : "0" })} data-testid="checkbox-os-hide-settled" />
+            Settled chhupao{data?.hide_settled && data.settled_hidden > 0 ? ` (${data.settled_hidden})` : ""}
+          </label>
           {data && (
             <ExportBar filename={`outstanding-${side}-${asOn}`} sheets={[{
               name: `Outstanding ${side.toUpperCase()} ${asOn}`,
@@ -85,8 +91,9 @@ export default function Outstanding() {
                 { key: "days", label: "Days", width: 7 },
                 { key: "dr", label: "Dr (Lena)", width: 16, num: true },
                 { key: "cr", label: "Cr (Dena)", width: 16, num: true },
+                { key: "settled_text", label: "Settled", width: 18 },
               ],
-              rows: flatRows,
+              rows: flatRows.map((r) => ({ ...r, settled_text: r.settled_upto ? `Cleared upto ${r.settled_upto.split("-").reverse().join("-")}` : "" })),
               groupBy: "group",
             }]} />
           )}
@@ -101,7 +108,8 @@ export default function Outstanding() {
             <div className="card-flat p-4"><div className="section-title">Parties</div><div className="font-mono-data text-2xl" data-testid="os-count">{data.count}</div></div>
             <div className="card-flat p-4"><div className="section-title">Lena hai (Dr)</div><div className="font-mono-data text-2xl text-[#B71C1C]" data-testid="os-grand-dr">₹ {inr(data.grand_dr)}</div></div>
             <div className="card-flat p-4"><div className="section-title">Dena hai (Cr)</div><div className="font-mono-data text-2xl text-jama" data-testid="os-grand-cr">₹ {inr(data.grand_cr)}</div></div>
-            <div className="card-flat p-4"><div className="section-title">Groups</div><div className="font-mono-data text-2xl">{data.sections.length}</div></div>
+            <div className="card-flat p-4"><div className="section-title">Groups</div><div className="font-mono-data text-2xl">{data.sections.length}
+              {data.hide_settled && data.settled_hidden > 0 && <span className="text-xs text-jama font-heading ml-2" data-testid="os-settled-hidden">· {data.settled_hidden} settled chhupaye</span>}</div></div>
           </div>
           <OutstandingSheet data={data} />
         </>
