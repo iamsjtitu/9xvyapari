@@ -47,7 +47,7 @@ const PayDialog = ({ row, month, monthEnd, onClose, onPaid }) => {
           <div><label className="lbl">Date</label><input type="date" className="input-dense" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} data-testid="pay-date" /></div>
           <div><label className="lbl">Mode</label><select className="input-dense" value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })} disabled={!form.pay_now} data-testid="pay-mode">{MODES.map((m) => <option key={m}>{m}</option>)}</select></div>
           <div className="col-span-2"><label className="lbl">Cash / Bank Account</label>
-            <select className="input-dense" value={form.cash_account_id} onChange={(e) => setForm({ ...form, cash_account_id: e.target.value })} disabled={!form.pay_now} data-testid="pay-account">
+            <select className="input-dense" value={form.cash_account_id} onChange={(e) => { const a = accounts.find((x) => x.id === e.target.value); setForm({ ...form, cash_account_id: e.target.value, mode: a && /bank/i.test(a.group_name || "") && !/cash/i.test(a.name || "") ? "Bank" : "Cash" }); }} disabled={!form.pay_now} data-testid="pay-account">
               {accounts.map((a) => <option key={a.id} value={a.id}>{accountLabel(a)}</option>)}</select></div>
           <div className="col-span-2"><label className="lbl">Note</label><input className="input-dense" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} data-testid="pay-note" /></div>
         </div>

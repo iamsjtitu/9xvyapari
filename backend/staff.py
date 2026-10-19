@@ -126,10 +126,10 @@ def make_staff_router(db, get_current_user, now_iso, compute_party_balance, next
         # cash/bank ledgers live in parties (CASH & BANK group) or the legacy accounts collection
         acc = None
         if cash_account_id:
-            acc = await db.parties.find_one({"id": cash_account_id}, {"_id": 0, "id": 1, "name": 1}) \
+            acc = await db.parties.find_one({"id": cash_account_id, "group_name": {"$regex": "cash|bank", "$options": "i"}}, {"_id": 0, "id": 1, "name": 1}) \
                 or await db.accounts.find_one({"id": cash_account_id}, {"_id": 0, "id": 1, "name": 1})
             if not acc:
-                raise HTTPException(404, "Chuna hua Cash/Bank account nahi mila")
+                raise HTTPException(404, "Chuna hua Cash/Bank account nahi mila (sirf CASH & BANK group ke ledger chalenge)")
         if not acc:
             acc = await default_cash_account()
         if not acc:

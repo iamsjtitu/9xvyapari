@@ -1,0 +1,40 @@
+{
+  "summary": "Retest of the iteration_37 fix: Staff Advance and Salary Pay now save the Cash/Bank ledger the user picks. The fix works in the backend and the UI. pytest: test_staff_v37 9/9, test_staff_v36 18/18, new test_staff_v38 3/4. The one failure is a new minor finding: _cash_account accepts any party id, not only CASH & BANK ledgers. UI flow: an advance of 500 on 2026-06-03 with 304 AXIS showed 'Cash · AXIS SK TRADERS.' with V.No. 1 in the adv-row; /rokad filtered to AXIS on 2026-06-03 shows the entry with V.No. 1 from the AXIS series; the AXIS ledger /parties/<id> shows 'Payment · QA BANKY · Advance' 500 on the credit side; after 2 P days in June, Salary Pay with 302 HDFC (deduct 0) gave 'PAID 30-06-2026 · V.No. 1', and /rokad filtered to HDFC shows the 400 row '[HDFC M M TRADERS.] Salary Jun 2026'. An unknown cash_account_id returns 404. All QA data has been cleaned up and checked: no QA staff, parties, rokad or journal entries are left.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/staff/advance, POST /api/staff/salary/pay (staff.py _cash_account)", "issue": "The cash_account_id lookup is db.parties.find_one({id}) with no group check. Any party is accepted as the 'cash account'. Repro: advance with cash_account_id = a purchase party (AAKASH BARGARH., group PURCHASE PARTY) returned 200 and wrote a rokad row whose cash_account is that party. The UI only lists CASH & BANK ledgers, so this is only reachable through the API, but it can corrupt the books. Fix: only accept parties whose group_name matches /cash|bank/i (same filter as the frontend fetchCashAccounts); otherwise return 400. Test: tests/test_staff_v38.py::test_non_cash_party_rejected_probe (currently fails)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Staff Advance / Pay dialog", "issues": ["Mode stays 'Cash' when a bank ledger is chosen, so the row shows 'Cash · AXIS SK TRADERS.'. Consider defaulting Mode to Bank/UPI when a bank ledger is selected. Cosmetic.", "The adv-date and pay-date fields use the browser's native date input, not a shadcn calendar. This matches the rest of the app."]}
+    ]
+  },
+  "passed_checks": [
+    "pytest test_staff_v37.py 9/9 (incl. test_advance_with_bank_ledger) and test_staff_v36.py 18/18",
+    "API: advance with 304 AXIS gives cash_account_id and name = AXIS, also in GET /rokad; unknown id gives 404; salary pay with 302 HDFC and deduct_advance 0 gives a rokad under HDFC",
+    "UI adv-account lists 304, 301, 302, 303, 307, 306 and the old 'Cash IN Hand' account; choosing 304 AXIS is saved; adv-row Mode / A/c = 'Cash · AXIS SK TRADERS.', V.No. 1",
+    "UI /rokad with the AXIS filter on 2026-06-03 shows 1 QA BANKY row, V.No. 1, kharch 500; closing balance 47,691.30 to 47,191.30",
+    "UI /parties/<AXIS id> ledger shows 03-06-2026 'Payment · QA BANKY · Advance' credit 500",
+    "UI Salary Pay with pay-account 302 HDFC and pay-deduct 0 gives sal-paid 'PAID 30-06-2026', title V.No. 1; /rokad with the HDFC filter shows the 400 salary row tagged [HDFC M M TRADERS.]",
+    "Note (expected behaviour): with the default deduct, the full remaining advance (500) is taken from the 400 gross. Net is 0, so the salary is CREDITED and no rokad entry is made."
+  ],
+  "test_report_links": ["/app/backend/tests/test_staff_v38.py", "/app/backend/tests/test_staff_v37.py", "/app/backend/tests/test_staff_v36.py", "/app/backend/tests/seed_v38_ui.py", "/app/test_reports/pytest/pytest_v38.xml"],
+  "action_items": [
+    "MINOR: In staff.py _cash_account(), reject parties outside the CASH & BANK group (400). Then test_staff_v38::test_non_cash_party_rejected_probe will pass.",
+    "Optional: set Mode automatically from the type of the selected Cash/Bank ledger."
+  ],
+  "critical_code_review_comments": [
+    "_cash_account: the parties lookup has no group filter (see the minor issue). Legacy db.accounts should also be limited to the cash/bank group, to match fetchCashAccounts."
+  ],
+  "updated_files": ["/app/backend/tests/test_staff_v38.py", "/app/backend/tests/seed_v38_ui.py"],
+  "success_rate": {"backend": "97% (30/31)", "frontend": "100% (all retest UI steps pass)"},
+  "seed_data_creation": "Temporary staff 'QA BANKY' and 'TEST_QA38 BANK' with their ledgers, attendance, an advance and a salary were created and then fully removed (checked: none left).",
+  "test_credentials": "admin / Vyapari@2026",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest tests/test_staff_v36.py tests/test_staff_v37.py tests/test_staff_v38.py. seed_v38_ui.py seed|info|clean creates and cleans 'QA BANKY' (ids in /tmp/v38_seed.json). The salary row's payment is under the key 'paid'. Pay deducts the full remaining advance by default; pass deduct_advance 0 to get a rokad entry. In playwright, import asyncio before using the dialog-accept handler."
+}
