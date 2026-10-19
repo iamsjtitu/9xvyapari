@@ -1965,6 +1965,59 @@ async def import_dbf_upload(payload: dict, current=Depends(get_current_user)):
 
 
 # ---------- PER-CASH-ACCOUNT VOUCHER NUMBERING ----------
+class RenumberIn(BaseModel):
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    start: int = Field(default=1, ge=1, le=10_000_000)
+    apply: bool = False  # false → preview only
+
+
+def _vno_num(v) -> int:
+    try:
+        return int(str(v or "").strip())
+    except ValueError:
+        return 0
+
+
+@api.post("/cash-accounts/{pid}/renumber-vouchers")
+async def renumber_vouchers(pid: str, body: RenumberIn, current=Depends(get_current_user)):
+    """Date-wise V.No. for one cash/bank a/c: entries sorted by date (then entry order) get start, start+1, …
+    Preview (apply=false) returns the change list; apply=true writes it after a safety backup."""
+    for d in (body.date_from, body.date_to):
+        if d and not _is_date(d):
+            raise HTTPException(400, "Date YYYY-MM-DD format me do")
+    acc = await db.parties.find_one({"id": pid}, {"_id": 0, "name": 1}) or await db.accounts.find_one({"id": pid}, {"_id": 0, "name": 1})
+    if not acc:
+        raise HTTPException(404, "Cash/Bank account nahi mila")
+    q: dict = {"cash_account_id": pid}
+    if body.date_from or body.date_to:
+        q["date"] = {**({"$gte": body.date_from} if body.date_from else {}), **({"$lte": body.date_to} if body.date_to else {})}
+    rows = await db.rokad.find(q, {"_id": 0, "id": 1, "date": 1, "created_at": 1, "voucher_no": 1, "party_name": 1, "amount": 1, "type": 1}).to_list(100000)
+    rows.sort(key=lambda r: ((r.get("date") or ""), (r.get("created_at") or ""), _vno_num(r.get("voucher_no"))))
+    changes = []
+    n = body.start
+    for r in rows:
+        new = str(n)
+        if str(r.get("voucher_no") or "") != new:
+            changes.append({"id": r["id"], "date": r.get("date"), "party_name": r.get("party_name", ""), "type": r.get("type"),
+                            "amount": r.get("amount"), "old": str(r.get("voucher_no") or ""), "new": new})
+        n += 1
+    out = {"account": acc["name"], "total": len(rows), "changed": len(changes), "first_no": body.start,
+           "last_no": body.start + len(rows) - 1 if rows else None, "sample": changes[:12], "applied": False, "safety_backup": None}
+    if body.apply and changes:
+        if await _backup_key():
+            try:
+                out["safety_backup"] = (await _write_backup("renumber"))["name"]
+            except Exception as e:
+                logger.warning(f"Renumber safety backup failed: {e}")
+        ts = now_iso()
+        for c in changes:
+            await db.rokad.update_one({"id": c["id"]}, {"$set": {"voucher_no": c["new"], "updated_at": ts}})
+        out["applied"] = True
+        logger.info(f"Renumbered {len(changes)} vouchers for {acc['name']} ({body.date_from}..{body.date_to})")
+    return out
+
+
 @api.get("/cash-accounts/{pid}/next-voucher")
 async def next_cash_voucher(pid: str, current=Depends(get_current_user)):
     """Next voucher number for a cash/bank ledger — FoxPro per-account numbering (every cash a/c has its own seq)."""

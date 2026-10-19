@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
-import { Plus, Trash, ArrowDown, ArrowUp, X, PencilSimple, ArrowsLeftRight, Printer } from "@phosphor-icons/react";
+import { Plus, Trash, ArrowDown, ArrowUp, X, PencilSimple, ArrowsLeftRight, Printer, ListNumbers } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { TransferForm } from "@/components/rokad/TransferForm";
 import { DayBookSheet } from "@/components/rokad/DayBookSheet";
 import { VoucherSearch } from "@/components/rokad/VoucherSearch";
+import { RenumberVouchersDialog } from "@/components/rokad/RenumberVouchersDialog";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 
 // Mode follows the ACCOUNT name only (group "CASH & BANK BALANCE" must not force "Bank" on CASH IN HAND)
@@ -28,6 +29,7 @@ export default function RokadPanna() {
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState(null);
   const [transfer, setTransfer] = useState(null);          // null | { contraId?: string }
+  const [renumber, setRenumber] = useState(false);          // V.No. date-wise renumber dialog (needs a selected a/c)
   const emptyForm = {
     date: todayISO(),
     type: "jama",
@@ -372,6 +374,12 @@ export default function RokadPanna() {
           >
             <Printer size={16} /> {view === "daybook" ? "List View" : "Day Book (Print)"}
           </button>
+          {selectedBank && (
+            <button className="btn-outline" onClick={() => setRenumber(true)}
+              title={`${selectedBank.name} ke V.No. date-wise 1,2,3… renumber karein`} data-testid="btn-renumber-vouchers">
+              <ListNumbers size={16} /> V.No. Date-wise
+            </button>
+          )}
           <button
             className="btn-outline"
             onClick={() => setTransfer({})}
@@ -393,6 +401,10 @@ export default function RokadPanna() {
         </div>
       </div>
 
+      {renumber && selectedBank && (
+        <RenumberVouchersDialog account={selectedBank} fyStart={settings?.fy_start} fyEnd={settings?.fy_end}
+          onClose={() => setRenumber(false)} onDone={load} />
+      )}
       {transfer && (
         <TransferForm accounts={accounts} date={dateTo} contraId={transfer.contraId}
           onClose={() => setTransfer(null)} onSaved={() => { load(); loadSummary(); }} />
