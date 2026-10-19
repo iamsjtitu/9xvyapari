@@ -302,11 +302,11 @@ export default function JournalEntry() {
                         <LedgerBalanceHint ledgerId={l.account_id} delta={lineDelta(l)} compact className="mt-1" testId={`jline-balance-${idx}`} />
                       </td>
                       <td>
-                        <input type="number" step="0.01" className="input-dense num" value={l.debit}
+                        <input type="number" step="0.01" className="input-dense num" value={l.debit} data-testid={`jline-debit-${idx}`}
                           onChange={(e) => updateLine(idx, { debit: e.target.value, credit: e.target.value ? "" : l.credit })} />
                       </td>
                       <td>
-                        <input type="number" step="0.01" className="input-dense num" value={l.credit}
+                        <input type="number" step="0.01" className="input-dense num" value={l.credit} data-testid={`jline-credit-${idx}`}
                           onChange={(e) => updateLine(idx, { credit: e.target.value, debit: e.target.value ? "" : l.debit })} />
                       </td>
                       <td>

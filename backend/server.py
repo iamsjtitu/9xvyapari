@@ -816,11 +816,16 @@ async def _apply_settlement(rok: dict) -> Optional[dict]:
             "ledger": led["name"], "narration": narr}
 
 
+SALARY_LOCK_MSG = "Yeh Staff Salary ki entry hai — isse seedha badal/hata nahi sakte. Staff Salary Payments page se us mahine ki salary delete karein"
+
+
 @api.put("/rokad/{rid}")
 async def update_rokad(rid: str, body: RokadIn, current=Depends(get_current_user)):
     existing = await db.rokad.find_one({"id": rid}, {"_id": 0})
     if not existing:
         raise HTTPException(404, "Entry nahi mili")
+    if existing.get("salary_payment_id"):
+        raise HTTPException(400, SALARY_LOCK_MSG)
     if existing.get("contra_id"):
         raise HTTPException(400, "Yeh Transfer (contra) entry hai – ise Transfer form se edit karein")
     doc = body.model_dump()
@@ -903,7 +908,9 @@ async def account_clear_report(date_from: Optional[str] = None, date_to: Optiona
 
 @api.delete("/rokad/{rid}")
 async def delete_rokad(rid: str, current=Depends(get_current_user)):
-    existing = await db.rokad.find_one({"id": rid}, {"_id": 0, "contra_id": 1})
+    existing = await db.rokad.find_one({"id": rid}, {"_id": 0, "contra_id": 1, "salary_payment_id": 1})
+    if existing and existing.get("salary_payment_id"):
+        raise HTTPException(400, SALARY_LOCK_MSG)
     await db.journal.delete_many({"settles_rokad_id": rid})  # its Account Settled adjustment goes with it
     if existing and existing.get("contra_id"):
         await db.rokad.delete_many({"contra_id": existing["contra_id"]})  # both legs go together
@@ -1104,7 +1111,7 @@ async def _journal_rows(pid: str, upto: dict) -> list:
                 journal.append({"id": j["id"], "date": j.get("date"), "voucher_no": j.get("voucher_no", ""),
                                 "narration": j.get("narration", ""), "other": other,
                                 "debit": float(ln.get("debit") or 0), "credit": float(ln.get("credit") or 0),
-                                "settles_rokad_id": j.get("settles_rokad_id"), "auto": j.get("auto")})
+                                "settles_rokad_id": j.get("settles_rokad_id"), "auto": j.get("auto"), "created_at": j.get("created_at", "")})
     return journal
 
 
@@ -1323,6 +1330,8 @@ async def update_journal(jid: str, body: JournalIn, current=Depends(get_current_
         raise HTTPException(404, "Journal entry nahi mili")
     if existing.get("settles_rokad_id"):
         raise HTTPException(400, "Yeh Account Settled ka auto journal hai — isse seedha edit nahi kar sakte. Rokad entry edit karein, yeh apne aap dobara banega")
+    if existing.get("salary_payment_id"):
+        raise HTTPException(400, SALARY_LOCK_MSG)
     total = _validate_journal(body)
     doc = body.model_dump()
     doc["total"] = total
@@ -1332,6 +1341,8 @@ async def update_journal(jid: str, body: JournalIn, current=Depends(get_current_
 
 @api.delete("/journal/{jid}")
 async def delete_journal(jid: str, current=Depends(get_current_user)):
+    if await db.journal.find_one({"id": jid, "salary_payment_id": {"$exists": True, "$ne": None}}, {"_id": 0, "id": 1}):
+        raise HTTPException(400, SALARY_LOCK_MSG)
     await db.journal.delete_one({"id": jid})
     await db.rokad.update_one({"settle_journal_id": jid}, {"$set": {"settle": False}, "$unset": {"settle_journal_id": "", "settled_amount": ""}})
     return {"ok": True}

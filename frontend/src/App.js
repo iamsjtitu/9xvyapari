@@ -67,7 +67,7 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Sonner position="top-right" richColors />
+        <Sonner position="bottom-right" richColors />
         <UpdateBanner />
         <Routes>
           <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />

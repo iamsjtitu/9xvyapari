@@ -179,10 +179,15 @@ def make_staff_router(db, get_current_user, now_iso, compute_party_balance, next
         return {"month": month, "label": _month_label(month), "days": days, "today": today, "rows": rows,
                 "weekdays": [calendar.day_abbr[datetime(y, m, d).weekday()] for d in range(1, days + 1)]}
 
+    def _not_future(d: str):
+        if d > datetime.now().date().isoformat():
+            raise HTTPException(400, "Aage ki date ki attendance nahi lag sakti")
+
     @r.put("/attendance")
     async def mark_attendance(body: MarkIn, current=Depends(get_current_user)):
         if not is_date(body.date):
             raise HTTPException(400, "Date YYYY-MM-DD format me do")
+        _not_future(body.date)
         await _staff_or_404(body.staff_id)
         if body.mark is None:
             await db.attendance.delete_one({"staff_id": body.staff_id, "date": body.date})
@@ -196,8 +201,12 @@ def make_staff_router(db, get_current_user, now_iso, compute_party_balance, next
     async def bulk_attendance(body: BulkMarkIn, current=Depends(get_current_user)):
         if not is_date(body.date):
             raise HTTPException(400, "Date YYYY-MM-DD format me do")
+        _not_future(body.date)
+        known = {s["id"] async for s in db.staff.find({"id": {"$in": body.staff_ids}}, {"_id": 0, "id": 1})}
         n = 0
         for sid in body.staff_ids:
+            if sid not in known:
+                continue
             if body.only_unmarked and await db.attendance.find_one({"staff_id": sid, "date": body.date}):
                 continue
             await db.attendance.update_one({"staff_id": sid, "date": body.date},
@@ -216,7 +225,7 @@ def make_staff_router(db, get_current_user, now_iso, compute_party_balance, next
         async for a in db.attendance.find({"date": {"$gte": f"{month}-01", "$lte": month_end}}, {"_id": 0}):
             marks.setdefault(a["staff_id"], {})[a["date"]] = a["mark"]
         paid = {p["staff_id"]: p async for p in db.salary_payments.find({"month": month}, {"_id": 0})}
-        rows, totals = [], {"gross": 0.0, "deduct": 0.0, "net": 0.0, "paid_count": 0}
+        rows, totals = [], {"gross": 0.0, "deduct": 0.0, "net": 0.0, "paid_count": 0, "paid_net": 0.0, "credited_count": 0, "credited_net": 0.0}
         for st in staff:
             mm = marks.get(st["id"], {})
             rec = paid.get(st["id"])
@@ -234,7 +243,11 @@ def make_staff_router(db, get_current_user, now_iso, compute_party_balance, next
                    "advance_due": advance_due, "salary_due": round(-bal, 2) if bal < 0 else 0.0,
                    "suggested_deduct": suggested, "net": round(gross - suggested, 2), "paid": rec}
             if rec:
-                totals["gross"] += rec["gross"]; totals["deduct"] += rec["advance_deducted"]; totals["net"] += rec["net"]; totals["paid_count"] += 1
+                totals["gross"] += rec["gross"]; totals["deduct"] += rec["advance_deducted"]; totals["net"] += rec["net"]
+                if rec.get("paid_now"):
+                    totals["paid_count"] += 1; totals["paid_net"] += rec["net"]
+                else:
+                    totals["credited_count"] += 1; totals["credited_net"] += rec["net"]
             rows.append(row)
         return {"month": month, "label": _month_label(month), "days": days, "month_end": month_end, "rows": rows,
                 "totals": {k: round(v, 2) if isinstance(v, float) else v for k, v in totals.items()}}

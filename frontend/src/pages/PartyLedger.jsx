@@ -27,7 +27,7 @@ function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = 
     debit: b.bill_type === "sale" ? b.total : 0, credit: b.bill_type === "purchase" ? b.total : 0,
   }));
   rokad.forEach((r) => rows.push({
-    kind: "rokad", id: r.id, date: r.date, vno: r.voucher_no || "",
+    kind: "rokad", id: r.id, date: r.date, vno: r.voucher_no || "", created_at: r.created_at || "",
     label: `${r.description || (r.type === "jama" ? "Payment Received" : "Payment Paid")}${r.cash_account_name ? ` · ${r.cash_account_name}` : ""}`,
     debit: r.type === "kharch" ? r.amount : 0, credit: r.type === "jama" ? r.amount : 0,
   }));
@@ -37,7 +37,7 @@ function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = 
     debit: r.type === "jama" ? r.amount : 0, credit: r.type === "kharch" ? r.amount : 0,
   }));
   journal.forEach((j, i) => rows.push({
-    kind: "journal", id: `${j.id}-${i}`, refId: j.id, date: j.date, vno: j.voucher_no || "",
+    kind: "journal", id: `${j.id}-${i}`, refId: j.id, date: j.date, vno: j.voucher_no || "", created_at: j.created_at || "",
     label: `Journal${j.narration ? " · " + j.narration : ""}${j.other ? " | vs " + j.other : ""}`,
     debit: j.debit, credit: j.credit, settles_rokad_id: j.settles_rokad_id || null,
   }));
@@ -50,7 +50,8 @@ function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = 
       debit: Number(j.debit || 0), credit: Number(j.credit || 0), ref_no: j.ref_no, sgn: j.sgn,
     });
   });
-  rows.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  // same date → entry order (created_at); salary journal (credit) lands before its payment, settlement after its receipt
+  rows.sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.created_at || "").localeCompare(b.created_at || ""));
   return rows;
 }
 

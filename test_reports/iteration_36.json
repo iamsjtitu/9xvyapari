@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 36 tested Live Balance hints and the new Staff Attendance & Payments module, backend and frontend. I converted the bash smoke test into pytest: tests/test_staff_v36.py has 18 tests; 17 pass and 1 fails because the backend accepts future attendance dates. Frontend checks that passed: (1) live 'after' balance hints in Rokad (new entry and edit), Journal, Bill (sale and purchase) and Transfer; (2) nav links and Alt+S/V/Z/U shortcuts; (3) Staff Master create, edit, inactive, duplicate 409, delete (ledger kept), re-create, search and name link; (4) the staff ledger appears in Rokad party autocomplete; (5) Staff Advance; (6) the attendance grid, including the P/H/A/C cycle, counts, right-click clear, future cells disabled and 'Aaj sab Present'; (7) the salary sheet (monthly ÷30 and daily rate), the pay modal with deduction override, the accounting (ledger closes at 400 Dr, journal J00002 and rokad V.No. 2), unpay, and credit-only pay. Two real issues were found: the Advance and Salary forms list the wrong cash accounts, and the staff pages can show the previous month's data after a quick month change. All QA data has been removed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/staff/attendance, POST /api/staff/attendance/bulk", "issue": "Future dates are accepted. PUT with 2030-01-01 returned 200; only the UI blocks future dates. Bulk also does not check that the staff_ids exist."},
+      {"endpoint": "DELETE/PUT /api/rokad/{id}, /api/journal/{id}", "issue": "The rokad and journal entries linked to a salary (salary_payment_id) can be edited or deleted from the Rokad, Journal and Party ledger screens. The salary_payments record then stays PAID with no journal or rokad behind it. Block this or cascade the change (server.py has no salary_payment_id guard)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "StaffAdvance.jsx (adv-account) + StaffSalary.jsx PayModal (pay-account)", "issue": "Cash/bank options come only from GET /api/accounts, which is the old accounts collection. The dropdown therefore lists only the old 'Cash IN Hand' account (no code). The primary '301 · CASH IN HAND' ledger and all bank ledgers (302 HDFC, 304 AXIS, …) are missing, so advances and salary payments always post to the old account. This does not match Rokad, whose default is 301, or the backend _default_cash_account, which returns the 301 ledger. Confirmed: the advance and salary rokad rows had cash_account_name 'Cash IN Hand' (id ff518072…), and that account's closing balance dropped in the Rokad summary.", "selector": "[data-testid='adv-account'], [data-testid='pay-account']", "priority": "HIGH"},
+      {"component": "StaffSalary / StaffAttendance / StaffAdvance load()", "issue": "Stale responses can overwrite newer ones. If the month picker changes before the first current-month fetch finishes, that late response replaces the new month's data. Reproduced: the picker showed 2026-06 but the grid had October data ('31 din bina mark', no marks), and the sal-unpay button was missing. In Attendance, dates are built from the current month plus the stale data.days, which can create cells like 2026-06-31. Fix: ignore stale responses (alive flag or AbortController in the useEffect, or check r.data.month === month).", "selector": "[data-testid='sal-month-input'], [data-testid='att-month-input'], [data-testid='adv-month-input']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Staff Master / Attendance / Salary / Advance", "issues": ["Sonner toasts (top-right, 4–7 s) cover the header actions: the Naya Staff button, the search box, and the month picker next-arrow / Print / 'Aaj sab Present'."]},
+      {"screen": "Staff Salary cards", "issues": ["The 'PAID (n)' card counts credit-only (CREDITED, pay_now=false) salaries as paid. A credited ₹1,500 showed as 'PAID (1) ₹1,500.00' although no cash was paid."]},
+      {"screen": "Party ledger (staff)", "issues": ["On the same date, the salary payment (Dr 6,000) is listed before the salary journal (Cr 6,600), so the running balance briefly shows ₹7,000. Sort the salary journal credit before its payment."]},
+      {"screen": "Journal entry modal", "issues": ["The Debit and Credit inputs on each line have no data-testid (e.g. jline-debit-<idx> / jline-credit-<idx>)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_staff_v36.py", "/app/test_reports/pytest/pytest_results_v36.xml"],
+  "action_items": [
+    "HIGH: In StaffAdvance.jsx and StaffSalary.jsx, build the cash/bank list the same way RokadPanna does: parties in a cash/bank group plus old accounts. Default to the code-301 party ledger and include the bank ledgers.",
+    "MEDIUM: Add a stale-response guard to load() in StaffSalary, StaffAttendance and StaffAdvance.",
+    "Backend: reject future dates in PUT /staff/attendance and /staff/attendance/bulk, and check that staff exist in bulk.",
+    "Protect salary-linked rokad and journal entries from direct edit/delete, or cascade the change to salary_payments.",
+    "Optional: do not count CREDITED salaries as PAID in the card; fix same-date ledger ordering; add testids to the journal debit/credit inputs; move toasts away from the header actions."
+  ],
+  "critical_code_review_comments": [
+    "staff.py create_staff: if a party with the same name already exists, that ledger is linked silently, even when it is a non-staff ledger in another group. This is how the re-created QA SHYAM got its old ledger back. It is fine for re-creation, but it could link a trading party by mistake. Consider requiring the ledger to be in the STAFF group.",
+    "staff.py delete_staff does not count journal lines on the staff ledger. This is OK because the ledger is kept.",
+    "_salary_rows calls _ledger_balance once per staff (N+1). Fine for small staff counts."
+  ],
+  "updated_files": ["/app/backend/tests/test_staff_v36.py"],
+  "success_rate": {"backend": "94% (17/18)", "frontend": "~92% (all requested flows work; the cash account selection is wrong)"},
+  "test_credentials": "admin / Vyapari@2026 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None kept. QA RAMU and QA SHYAM staff, their ledgers, advances, salaries, attendance and one TEST_QA rokad on SETTLE TEST PARTY were all deleted. SETTLE TEST PARTY is back to 1000 Dr; STAFF SALARY and ACCOUNT CLEAR were kept.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run pytest tests/test_staff_v36.py; it cleans up after itself. On the staff pages, wait for the first data load (e.g. a sal-row-/att-row- element) before changing the month picker, because of the stale-response race. Accept window.confirm dialogs for deletes. The staff group is 'STAFF ADVANCE' (id d367a83d…) and the salary ledger is 'STAFF SALARY' (id 3b9bcd6b…). The primary cash ledger is party 3811380b… (code 301); the old account ff518072… 'Cash IN Hand' is the one the staff forms currently use. Browser date is 2026-10-19.",
+  "rca of the issue": "Cash account: StaffAdvance.jsx line 24 and StaffSalary.jsx line 16 call api.get('/accounts'), which returns only the old accounts collection. The real cash/bank ledgers are parties in the 'CASH & BANK BALANCE' group; RokadPanna merges both lists. Race: each page's useEffect([month]) calls load() without cancelling earlier requests, so whichever response arrives last wins."
+}

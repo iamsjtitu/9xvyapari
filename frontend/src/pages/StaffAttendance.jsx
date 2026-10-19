@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import api, { formatApiErrorDetail, todayISO } from "@/lib/api";
 import { toast } from "sonner";
 import { CalendarCheck, CheckCircle, Printer } from "@phosphor-icons/react";
@@ -11,12 +11,14 @@ export default function StaffAttendance() {
   const [month, setMonth] = useState(thisMonth());
   const [data, setData] = useState(null);
   const [busyCell, setBusyCell] = useState("");
-  const load = () => api.get("/staff/attendance", { params: { month } }).then((r) => setData(r.data))
+  const monthRef = useRef(month);
+  const load = (m = month) => api.get("/staff/attendance", { params: { month: m } })
+    .then((r) => setData((cur) => (r.data.month === monthRef.current ? r.data : cur)))   // ignore stale month responses
     .catch((err) => toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message));
-  useEffect(() => { setData(null); load(); /* eslint-disable-next-line */ }, [month]);
+  useEffect(() => { monthRef.current = month; setData(null); load(month); /* eslint-disable-next-line */ }, [month]);
 
   const today = todayISO();
-  const dates = useMemo(() => (data ? Array.from({ length: data.days }, (_, i) => `${month}-${String(i + 1).padStart(2, "0")}`) : []), [data, month]);
+  const dates = useMemo(() => (data ? Array.from({ length: data.days }, (_, i) => `${data.month}-${String(i + 1).padStart(2, "0")}`) : []), [data]);
 
   // click = cycle P → H → A → C → blank; right-click = clear
   const mark = async (staff, date, forced) => {

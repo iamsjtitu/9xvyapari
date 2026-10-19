@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { inr, formatApiErrorDetail, todayISO } from "@/lib/api";
 import { toast } from "sonner";
@@ -6,6 +6,7 @@ import { Money, Printer, Trash, X, CheckCircle } from "@phosphor-icons/react";
 import { FoxProPrintHeader } from "@/components/ExportBar";
 import { backdropClose } from "@/lib/backdrop";
 import { MonthPicker, MODES, thisMonth, monthLabel, StaffPageHeader } from "@/components/staff/common";
+import { fetchCashAccounts, defaultCashAccount, accountLabel } from "@/lib/cashAccounts";
 
 // Confirm + pay dialog for one staff's month
 const PayDialog = ({ row, month, monthEnd, onClose, onPaid }) => {
@@ -13,7 +14,7 @@ const PayDialog = ({ row, month, monthEnd, onClose, onPaid }) => {
   const today = todayISO();
   const [form, setForm] = useState({ deduct: String(row.suggested_deduct), pay_now: true, cash_account_id: "", mode: "Cash", date: monthEnd < today ? monthEnd : today, note: "" });
   const [busy, setBusy] = useState(false);
-  useEffect(() => { api.get("/accounts").then((r) => { setAccounts(r.data); const c = r.data.find((a) => Number(a.code) === 301) || r.data[0]; if (c) setForm((f) => ({ ...f, cash_account_id: c.id })); }); }, []);
+  useEffect(() => { fetchCashAccounts().then((list) => { setAccounts(list); const c = defaultCashAccount(list); if (c) setForm((f) => ({ ...f, cash_account_id: c.id })); }); }, []);
   const deduct = Math.min(Math.max(Number(form.deduct) || 0, 0), row.gross, row.advance_due);
   const net = Math.round((row.gross - deduct) * 100) / 100;
   const submit = async (e) => {
@@ -47,7 +48,7 @@ const PayDialog = ({ row, month, monthEnd, onClose, onPaid }) => {
           <div><label className="lbl">Mode</label><select className="input-dense" value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })} disabled={!form.pay_now} data-testid="pay-mode">{MODES.map((m) => <option key={m}>{m}</option>)}</select></div>
           <div className="col-span-2"><label className="lbl">Cash / Bank Account</label>
             <select className="input-dense" value={form.cash_account_id} onChange={(e) => setForm({ ...form, cash_account_id: e.target.value })} disabled={!form.pay_now} data-testid="pay-account">
-              {accounts.map((a) => <option key={a.id} value={a.id}>{a.code ? `${a.code} · ` : ""}{a.name}</option>)}</select></div>
+              {accounts.map((a) => <option key={a.id} value={a.id}>{accountLabel(a)}</option>)}</select></div>
           <div className="col-span-2"><label className="lbl">Note</label><input className="input-dense" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} data-testid="pay-note" /></div>
         </div>
         <div className="flex justify-end gap-2 mt-4 border-t border-khaki pt-3">
@@ -63,9 +64,11 @@ export default function StaffSalary() {
   const [month, setMonth] = useState(thisMonth());
   const [data, setData] = useState(null);
   const [paying, setPaying] = useState(null);
-  const load = () => api.get("/staff/salary", { params: { month } }).then((r) => setData(r.data))
+  const monthRef = useRef(month);
+  const load = (m = month) => api.get("/staff/salary", { params: { month: m } })
+    .then((r) => setData((cur) => (r.data.month === monthRef.current ? r.data : cur)))   // ignore stale month responses
     .catch((err) => toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message));
-  useEffect(() => { setData(null); load(); /* eslint-disable-next-line */ }, [month]);
+  useEffect(() => { monthRef.current = month; setData(null); load(month); /* eslint-disable-next-line */ }, [month]);
 
   const unpay = async (r) => {
     if (!window.confirm(`${r.name} ki ${monthLabel(month)} salary entry delete karein?\nSalary journal aur payment (Rokad) dono hat jayenge.`)) return;
@@ -86,7 +89,9 @@ export default function StaffSalary() {
       {data && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 print:hidden">
           <div className="card-flat p-4"><div className="section-title">Staff</div><div className="font-mono-data text-2xl">{rows.length}</div></div>
-          <div className="card-flat p-4"><div className="section-title">Paid ({data.totals.paid_count})</div><div className="font-mono-data text-2xl text-jama" data-testid="sal-total-net">₹ {inr(data.totals.net)}</div></div>
+          <div className="card-flat p-4"><div className="section-title">Paid ({data.totals.paid_count}){data.totals.credited_count ? <span className="normal-case tracking-normal"> · credited {data.totals.credited_count}</span> : ""}</div>
+            <div className="font-mono-data text-2xl text-jama" data-testid="sal-total-net">₹ {inr(data.totals.paid_net)}</div>
+            {data.totals.credited_count > 0 && <div className="text-[10px] text-muted2 font-mono-data" data-testid="sal-total-credited">+ ₹ {inr(data.totals.credited_net)} credited (dena baaki)</div>}</div>
           <div className="card-flat p-4"><div className="section-title">Advance kata</div><div className="font-mono-data text-2xl" data-testid="sal-total-deduct">₹ {inr(data.totals.deduct)}</div></div>
           <div className="card-flat p-4"><div className="section-title">Baaki (pending)</div><div className="font-mono-data text-2xl text-[#B71C1C]" data-testid="sal-pending">{pending.length} · ₹ {inr(pending.reduce((t, r) => t + r.net, 0))}</div></div>
         </div>
