@@ -1,0 +1,28 @@
+{
+  "summary": "Frontend E2E for Party Ledger delete-row (trash) feature on SETTLE TEST PARTY. Seeded via API: rokad 300 (10-06), journal 'QA del jrnl' Dr20 (11-06), rokad 700 settle:true (12-06, settlement J00003 Cr20), sale bill S00001 100 (13-06). All flows pass: trash testids present for every voucher row (rokad/journal/bill + settlement journal), none on opening/closing rows, pencil coexists, column hidden in print media. Cancel on 300 receipt -> confirm text correct ('Rokad entry delete karein?', 10-06-2026, label, '₹ 300.00'), nothing changed. Accept -> toast 'Rokad entry delete ho gaya · ₹ 300.00', same URL, row gone, closing recomputed, backend GET /api/rokad 10-06 empty. Journal delete -> 'Journal voucher delete karein?' -> toast, row gone, gone from /api/journal. Settlement row trash -> 'SETTLE TEST PARTY ka Account Settled hataayein?' -> toast 'Account reopened · ₹20.00 ka adjustment hata ...', settlement line + marker + header badge gone, 700 receipt stays, rokad settle=false. Bill delete -> 'Bill delete karein?' -> toast, row gone, GET /api/bills/<id> 404. Delete with from=2026-06-01 range also works (URL kept). No console errors. Found and fixed 1 UI bug: trash icon was grey, not red.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PartyLedger trash button", "issue": "Trash icon showed grey rgb(89,89,89) instead of red. The .btn-ghost color in index.css overrode the text-[#B71C1C] utility. FIXED by changing it to !text-[#B71C1C]; it now renders rgb(183,28,28), also on hover.", "selector": "[data-testid^='ledger-del-']", "priority": "LOW (fixed)"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Party Ledger after deleting a voucher dated before an Account Settled", "issues": ["If you delete the 300 receipt or the 20 journal that come before the settlement, the settlement journal keeps its old fixed amount (Cr 20). The green marker still says 'ACCOUNT CLEARED UPTO 12-06-2026 · LEDGER 0', but the running balance on 12-06 is now 300 or 280. Consider recomputing or flagging the settlement as stale, or warning in the delete confirm that the settlement is out of date. This is a product decision (not a crash)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/qa30_setup.py"],
+  "action_items": [
+    "Optional: handle a stale settlement when an earlier voucher is deleted. The marker shows 'LEDGER 0' while the balance is not 0.",
+    "Trash colour fix already applied in PartyLedger.jsx (!text-[#B71C1C]). Keep it."
+  ],
+  "critical_code_review_comments": [
+    "deleteRow uses window.confirm (blocking native dialog). It works, but a styled AlertDialog would be more consistent with the rest of the app.",
+    "The rokad confirm text always mentions transfer legs and the settlement adjustment, even for a plain receipt. It could be made conditional on r.settle or a contra entry."
+  ],
+  "updated_files": ["/app/frontend/src/pages/PartyLedger.jsx", "/app/backend/tests/qa30_setup.py"],
+  "success_rate": {"backend": "skipped (frontend only)", "frontend": "100%"},
+  "seed_data_creation": "Created rokad 300/700, journal 'QA del jrnl', settlement J00003 and bill S00001 for SETTLE TEST PARTY. All were deleted through the UI. Final state: no entries, 1000 Dr. SETTLE TEST PARTY and ACCOUNT CLEAR kept.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Helper: REACT_APP_BACKEND_URL=... python3 /app/backend/tests/qa30_setup.py setup|state|cleanup|bill (ids in /tmp/qa30.json). Ledger URL: /parties/640f05fe-107a-4c69-8752-eef837c70f77?as_on=2026-06-30&from= . DOS rows were not tested: this party has no DOS data (by code, editHref is null for the dos kind, so no buttons)."
+}

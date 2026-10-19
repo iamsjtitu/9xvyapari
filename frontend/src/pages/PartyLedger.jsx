@@ -280,7 +280,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                           data-testid={`ledger-edit-${r.kind}-${r.refId || r.ref || r.id}`}>
                           <PencilSimple size={14} />
                         </Link>
-                        <button type="button" className="btn-ghost p-1.5 inline-flex text-[#B71C1C]" onClick={() => deleteRow(r)}
+                        <button type="button" className="btn-ghost p-1.5 inline-flex !text-[#B71C1C]" onClick={() => deleteRow(r)}
                           title={r.settles_rokad_id ? "Settlement hatao (Reopen)" : "Voucher delete karein"}
                           data-testid={`ledger-del-${r.kind}-${r.refId || r.ref || r.id}`}>
                           <Trash size={14} />
@@ -290,7 +290,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                   </td>
                 </tr>
                 {r.settles_rokad_id && (
-                  <SettledMarkerRow colSpan={6} date={(r.date || "").slice(0, 10)} rokadId={r.settles_rokad_id}
+                  <SettledMarkerRow colSpan={6} date={(r.date || "").slice(0, 10)} rokadId={r.settles_rokad_id} balance={r.balance}
                     onReopen={async () => { if (await reopenSettled(r.settles_rokad_id, party.name)) setAttempt((a) => a + 1); }} />
                 )}
                 </Fragment>

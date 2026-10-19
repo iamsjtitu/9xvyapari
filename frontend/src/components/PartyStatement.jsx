@@ -48,8 +48,8 @@ export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFr
           {r.settles_rokad_id && (
             <div className="dos-stmt-row dos-settled" data-testid="stmt-settled-row">
               <span className="dt"></span>
-              <span className="pt">*** ACCOUNT CLEARED UPTO {fmtDate((r.date || "").slice(0, 10))} — LEDGER 0 ***</span>
-              <span className="rf"></span><span className="am"></span><span className="am"></span><span className="bl">0.00</span>
+              <span className="pt">*** ACCOUNT CLEARED UPTO {fmtDate((r.date || "").slice(0, 10))} — {Math.abs(r.balance) < 0.005 ? "LEDGER 0" : `SETTLEMENT PURANA · BAKI ${drcr(r.balance)}`} ***</span>
+              <span className="rf"></span><span className="am"></span><span className="am"></span><span className="bl">{drcr(r.balance)}</span>
             </div>
           )}
         </div>

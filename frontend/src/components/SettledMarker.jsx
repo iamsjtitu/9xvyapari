@@ -1,6 +1,6 @@
 import api, { inr, formatApiErrorDetail } from "@/lib/api";
 import { toast } from "sonner";
-import { CheckCircle, ArrowCounterClockwise } from "@phosphor-icons/react";
+import { CheckCircle, ArrowCounterClockwise, Warning } from "@phosphor-icons/react";
 
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
 
@@ -26,12 +26,16 @@ export const SettledBadge = ({ date, className = "" }) => (
 );
 
 // Green full-width marker row rendered right after a settlement journal line in the ledger table
-export const SettledMarkerRow = ({ colSpan, date, rokadId, onReopen }) => (
-  <tr className="bg-jama-bg" data-testid={`ledger-settled-marker-${rokadId}`}>
+// `balance` = running balance right after the settlement line; non-zero means an earlier voucher changed later → stale
+export const SettledMarkerRow = ({ colSpan, date, rokadId, onReopen, balance = 0 }) => {
+  const stale = Math.abs(balance) >= 0.005;
+  return (
+  <tr className={stale ? "bg-[#FFF3E0]" : "bg-jama-bg"} data-testid={`ledger-settled-marker-${rokadId}`} data-stale={stale ? "1" : "0"}>
     <td colSpan={colSpan} className="!py-1.5">
       <div className="flex items-center justify-between gap-3">
-        <span className="flex items-center gap-1.5 text-jama font-heading font-semibold text-xs uppercase tracking-wider">
-          <CheckCircle size={14} weight="fill" /> Account cleared upto {fmtDate(date)} · ledger 0
+        <span className={`flex items-center gap-1.5 font-heading font-semibold text-xs uppercase tracking-wider ${stale ? "text-[#B45309]" : "text-jama"}`}>
+          {stale ? <Warning size={14} weight="fill" /> : <CheckCircle size={14} weight="fill" />}
+          Account cleared upto {fmtDate(date)} · {stale ? `settlement purana — baki ₹ ${inr(Math.abs(balance))} ${balance > 0 ? "Dr" : "Cr"} (Rokad entry edit karein ya Reopen)` : "ledger 0"}
         </span>
         {onReopen && (
           <button type="button" className="btn-ghost !h-6 text-[11px] text-jama print:hidden flex items-center gap-1" onClick={onReopen}
@@ -42,4 +46,5 @@ export const SettledMarkerRow = ({ colSpan, date, rokadId, onReopen }) => (
       </div>
     </td>
   </tr>
-);
+  );
+};
