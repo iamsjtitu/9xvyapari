@@ -1,0 +1,17 @@
+{
+  "summary": "RETEST of /opening-balance race fix + new 'Opening / other postings' breakdown row (frontend only). RACE: 7 scenarios all PASS — default load then immediate as-on=2026-06-30; FY Start click then quick type 06-30; 4 rapid-flip sequences across 2026-06-30/2026-10-19/2026-06-19 (250ms apart, during the slow initial ~349-ledger load). In every case the sheet's visible 'AS ON dd-mm-yyyy' header matched the final input and URL. Breakdown follows the as-on date: at 2026-06-21 with the QA settled rokad (06-20, jama 940 → settlement 60) the head showed 60.00 and the breakdown showed only 'SETTLE TEST PARTY · cleared upto 20-06-2026 60.00'. After flipping 06-19→06-21 with the breakdown expanded, it still matched (60.00). ADDITION: with ACCOUNT CLEAR opening_balance=25, as-on 06-21 showed head 85.00, then sub-rows SETTLE TEST PARTY 60.00 and a last row 'Opening / other postings' 25.00 DR (data-testid ob-clear-sub-other), so the sub-rows add up to the head. As-on 06-19 showed head 25.00 with only the 'Opening / other postings' 25.00 row. With opening 0 (first run), the other row was absent (count 0). Cleanup done: opening_balance put back to 0 (PUT 200) and the QA rokad deleted (200). The SETTLE TEST PARTY and ACCOUNT CLEAR ledgers were kept.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/ob_v25_fixture.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Both effects use an 'alive' cleanup flag, so stale responses are dropped. The breakdown effect depends on [data], so it always uses data.as_on and stays consistent with the header.",
+    "When the head balance is 0, the ACCOUNT CLEAR row is not listed at all, so the toggle is not available. This is expected behaviour."
+  ],
+  "updated_files": ["/app/backend/tests/ob_v25_fixture.py"],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "Temporary only: rokad 2026-06-20 jama 940 settle for SETTLE TEST PARTY + ACCOUNT CLEAR opening 25. Both reverted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Fixture helper: REACT_APP_BACKEND_URL=... python /app/backend/tests/ob_v25_fixture.py setup|cleanup|open <amt>|show <dates...>. The visible header is the 3rd div inside [data-testid=opening-balance-sheet] .text-center. FoxProPrintHeader is print-only."
+}

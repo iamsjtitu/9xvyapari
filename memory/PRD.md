@@ -167,6 +167,10 @@ User chahta hai ek desktop-grade Hisab Kitab software (Electron-based) for Galla
 - Party/account ledger rows: no more "V.1/V.2" rokad voucher badges (only Bill no. / Journal no. badges remain). DOS statement keeps its Vch/Ref column.
 - Verified: iteration 22 + 23 (frontend).
 
+### Jun 2026 – Opening Balance Sheet: ACCOUNT CLEAR "+" party-wise breakdown
+- `/reports/opening-balances` rows now carry `id`; response has `settle_account_id`. Page fetches `/reports/account-clear?date_to=as_on`, aggregates per party (net off−back, cleared-upto date) + an "Opening / other postings" row when head ≠ sum. `OpeningBalanceSheet` renders a `+`/`−` toggle (`ob-clear-toggle`, print:hidden) on the Account Clear row; sub-rows (`ob-clear-sub-<party>`) show on screen, in print and in Excel ONLY when expanded; group/grand totals untouched (head only). Fetch effects guarded against stale responses.
+- Verified: iteration 24 + 25.
+
 ## Verification (Jun 2026)
 - Packaged PyInstaller backend tested on Linux: SPA serving, API, login, graceful mongo shutdown ✅
 - Full Electron packaged run under Xvfb (Linux build): chooser → services → login → dashboard (version badge "Desktop v1.0.0") → logout → backup file in `<root>/backups` ✅; SIGKILL Electron → watchdog stops backend+mongod ✅
