@@ -104,7 +104,7 @@ export default function StaffSalary() {
   }];
   return (
     <div className="space-y-4" data-testid="page-staff-salary">
-      <style>{`@media print { @page { size: A4 landscape; margin: 8mm; } }`}</style>
+      {!slip && <style>{`@media print { @page { size: A4 landscape; margin: 8mm; } }`}</style>}
       <StaffPageHeader title="Staff Salary Payments" icon={Money} subtitle="Attendance se salary: paid din = P + H/2 + C · Monthly = salary ÷ 30 × din · bacha advance apne aap katta hai (kam kar sakte ho).">
         <MonthPicker value={month} onChange={setMonth} testId="sal-month" />
         <ExportBar filename={`staff-salary-${month}`} title={`Staff Salary Sheet · ${monthLabel(month)}`} sheets={excelSheets} />

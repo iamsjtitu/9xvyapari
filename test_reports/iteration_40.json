@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 40: tested Multi Account Clear ledgers, Staff ExportBar (Print/PDF/Excel) and Esc-closes-dialogs, end to end (backend + UI). Backend: test_multi_clear_v40.py ran 2x with ALL OK. Frontend checks that passed: Settings link / default banao / unlink / relink chips + multi hint, and the chips persist after Save Settings + reload. Rokad: settle-ledger-select shows up only when Account Settled is ticked, default is pre-selected and labelled '(default)', settle-info-ledger updates, toast names the chosen ledger, party balance is 0 with the cleared-upto marker, badge title shows '-> ledger'. Editing pre-selects the saved ledger; switching it moved the journal to the other ledger (confirmed in the register + API). Account Clear Register: 'Sab ledgers (2)' + each ledger; Ledger column in both the table and the DOS sheet; per-ledger filter hides the column and totals match (1000 = 700 + 300); Excel downloads. TB/OB: a separate +/- toggle on each linked head, sub rows only under the clicked head, group totals unchanged. Staff Attendance/Salary: btn-print/btn-pdf/btn-excel are present and old buttons are gone. window.print stub was called. Excel columns are as specified (attendance: 31 day columns + P/H/A/C/Din; salary: Staff..V.No.). Esc closed modal-pay-salary (also with focus in pay-deduct; no payment made), the salary slip, modal-staff (also from an input), transfer-modal and ledger-in-use-dialog, and the route did not change in any case. Esc with no modal open still does DOS back-navigation. No JS page errors. Only finding: an old print-orientation issue on the salary slip (see minor).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "tests/test_multi_clear_v40.py", "issue": "Leftover parties 'AC CLEAR ONE/TWO 1322F' and 'QA MULTI 1322F' (1000 Dr) were in the preview DB from an earlier E1 run of this test, probably an aborted run before cleanup. I deleted them. My 2 runs cleaned up correctly (all DELETE 200). Optional: move cleanup into try/finally."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SalarySlip on /staff/salary", "issue": "The slip prints/PDFs as A4 LANDSCAPE, not portrait. triggerPrint() injects '@page{size:A4 portrait}' into <head>. But StaffSalary.jsx line 107 renders an inline <style>@media print{@page{size:A4 landscape}}</style> inside the body. That rule comes later in document order, so it wins. Verified with page.pdf(prefer_css_page_size=True) while the slip was open: MediaBox 842x595 (landscape). Electron printing.js uses preferCSSPageSize:true, so the desktop PDF preview is affected too. This existed before this iteration (the inline style is in earlier commits); it is not a regression. Fix: drop the inline @page from StaffSalary.jsx (triggerPrint already picks landscape for /staff/), or disable it while body.print-slip is set. The same inline pattern is in StaffAttendance, AccountClearReport, Outstanding, OpeningBalance, StaffReport.", "selector": "[data-testid=salary-slip-print]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Settings / Rokad / Account Clear / Staff month pickers", "issues": ["These screens use the browser's native date/month inputs, not a styled calendar. This was already the case and matches the DOS style; mentioned only for awareness."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_multi_clear_v40.py", "/app/tests/qa40_setup.py", "/app/tests/qa40_check.py", "/app/tests/qa40_staff.py", "/app/tests/qa40_cleanup.py", "/app/tests/qa40_cleanup2.py"],
+  "action_items": [
+    "(Low) Remove or neutralise the inline '@media print { @page { size: A4 landscape } }' <style> in StaffSalary.jsx so the Salary Slip prints portrait. Check the same thing for the VoucherSlip on /rokad and any other print-slip overlay on pages with an inline @page style.",
+    "(Low) Make test_multi_clear_v40.py clean up in try/finally so a failed run doesn't leave AC CLEAR*/QA MULTI* parties in the shared DB."
+  ],
+  "critical_code_review_comments": [
+    "useEscClose (capture phase + stopImmediatePropagation) works correctly with useEscapeBack (bubble + setTimeout + overlayOpen check). Verified: no route change when a modal is open.",
+    "SettleToggle reads /settings once on mount. If ledgers are unlinked in another tab while the form is open, the stale id is caught by the backend 400. Acceptable.",
+    "SettleToggle falls back to the default ledger when a saved settle_account_id is no longer linked. That edit silently moves the settlement to the default ledger with no warning shown; consider a small hint."
+  ],
+  "updated_files": ["/app/tests/qa40_setup.py", "/app/tests/qa40_check.py", "/app/tests/qa40_staff.py", "/app/tests/qa40_cleanup.py", "/app/tests/qa40_cleanup2.py"],
+  "success_rate": {"backend": "100%", "frontend": "100% of requested flows (1 low-priority print-orientation issue that already existed)"},
+  "test_credentials": "admin / Vyapari@2026 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Temporary data, all deleted at the end: ledger 'QA CLEAR TWO' (linked as the 2nd Account Clear ledger, then unlinked), parties 'QA SETTLE PARTY40' (OB 1000) and 'QA SETTLE PARTY40B' (OB 500), 2 rokad settle entries on 2026-10-19, staff QA STAFF40A/B with 10 days P in Oct 2026 plus one salary payment, and their staff ledgers. Final state: settings settle_accounts = [ACCOUNT CLEAR] (default). Note: the preview DB had NO staff (MANTU DRIVER did not exist), so I created test staff.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 40 covered multi Account Clear ledgers (Settings picker, Rokad settle-ledger-select create + edit switch, Account Clear Register ledger filter/column/sheet, TB/OB per-head +/- breakdown), the Staff ExportBar (print stub + xlsx contents) and Esc on modal-pay-salary/modal-staff/transfer-modal/ledger-in-use-dialog/salary-slip. All passed. Open item: Salary Slip prints landscape because of the inline @page style on StaffSalary. Working date in preview is 2026-10-19 and month pickers accept a typed 'YYYY-MM' value (sal-month-input / att-month-input). The playwright env has no openpyxl: save downloads to /tmp and parse them with local python."
+}
