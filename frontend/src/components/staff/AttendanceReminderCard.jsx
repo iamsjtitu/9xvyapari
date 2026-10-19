@@ -8,9 +8,10 @@ import { CalendarCheck, CheckCircle, ArrowRight } from "@phosphor-icons/react";
 export const AttendanceReminderCard = () => {
   const [info, setInfo] = useState(null);
   const [busy, setBusy] = useState(false);
-  const load = () => api.get("/staff/attendance/today").then((r) => setInfo(r.data)).catch(() => setInfo(null));
+  const load = () => api.get("/staff/attendance/today").then((r) => setInfo(r.data)).catch(() => setInfo({ total: 0 }));
   useEffect(() => { load(); }, []);
-  if (!info || info.total === 0) return null;
+  if (info === null) return <div className="card-flat p-4 h-[88px] animate-pulse" data-testid="attendance-reminder-loading" />;  // keeps layout stable
+  if (info.total === 0) return null;
 
   const pending = info.unmarked.length;
   const markAll = async () => {

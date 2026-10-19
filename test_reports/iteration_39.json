@@ -1,0 +1,34 @@
+{
+  "summary": "Tested the 3 Staff additions (Salary Slip, Attendance Reminder card, Monthly Staff Report) through the backend (pytest tests/test_staff_v39.py, 3 of 4 pass) and the UI (Playwright on the preview URL). Slip, auto-open after Pay, reminder card and report UI/Excel/Alt+Q all work. One backend business-logic bug: in /api/staff/report, cash_out counts the net of CREDITED (not paid) salaries as cash gone out. Row B shows 5000 instead of 0, and totals.cash_out shows 11600 instead of 6600. The UI rep-cash-out card, the row cell and the Excel 'Total cash out' column all show the wrong value because of this.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/staff/report", "issue": "cash_out = net + advance_amount is computed for every row, including status 'credited' (paid_now false, no Rokad entry). Expected credited row cash_out = advance_amount only (B: 0, got 5000). totals.cash_out = tot.net + tot.advance also includes credited net (got 11600, expected 6600). Fix in staff.py staff_report: row['cash_out'] = round((row['net'] if rec.get('paid_now') else 0) + row['advance_amount'], 2), and totals.cash_out = sum of row cash_out (or paid_net + advance).", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Monthly Staff Report cash out", "issue": "The values shown come straight from the backend, so the 'Total cash out' card, the row cell and the Excel column are wrong for credited staff. Fixing the backend fixes all three.", "affected_selectors": ["rep-cash-out", "rep-cashout-<id>", "rep-total-row"]}
+    ],
+    "design_issues": [
+      {"screen": "Dashboard", "issues": ["The attendance-reminder card loads after the rest of the page (about 1-3s after SPA navigation), which causes a small layout shift. A placeholder would avoid this. Minor."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_staff_v39.py", "/app/test_reports/pytest/pytest_v39.xml"],
+  "action_items": [
+    "Fix staff_report cash_out so CREDITED (paid_now=false) salary net is excluded at row level and in totals. Then re-run pytest /app/backend/tests/test_staff_v39.py; test_pay_and_report should pass."
+  ],
+  "critical_code_review_comments": [
+    "staff.py staff_report: cash_out treats credited salary as cash out (see bug above). The PDF/print subtitle 'Cash out = net salary + advances' should also say 'net salary paid'.",
+    "SalarySlip useEffect depends on onClose. StaffSalary passes an inline arrow function, so the effect re-runs on every parent re-render (removes and re-adds body.print-slip and the key listener). It works, but wrapping onClose in useCallback would be cleaner.",
+    "StaffSalary PayDialog onPaid: the slip also auto-opens for a credited (pay_now false) record. It shows 'NET PAYABLE / Credited' correctly, so this is acceptable."
+  ],
+  "updated_files": ["/app/backend/tests/test_staff_v39.py"],
+  "success_rate": {"backend": "75% (3/4 tests; the 1 failure is the cash_out bug)", "frontend": "~95% (all requested UI flows pass; only the cash-out value is wrong, inherited from the backend)"},
+  "seed_data_creation": "Created QA SLIP A / QA SLIP B, attendance, advance and a direct Rokad payment of 200. All were fully cleaned up (salary records, rokad, attendance incl. 2026-10-19, staff, ledgers). The staff list is empty now. SETTLE TEST PARTY, ACCOUNT CLEAR and STAFF SALARY were kept.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run STAFF39_KEEP=1 pytest tests/test_staff_v39.py to keep the state (A paid, B credited); the ids are written to /tmp/staff39.json. Without the env var the test cleans up by itself. Verified in the UI: slip content and title 'SALARY SLIP — JUN 2026', attendance line, Gross 6,600 / Advance Cut 1,200 / NET PAID 5,400, Rupees in words, Paid By CASH IN HAND + V.No.; ESC, X and backdrop click close the slip; drag-select from inside to outside keeps it open; body.print-slip toggles on open and close. Pay dialog for B auto-opens the slip after the toast. Dashboard card: pending 2 -> mark-all toast '2 staff aaj Present mark ho gaye' -> done 'Sab 2 staff ki attendance ho gayi', button gone; an A+P mix still shows done; right-click clear returns it to pending; with zero staff the card is absent. Report: Alt+Q and nav-staff-report work; PAID is green and CREDITED is outlined; pending gross shows in grey parentheses; Excel sheet 'Staff Report' has the required columns; print-header is hidden on screen. Only rep-cash-out is wrong (11,600 instead of 6,600).",
+  "rca of the issue": "staff.py, staff_report: row['cash_out'] = round(row['net'] + row['advance_amount'], 2) uses rec.net whether or not rec.paid_now. A credited salary has no Rokad payment, so no cash went out; its net is a salary_due liability. The totals use tot['net'] (which includes credited) + tot['advance']. Reproduce: credit B (pay_now false), then GET /api/staff/report?month=2026-06 gives B cash_out 5000 and totals.cash_out 11600."
+}

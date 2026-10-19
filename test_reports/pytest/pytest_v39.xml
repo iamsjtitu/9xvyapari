@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="4" time="7.209" timestamp="2026-10-19T11:24:22.753461+00:00" hostname="agent-env-625b8215-bc03-4e12-88b4-9eed2c3dad5c"><testcase classname="tests.test_staff_v39" name="test_attendance_today" time="3.176" /><testcase classname="tests.test_staff_v39" name="test_report_before_pay" time="0.082" /><testcase classname="tests.test_staff_v39" name="test_report_invalid_month" time="0.125" /><testcase classname="tests.test_staff_v39" name="test_pay_and_report" time="3.764"><failure message="AssertionError: assert (5000.0, 5000...000.0, 5000.0) == (5000, 5000, ...ted', 5000, 0)&#10;  &#10;  At index 4 diff: 5000.0 != 0&#10;  &#10;  Full diff:&#10;    (&#10;  -     5000,&#10;  +     5000.0,...&#10;  &#10;  ...Full output truncated (11 lines hidden), use '-vv' to show">E   AssertionError: assert (5000.0, 5000...000.0, 5000.0) == (5000, 5000, ...ted', 5000, 0)
+      
+      At index 4 diff: 5000.0 != 0
+      
+      Full diff:
+        (
+      -     5000,
+      +     5000.0,...
+      
+      ...Full output truncated (11 lines hidden), use '-vv' to show</failure></testcase></testsuite></testsuites>

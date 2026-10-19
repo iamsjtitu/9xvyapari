@@ -256,13 +256,15 @@ def make_staff_router(db, get_current_user, now_iso, compute_party_balance, next
                    "advance_count": a["count"], "advance_amount": round(a["amount"], 2),
                    "advance_due": x["advance_due"], "salary_due": x["salary_due"]}
             row["cost"] = round(row["gross"], 2)                      # salary expense booked for the month
-            row["cash_out"] = round(row["net"] + row["advance_amount"], 2)   # actual paisa gone out (salary net + advances)
+            paid_cash = row["net"] if rec.get("paid_now") else 0.0       # credited-only salary hasn't left the galla yet
+            row["cash_out"] = round(paid_cash + row["advance_amount"], 2)   # actual paisa gone out (salary net paid + advances)
             for k in ("gross", "deduct", "net", "paid_days", "advance_due", "salary_due"):
                 tot[k] += row[k]
             tot["advance"] += row["advance_amount"]
+            tot["cash_out"] = tot.get("cash_out", 0.0) + row["cash_out"]
             rows.append(row)
         tot = {k: round(v, 2) for k, v in tot.items()}
-        tot["cost"] = tot["gross"]; tot["cash_out"] = round(tot["net"] + tot["advance"], 2)
+        tot["cost"] = tot["gross"]; tot.setdefault("cash_out", 0.0)
         return {"month": month, "label": data["label"], "days": data["days"], "rows": rows, "totals": tot,
                 "firm_name": (await db.settings.find_one({"id": "default"}, {"_id": 0, "firm_name": 1}) or {}).get("firm_name", "")}
 
