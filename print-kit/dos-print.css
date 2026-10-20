@@ -1,0 +1,284 @@
+/* ============ FoxPro-style PRINT ============ */
+.foxpro-rule {
+  border-top: 1px dashed #000;
+  margin: 4px 0;
+}
+
+@media print {
+  /* ---- Page setup ---- */
+  @page { size: A4; margin: 10mm 8mm; }
+  html, body { margin: 0 !important; padding: 0 !important; }
+  body, html, .paper-bg, #root { background: white !important; }
+
+  /* Force colors to print as designed */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  /* Hide UI chrome */
+  aside, .print\:hidden { display: none !important; }
+  main { overflow: visible !important; width: 100% !important; }
+  main > div { padding: 0 !important; max-width: 100% !important; margin: 0 !important; }
+
+  /* Body monospace for FoxPro look */
+  body {
+    font-family: "IBM Plex Mono", "Courier New", monospace !important;
+    font-size: 9pt !important;
+    color: #000 !important;
+    line-height: 1.25 !important;
+  }
+  h1, h2, h3, .font-heading {
+    font-family: "IBM Plex Mono", "Courier New", monospace !important;
+    font-weight: 700 !important;
+  }
+
+  /* Print FoxPro header */
+  .foxpro-print-header {
+    margin-bottom: 6px !important;
+  }
+
+  /* Tables — FoxPro dense monochrome, tight fit */
+  table.dense {
+    width: 100% !important;
+    table-layout: auto !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto;
+  }
+  table.dense thead th {
+    background: white !important;
+    border-bottom: 1px solid #000 !important;
+    border-top: 1px solid #000 !important;
+    color: #000 !important;
+    font-family: "IBM Plex Mono", monospace !important;
+    font-weight: 700 !important;
+    font-size: 7.5pt !important;
+    text-transform: uppercase;
+    padding: 2px 4px !important;
+    text-align: left;
+    word-wrap: break-word;
+  }
+  table.dense tbody td {
+    padding: 1.5px 4px !important;
+    font-size: 8pt !important;
+    border-bottom: 1px dotted #888 !important;
+    color: #000 !important;
+    word-wrap: break-word;
+    max-width: 0;          /* allow flexible width */
+    overflow-wrap: break-word;
+    background: white !important;
+  }
+  table.dense tfoot td {
+    border-top: 1px solid #000 !important;
+    border-bottom: 2px solid #000 !important;
+    font-weight: 700 !important;
+    background: white !important;
+    padding: 2px 4px !important;
+    font-size: 8.5pt !important;
+  }
+  table.dense tbody tr:nth-child(even),
+  table.dense tbody tr:hover { background: white !important; }
+
+  /* Right-align numbers */
+  table.dense td.num, table.dense th.num { text-align: right !important; }
+
+  /* Cards flat */
+  .card-flat {
+    background: white !important;
+    border: 1px solid #000 !important;
+    box-shadow: none !important;
+    margin-bottom: 4px !important;
+    padding: 4px 6px !important;
+    border-radius: 0 !important;
+  }
+
+  /* Tighten spacing */
+  .space-y-5 > * + * { margin-top: 4px !important; }
+  .p-5, .p-6 { padding: 4px 6px !important; }
+  .px-5, .px-6 { padding-left: 6px !important; padding-right: 6px !important; }
+  .py-3 { padding-top: 4px !important; padding-bottom: 4px !important; }
+
+  /* Section title bold black */
+  .section-title { color: #000 !important; font-weight: 700 !important; font-size: 7.5pt !important; }
+
+  /* Amount colors -> keep red/green for visibility */
+  .amount-jama { color: #0a4d10 !important; }
+  .amount-kharch { color: #8b0000 !important; }
+
+  /* Inputs / buttons hidden */
+  input, select, button, label.lbl { display: none !important; }
+
+  /* Allow hidden display for our print-only header */
+  .foxpro-print-header.hidden.print\:block,
+  .print-only { display: block !important; }
+
+  /* Hide modal overlays in print */
+  .fixed { display: none !important; }
+
+  /* Page break helpers */
+  .page-break { page-break-after: always; }
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; page-break-after: auto; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+
+  /* ---- CASH BOOK 2-column DOS layout ---- */
+  .cash-book-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+  }
+  /* Force tight table for cash book on print */
+  .cash-book-grid table.dense thead th,
+  .cash-book-grid table.dense tbody td {
+    font-size: 7pt !important;
+    padding: 1px 3px !important;
+  }
+
+  /* Bank summary card — flex layout for print */
+  [data-testid="bank-summary"] {
+    padding: 4px 8px !important;
+  }
+  [data-testid="bank-summary"] .font-mono-data {
+    font-size: 9pt !important;
+  }
+
+  /* Wide reports landscape via JS-driven body class */
+  body.print-landscape, body.print-landscape * {
+    /* placeholder — actual @page set below */
+  }
+}
+
+/* Landscape page size applied via body class */
+@media print {
+  body.print-landscape {
+    /* fallback */
+  }
+}
+
+/* Use a separate sheet that targets landscape pages */
+@media print and (orientation: landscape) {
+  /* Will apply if user manually picks landscape in print dialog */
+}
+
+/* ---- DOS-style Opening Balance Sheet ---- */
+.dos-sheet { font-family: "IBM Plex Mono", "Courier New", monospace; font-size: 12px; color: #000; }
+.dos-sheet .dos-cols { column-count: 1; column-gap: 28px; column-rule: 1px dashed #777; }
+@media (min-width: 1280px) { .dos-sheet .dos-cols { column-count: 2; } }
+.dos-line { display: flex; gap: 6px; padding: 1px 0; break-inside: avoid; border-bottom: 1px dotted #c9c3b5; }
+.dos-line .c { width: 44px; flex: none; color: #555; }
+.dos-line .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
+.dos-line .d, .dos-line .k { width: 112px; flex: none; text-align: right; font-variant-numeric: tabular-nums; }
+.dos-line.dos-sub { border-bottom-style: dashed; color: #333; font-size: 0.92em; background: #faf8f2; }
+.dos-line.dos-sub .n { padding-left: 14px; text-transform: none; font-style: italic; }
+.dos-line.dos-sub .d, .dos-line.dos-sub .k { color: #333; }
+.dos-head { font-weight: 700; border-bottom: 1px solid #000; text-transform: uppercase; }
+.dos-group { font-weight: 700; border-bottom: 1px solid #000; margin-top: 10px; padding-top: 2px; break-after: avoid; }
+.dos-total { font-weight: 700; border-top: 1px solid #000; border-bottom: 3px double #000; }
+.dos-grand { font-family: "IBM Plex Mono", "Courier New", monospace; border: 1px solid #000; padding: 6px 10px; margin-top: 14px; break-inside: avoid; }
+.dos-sign { display: flex; justify-content: space-between; margin-top: 36px; font-family: "IBM Plex Mono", monospace; font-size: 11px; break-inside: avoid; }
+.dos-sign div { border-top: 1px solid #000; padding-top: 4px; width: 28%; text-align: center; text-transform: uppercase; }
+/* ---- DOS-style Outstanding (collection) list ---- */
+.os-row .c { width: 44px; flex: none; color: #555; }
+.os-row .n { flex: 1.6; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
+.os-row .pl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; color: #333; }
+.os-row .ph { width: 100px; flex: none; }
+.os-row .lt { width: 82px; flex: none; color: #555; }
+.os-row .dy { width: 40px; flex: none; text-align: right; color: #555; }
+.os-row .am { width: 118px; flex: none; text-align: right; }
+.os-row .tk { width: 120px; flex: none; border-left: 1px dotted #999; }
+.os-group { break-inside: auto; }
+@media print {
+  .os-row .ph { width: 70pt; }
+  .os-row .lt { width: 58pt; }
+  .os-row .dy { width: 28pt; }
+  .os-row .am { width: 78pt; }
+  .os-row .tk { width: 90pt; }
+  #os-printable { box-shadow: none !important; border: none !important; padding: 0 !important; }
+  .os-row.dos-head { position: static; }
+}
+
+/* ---- DOS-style Day Book (T-shaped cash book) ---- */
+.db-t { display: flex; gap: 14px; }
+.db-side { flex: 1; min-width: 0; }
+.db-side + .db-side { border-left: 1px dashed #777; padding-left: 14px; }
+.db-row .dt { width: 72px; }
+.db-row .rf { width: 56px; }
+.db-row .iv { width: 64px; }
+.db-row .am { width: 112px; }
+.db-bold { font-weight: 700; background: #f6f2e8; }
+.db-daytotal { border-top: 1px solid #000; }
+.db-closing { border-top: 1px solid #000; }
+.db-account { margin-top: 10px; break-inside: avoid; }
+@media print { .db-account.db-pagebreak { break-after: page; } .db-account.db-pagebreak:last-of-type { break-after: auto; } }
+.db-t.dos-total { margin-top: 2px; }
+@media print {
+  .db-row .dt { width: 50pt; }
+  .db-row .rf { width: 40pt; }
+  .db-row .iv { width: 46pt; }
+  .db-row .am { width: 70pt; }
+  .db-bold { background: #eee !important; }
+  #daybook-printable { box-shadow: none !important; border: none !important; padding: 0 !important; }
+}
+
+/* ---- DOS-style Party Ledger Statement ---- */
+.dos-stmt-row { display: flex; gap: 8px; padding: 2px 0; border-bottom: 1px dotted #c9c3b5; break-inside: avoid; font-variant-numeric: tabular-nums; }
+.dos-stmt-row .dt { width: 78px; flex: none; }
+.dos-stmt-row .pt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
+.dos-stmt-row .rf { width: 70px; flex: none; color: #555; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dos-stmt-row .iv { width: 84px; flex: none; color: #1B5E20; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
+.dos-stmt-row .am { width: 118px; flex: none; text-align: right; }
+.dos-stmt-row .bl { width: 140px; flex: none; text-align: right; font-weight: 600; }
+.dos-stmt .dos-open { background: #f6f2e8; font-weight: 600; }
+.dos-stmt .dos-close { font-weight: 700; border-bottom: 3px double #000; }
+.dos-stmt .dos-settled { background: #E8F5E9; color: #1B5E20; font-weight: 700; border-bottom: 1px solid #1B5E20; }
+.dos-stmt .dos-settled .pt { letter-spacing: 0.04em; }
+.dos-settled-tag { display: inline-block; border: 2px solid #1B5E20; color: #1B5E20; font-weight: 700; padding: 1px 8px; letter-spacing: 0.06em; }
+@media print { .dos-stmt .dos-settled { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+@media print {
+  .dos-stmt-row { font-size: 8pt; border-bottom-color: #999; }
+  .dos-stmt-row .dt { width: 58pt; }
+  .dos-stmt-row .rf { width: 48pt; }
+  .dos-stmt-row .iv { width: 58pt; color: #000; }
+  .dos-stmt-row .am { width: 80pt; }
+  .dos-stmt-row .bl { width: 96pt; }
+  #ledger-printable { box-shadow: none !important; border: none !important; padding: 0 !important; }
+  .dos-stmt .dos-open { background: #eee !important; }
+}
+
+@media print {
+  [data-sonner-toaster] { display: none !important; }
+  .dos-sheet { font-size: 7.5pt; }
+  .dos-sheet .dos-cols { column-count: 2; column-gap: 20pt; }
+  .dos-line { border-bottom-color: #999; }
+  .dos-line .d, .dos-line .k { width: 68pt; }
+  .dos-line .c { width: 30pt; }
+  .dos-grand { font-size: 8.5pt; }
+  .dos-sign { font-size: 8pt; margin-top: 24pt; }
+  #ob-printable { box-shadow: none !important; border: none !important; padding: 0 !important; }
+}
+
+/* ---- DOS-style Voucher Slip (receipt / payment) ---- */
+.vs-sheet { font-family: "IBM Plex Mono", "Courier New", monospace; font-size: 12px; color: #000; padding: 18px 22px 14px; border: 1px solid #000; margin: 14px; background: #fff; }
+.vs-center { text-align: center; }
+.vs-firm { font-weight: 700; font-size: 15px; letter-spacing: .08em; }
+.vs-sub { font-size: 10.5px; color: #333; }
+.vs-hr { border-top: 1px dashed #000; height: 0; margin: 6px 0; }
+.vs-hr-dbl { border-top: 3px double #000; }
+.vs-row { display: flex; gap: 8px; padding: 2px 0; }
+.vs-row .vs-k { width: 118px; flex: none; }
+.vs-row .vs-k::after { content: " :"; }
+.vs-row .vs-k2 { width: 70px; text-align: right; }
+.vs-row .vs-v { flex: 1; min-width: 0; text-transform: uppercase; }
+.vs-row .vs-v2 { width: 130px; flex: none; text-transform: uppercase; }
+.vs-title { font-size: 13px; }
+.vs-amount-box { display: flex; justify-content: space-between; border: 2px solid #000; padding: 6px 12px; font-weight: 700; font-size: 14px; margin: 8px 0 26px; }
+.vs-sign { display: flex; justify-content: space-between; margin-top: 22px; padding-top: 4px; }
+.vs-sign span { width: 30%; border-top: 1px solid #000; text-align: center; padding-top: 3px; font-size: 10.5px; }
+.vs-foot { margin-top: 10px; font-size: 9px; color: #555; text-align: right; }
+@media print {
+  body.print-slip #root { display: none !important; }
+  body.print-slip .slip-overlay { display: block !important; position: static !important; background: none !important; padding: 0 !important; }
+  body.print-slip .slip-overlay > div { box-shadow: none !important; max-width: 520pt !important; margin: 0; }
+  .vs-sheet { margin: 0; border: 1px solid #000; font-size: 10pt; }
+  .vs-firm { font-size: 13pt; }
+  .vs-row .vs-k { width: 90pt; }
+  .vs-row .vs-v2 { width: 100pt; }
+}
