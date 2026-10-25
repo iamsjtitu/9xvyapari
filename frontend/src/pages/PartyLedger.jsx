@@ -248,7 +248,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
               <td className="font-semibold uppercase text-xs tracking-wider">Opening Balance{dateFrom ? " (B/F)" : ""}</td>
               <td className="num">—</td><td className="num">—</td>
               <td className="num font-medium whitespace-nowrap" style={{ color: opening >= 0 ? "#1A1A1A" : "#1B5E20" }}>
-                ₹ {inr(Math.abs(opening))} {opening < 0 && <span className="text-[10px] ml-1 text-jama">CR</span>}
+                ₹ {inr(Math.abs(opening))} <span className={`text-[10px] ml-1 ${opening < 0 ? "text-kharch" : "text-muted2"}`}>{drcr(opening)}</span>
               </td>
               <td className="print:hidden"></td>
             </tr>
@@ -281,7 +281,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                   <td className="num amount-kharch whitespace-nowrap" data-testid={`ledger-debit-${r.id}`}>{r.debit ? `₹ ${inr(r.debit)}` : "—"}</td>
                   <td className="num amount-jama whitespace-nowrap" data-testid={`ledger-credit-${r.id}`}>{r.credit ? `₹ ${inr(r.credit)}` : "—"}</td>
                   <td className="num font-medium whitespace-nowrap" style={{ color: r.balance >= 0 ? "#1A1A1A" : "#1B5E20" }}>
-                    ₹ {inr(Math.abs(r.balance))} {r.balance < 0 && <span className="text-[10px] ml-1 text-jama">CR</span>}
+                    ₹ {inr(Math.abs(r.balance))} <span className={`text-[10px] ml-1 ${r.balance < 0 ? "text-kharch" : "text-muted2"}`} data-testid={`ledger-bal-${r.id}`}>{drcr(r.balance)}</span>
                   </td>
                   <td className="print:hidden">
                     {editHref(r) && (

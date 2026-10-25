@@ -131,6 +131,8 @@ export default function PartyAutocomplete({
           className="input-dense pr-14"
           value={value || ""}
           required={required}
+          onInvalid={(e) => e.target.setCustomValidity("Party chunna zaroori hai — list se chunein ya nayi party banayein")}
+          onInput={(e) => e.target.setCustomValidity("")}
           disabled={disabled}
           placeholder={placeholder}
           onChange={(e) => {

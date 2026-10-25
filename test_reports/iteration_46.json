@@ -1,0 +1,34 @@
+{
+  "summary": "Tested PASSBOOK Dr/Cr convention, mandatory Rokad party, settings partial PUT, IE quick buttons/Excel, transfer smoke, TB/DayBook regression. Backend 6/6 pytest pass. Frontend: headers, debit/credit column placement, header & CLOSING balance (Cr/Dr), Statement(Print) columns + legends + Dr/Cr, Excel ledger export, Rokad summary, Dashboard widget, Outstanding labels, Day Book, IE quick buttons & Heads sheet all correct. ONE BUG: on-screen PartyLedger per-row running balance and Opening row still use OLD suffix (shows 'CR' for negative, nothing for positive) -> contradicts closing row (e.g. row '₹ 600.00 CR' while closing '₹ 600.00 Dr').",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST/PUT /api/rokad", "issue": "Backend does not resolve party_name from party_id; API-created entries (without party_name) show '—' in Rokad list and 'Receipt · · desc' in cash ledger. UI always sends party_name so only API clients affected."},
+      {"endpoint": "POST /api/rokad", "issue": "party_id of whitespace ' ' passes the mandatory check (only falsy check, no strip / existence validation of party_id)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PartyLedger.jsx line 284 (row balance) & line 251 (opening row)", "issue": "Uses old convention: `{r.balance < 0 && <span>CR</span>}` -> negative balance shows 'CR' (should be 'Dr'), positive shows no suffix (should be 'Cr'). Repro: party with receipt 1000 + payment 400 -> rows show '₹ 1,000.00 CR', '₹ 600.00 CR' but closing row/header show '₹ 600.00 Dr'. Cash ledger rows show no suffix for positive. Fix: replace with {drcr(r.balance)} / {drcr(opening)} and align colors with balColor.", "selector": "[data-testid=table-ledger] tbody tr td:nth-child(7)", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Rokad form", "issues": ["With empty party the native HTML 'required' tooltip ('Please fill out this field') appears instead of the Hinglish toast; toast only shows when a name is typed but not picked. Entry is correctly not created either way."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter46_passbook_party_required.py", "/app/test_reports/pytest/pytest_iter46.xml"],
+  "action_items": [
+    "PartyLedger.jsx: replace row-balance and opening-row suffix (`< 0 && CR`) with drcr() so rows show Cr for positive / Dr for negative, consistent with closing row, statement and Excel",
+    "Optional: backend create/update rokad should fill party_name from party_id and validate party exists (strip whitespace)"
+  ],
+  "critical_code_review_comments": [
+    "PartyLedger.jsx row/opening color logic (#1B5E20 for negative) still reflects old meaning; for parties negative = dena now — review colors alongside suffix fix",
+    "Trial Balance API grand_dr 1,149,473,943.81 vs grand_cr 40,264,393,984 — not balanced; appears to be legacy DOS data (last group credit 39,17,78,22,837), unrelated to this change but worth checking"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter46_passbook_party_required.py"],
+  "success_rate": {"backend": "100%", "frontend": "90%"},
+  "seed_data_creation": "Created TEST_QA_UI_PARTY + 2 rokad entries + 1 transfer; all deleted. firm_name restored to '9x Vyapari'.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "System date 2026-10-25, FY 2026-04-01..2027-03-31. CASH IN HAND id 3811380b-..., HDFC M M TRADERS 4831c910-... used as bank for transfer. Excel export via ExportBar 'Excel' button downloads xlsx (inspect with openpyxl). Only remaining issue: PartyLedger row-balance suffix."
+}

@@ -776,11 +776,22 @@ async def _default_cash_account() -> Optional[dict]:
 PARTY_REQUIRED_MSG = "Party chunna zaroori hai — bina party ke Rokad entry nahi hogi"
 
 
+async def _require_party(doc: dict):
+    """Rokad party is mandatory: must be a real party/ledger; fills party_name when the client sent only the id."""
+    pid = (doc.get("party_id") or "").strip()
+    if not pid:
+        raise HTTPException(400, PARTY_REQUIRED_MSG)
+    p = await db.parties.find_one({"id": pid}, {"_id": 0, "name": 1}) or await db.accounts.find_one({"id": pid}, {"_id": 0, "name": 1})
+    if not p:
+        raise HTTPException(400, "Party nahi mili — list se chunein ya nayi party banayein")
+    doc["party_id"] = pid
+    doc["party_name"] = (doc.get("party_name") or "").strip() or p["name"]
+
+
 @api.post("/rokad")
 async def create_rokad(body: RokadIn, current=Depends(get_current_user)):
     doc = body.model_dump()
-    if not doc.get("party_id"):
-        raise HTTPException(400, PARTY_REQUIRED_MSG)
+    await _require_party(doc)
     if not doc.get("cash_account_id"):
         cash = await _default_cash_account()
         if cash:
@@ -896,8 +907,7 @@ async def update_rokad(rid: str, body: RokadIn, current=Depends(get_current_user
     if existing.get("contra_id"):
         raise HTTPException(400, "Yeh Transfer (contra) entry hai – ise Transfer form se edit karein")
     doc = body.model_dump()
-    if not doc.get("party_id"):
-        raise HTTPException(400, PARTY_REQUIRED_MSG)
+    await _require_party(doc)
     if not doc.get("cash_account_id"):
         cash = await _default_cash_account()
         if cash:
