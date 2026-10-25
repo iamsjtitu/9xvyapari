@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
-import { Plus, Trash, ArrowDown, ArrowUp, X, PencilSimple, ArrowsLeftRight, Printer, ListNumbers, ArrowCounterClockwise } from "@phosphor-icons/react";
+import { Plus, X, ArrowsLeftRight, Printer, ListNumbers } from "@phosphor-icons/react";
 import { reopenSettled } from "@/components/SettledMarker";
+import { RokadRegister } from "@/components/rokad/RokadRegister";
 import { toast } from "sonner";
 import { ExportBar } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -16,7 +17,7 @@ import PartyAutocomplete from "@/components/PartyAutocomplete";
 import { SettleToggle } from "@/components/rokad/SettleToggle";
 import { InvoiceDupHint, describeDup } from "@/components/rokad/InvoiceDupHint";
 import { NoteSuggest } from "@/components/rokad/NoteSuggest";
-import { drcr } from "@/lib/drcr";
+import { drcr, COL_DEBIT, COL_CREDIT } from "@/lib/drcr";
 import { KhataModal } from "@/components/KhataModal";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 import { backdropClose } from "@/lib/backdrop";
@@ -31,6 +32,7 @@ const modeForAccount = (a) =>
 const LAST_USED_KEY = "vyapari.rokad.lastUsed";
 const readLastUsed = () => { try { return JSON.parse(localStorage.getItem(LAST_USED_KEY) || "null"); } catch { return null; } };
 const saveLastUsed = (v) => { try { localStorage.setItem(LAST_USED_KEY, JSON.stringify(v)); } catch {} };
+const fmtDate = (iso) => (iso ? iso.slice(0, 10).split("-").reverse().join("-") : "");
 
 export default function RokadPanna() {
   const { settings } = useOutletContext() || {};
@@ -138,8 +140,10 @@ export default function RokadPanna() {
     return { jama, kharch, baki: jama - kharch };
   }, [visibleEntries]);
 
-  const jamaList = visibleEntries.filter((e) => e.type === "jama");
-  const kharchList = visibleEntries.filter((e) => e.type === "kharch");
+  // Register rows: chronological (passbook) — date, then voucher no., then entry time
+  const registerRows = useMemo(() => [...visibleEntries].sort((a, b) =>
+    (a.date || "").localeCompare(b.date || "") || ((parseInt(a.voucher_no) || 0) - (parseInt(b.voucher_no) || 0)) || (a.created_at || "").localeCompare(b.created_at || "")),
+    [visibleEntries]);
 
   // ---- Bank summary (opening / closing / voucher range) ----
   const selectedBank = useMemo(
@@ -159,6 +163,8 @@ export default function RokadPanna() {
     const vMax = vouchers.length ? Math.max(...vouchers) : null;
     return { opening, closing, other: row?.other || 0, vMin, vMax, count: visibleEntries.length };
   }, [bankFilter, selectedBank, summary, totals, visibleEntries]);
+  // Running balance only when ONE account is selected and nothing outside Rokad (journal/DOS) touched it in this period
+  const showRunning = !!bankFilter && Math.abs(bankSummary?.other || 0) < 0.005;
 
   // Default cash account (CASH IN HAND) – preselected when the form opens
   const defaultCash = useMemo(
@@ -267,6 +273,17 @@ export default function RokadPanna() {
           return;
         }
       }
+      // Overdraft alert: payment that would push this cash/bank a/c below zero (as on entry date) → confirm
+      if (payload.type === "kharch" && payload.cash_account_id && liveDelta.cash < 0) {
+        const { data: lb } = await api.get(`/ledgers/${payload.cash_account_id}/balance`, { params: { as_on: payload.date } });
+        const after = (lb.balance || 0) + liveDelta.cash;
+        if (after < -0.005) {
+          const acct = lb.name || payload.cash_account_name || "Account";
+          const have = lb.balance || 0;
+          const msg = `OVERDRAFT ALERT — ${acct}\n\n${fmtDate(payload.date)} ko account me ${have <= 0 ? "paisa nahi hai" : `sirf ₹ ${inr(have)} hai`}${have < 0 ? ` (pehle se ₹ ${inr(Math.abs(have))} Dr)` : ""}.\nYeh payment ke baad balance ₹ ${inr(Math.abs(after))} Dr (minus) ho jayega.\n\nPhir bhi save karein?`;
+          if (!window.confirm(msg)) return;
+        }
+      }
       const { data } = editId ? await api.put(`/rokad/${editId}`, payload) : await api.post("/rokad", payload);
       toast.success(editId ? "Entry update ho gayi" : "Entry add ki gayi");
       saveLastUsed({ cash_account_id: payload.cash_account_id, mode: payload.mode, type: payload.type });
@@ -298,110 +315,6 @@ export default function RokadPanna() {
     loadSummary();
   };
 
-  const Side = ({ side, list, color, bg, label, icon: Icon }) => (
-    <div className="card-flat overflow-hidden flex flex-col">
-      <div
-        className="px-4 py-3 flex items-center justify-between border-b border-khaki"
-        style={{ background: bg }}
-      >
-        <div className="flex items-center gap-2">
-          <Icon size={18} color={color} weight="bold" />
-          <div className="font-heading font-semibold text-sm" style={{ color }}>
-            {label}
-          </div>
-        </div>
-        <div className="font-mono-data text-lg font-medium" style={{ color }}>
-          ₹ {inr(side === "jama" ? totals.jama : totals.kharch)}
-        </div>
-      </div>
-      <table className="dense w-full">
-        <thead>
-          <tr>
-            <th style={{ width: 80 }}>Date</th>
-            <th style={{ width: 50 }}>V.No.</th>
-            <th style={{ width: 90 }}>INV No.</th>
-            <th>Party / Vivran</th>
-            <th className="num" style={{ width: 110 }}>Amount</th>
-            <th style={{ width: 96 }} className="print:hidden"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {list.length === 0 ? (
-            <tr>
-              <td colSpan={6} className="text-center text-muted2 py-8 text-sm">
-                Koi entry nahi.
-              </td>
-            </tr>
-          ) : (
-            list.map((e) => (
-              <tr key={e.id} data-testid={`rokad-row-${e.id}`}>
-                <td className="font-mono-data text-xs">{(e.date || "").slice(0, 10)}</td>
-                <td className="font-mono-data text-xs text-terracotta">
-                  {e.voucher_no || "—"}
-                </td>
-                <td className="font-mono-data text-xs text-jama whitespace-nowrap" title="Invoice No." data-testid={`rokad-inv-${e.id}`}>{e.inv_no || ""}</td>
-                <td className="cell-grow" title={`${e.party_name || ""}${e.description ? ` · ${e.description}` : ""}`}>
-                  <div className="font-medium flex items-center gap-1.5 min-w-0">
-                    {e.contra_id && (
-                      <span className="kbd !text-[9px] !px-1 !py-0 text-jama border-jama/40" title="Cash/Bank transfer (contra)" data-testid={`rokad-contra-badge-${e.id}`}>
-                        <ArrowsLeftRight size={9} weight="bold" className="inline mr-0.5" />TRANSFER
-                      </span>
-                    )}
-                    {e.settle_journal_id && (
-                      <span className="kbd !text-[10px] !px-1.5 !py-0 font-semibold !text-white !bg-jama !border-jama" title={`Account Settled · ₹${inr(Math.abs(e.settled_amount || 0))} → ${e.settle_account_name || "Account Clear"}`} data-testid={`rokad-settled-badge-${e.id}`}>
-                        SETTLED
-                      </span>
-                    )}
-                    <span className="truncate min-w-0">{e.party_name || "—"}</span>
-                  </div>
-                  {(e.description || e.cash_account_name) && (
-                    <div className="text-[10px] text-muted2 mt-0.5 truncate">
-                      {e.cash_account_name ? `[${e.cash_account_name}] ` : ""}{e.description || ""}
-                    </div>
-                  )}
-                  {e.chq_no && (
-                    <div className="text-[10px] text-muted2 mt-0.5 font-mono-data">Chq: {e.chq_no}</div>
-                  )}
-                </td>
-                <td className="num" style={{ color }}>
-                  ₹ {inr(e.amount)}
-                </td>
-                <td className="print:hidden whitespace-nowrap">
-                  <button className="btn-ghost p-1.5" onClick={() => setSlip(e)} title="Voucher slip print" data-testid={`rokad-slip-${e.id}`}>
-                    <Printer size={14} />
-                  </button>
-                  <button
-                    className="btn-ghost p-1.5"
-                    onClick={() => (e.contra_id ? setTransfer({ contraId: e.contra_id }) : startEdit(e))}
-                    title={e.contra_id ? "Transfer edit" : "Edit"}
-                    data-testid={`rokad-edit-${e.id}`}
-                  >
-                    <PencilSimple size={14} />
-                  </button>
-                  <button
-                    className="btn-ghost p-1.5"
-                    onClick={() => del(e.id)}
-                    title="Delete"
-                    data-testid={`rokad-del-${e.id}`}
-                  >
-                    <Trash size={14} />
-                  </button>
-                  {e.settle_journal_id && (
-                    <button className="btn-ghost p-1.5 text-jama" title="Reopen — settlement hatao, party ka baki wapas aayega"
-                      onClick={async () => { if (await reopenSettled(e.id, e.party_name)) { load(); loadSummary(); } }}
-                      data-testid={`rokad-reopen-${e.id}`}>
-                      <ArrowCounterClockwise size={14} weight="bold" />
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-
   return (
     <div className="space-y-5 cash-book-page" data-testid="page-rokad">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -414,7 +327,7 @@ export default function RokadPanna() {
         <div className="flex items-end gap-3">
           <ExportBar filename={`cash-book-${dateFrom}-to-${dateTo}`} sheets={[
             {
-              name: "Receipts (Jama)",
+              name: "Cash Book",
               columns: [
                 { key: "date", label: "Date", width: 12 },
                 { key: "voucher_no", label: "V.No.", width: 8 },
@@ -423,23 +336,10 @@ export default function RokadPanna() {
                 { key: "party_name", label: "Party", width: 28 },
                 { key: "description", label: "Narration", width: 35 },
                 { key: "chq_no", label: "Chq No", width: 10 },
-                { key: "amount", label: "Amount", width: 14, num: true },
+                { key: "debit", label: COL_DEBIT(true), width: 15, num: true },
+                { key: "credit", label: COL_CREDIT(true), width: 15, num: true },
               ],
-              rows: jamaList,
-            },
-            {
-              name: "Payments (Kharch)",
-              columns: [
-                { key: "date", label: "Date", width: 12 },
-                { key: "voucher_no", label: "V.No.", width: 8 },
-                { key: "inv_no", label: "INV No.", width: 12 },
-                { key: "cash_account_name", label: "Cash A/C", width: 22 },
-                { key: "party_name", label: "Party", width: 28 },
-                { key: "description", label: "Narration", width: 35 },
-                { key: "chq_no", label: "Chq No", width: 10 },
-                { key: "amount", label: "Amount", width: 14, num: true },
-              ],
-              rows: kharchList,
+              rows: registerRows.map((e) => ({ ...e, debit: e.type === "kharch" ? e.amount : 0, credit: e.type === "jama" ? e.amount : 0 })),
             },
           ]} />
           <VoucherSearch accountId={bankFilter} accountName={selectedBank?.name}
@@ -606,8 +506,8 @@ export default function RokadPanna() {
               <tr>
                 <th>Account</th>
                 <th className="num">Opening</th>
-                <th className="num">Jama</th>
-                <th className="num">Kharch</th>
+                <th className="num">{COL_DEBIT(true)}</th>
+                <th className="num">{COL_CREDIT(true)}</th>
                 {allAccountsSummary.hasOther && <th className="num" title="Journal / DOS entries jo is ledger ko chhoo rahi hain">Journal/Anya</th>}
                 <th className="num">Closing</th>
                 <th className="print:hidden" style={{ width: 44 }}></th>
@@ -621,8 +521,8 @@ export default function RokadPanna() {
                   <td className="num font-mono-data" style={{ color: r.opening < 0 ? "#B71C1C" : "#1A1A1A" }} data-testid={`acct-opening-${r.id}`}>
                     ₹ {inr(Math.abs(r.opening))} {drcr(r.opening)}
                   </td>
-                  <td className="num font-mono-data amount-jama">{r.jama ? `₹ ${inr(r.jama)}` : "—"}</td>
                   <td className="num font-mono-data amount-kharch">{r.kharch ? `₹ ${inr(r.kharch)}` : "—"}</td>
+                  <td className="num font-mono-data amount-jama">{r.jama ? `₹ ${inr(r.jama)}` : "—"}</td>
                   {allAccountsSummary.hasOther && (
                     <td className="num font-mono-data text-muted2">{Math.abs(r.other) >= 0.005 ? `${r.other > 0 ? "+" : "−"}₹ ${inr(Math.abs(r.other))}` : "—"}</td>
                   )}
@@ -641,8 +541,8 @@ export default function RokadPanna() {
               <tr className="bg-parchment/60 font-semibold" data-testid="acct-total-row">
                 <td>TOTAL</td>
                 <td className="num font-mono-data">₹ {inr(Math.abs(allAccountsSummary.total.opening))} {drcr(allAccountsSummary.total.opening)}</td>
-                <td className="num font-mono-data amount-jama">₹ {inr(allAccountsSummary.total.jama)}</td>
                 <td className="num font-mono-data amount-kharch">₹ {inr(allAccountsSummary.total.kharch)}</td>
+                <td className="num font-mono-data amount-jama">₹ {inr(allAccountsSummary.total.jama)}</td>
                 {allAccountsSummary.hasOther && <td className="num font-mono-data text-muted2">{allAccountsSummary.total.other > 0 ? "+" : "−"}₹ {inr(Math.abs(allAccountsSummary.total.other))}</td>}
                 <td className="num font-mono-data" data-testid="acct-total-closing">₹ {inr(Math.abs(allAccountsSummary.total.closing))} {drcr(allAccountsSummary.total.closing)}</td>
                 <td className="print:hidden"></td>
@@ -656,19 +556,19 @@ export default function RokadPanna() {
       <div className="card-flat px-5 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-6">
           <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted2">Jama</div>
-            <div className="amount-jama text-lg font-medium" data-testid="total-jama">
-              ₹ {inr(totals.jama)}
-            </div>
-          </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted2">Kharch</div>
+            <div className="text-[11px] uppercase tracking-wider text-muted2">{COL_DEBIT(true)}</div>
             <div className="amount-kharch text-lg font-medium" data-testid="total-kharch">
               ₹ {inr(totals.kharch)}
             </div>
           </div>
           <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted2">Baki</div>
+            <div className="text-[11px] uppercase tracking-wider text-muted2">{COL_CREDIT(true)}</div>
+            <div className="amount-jama text-lg font-medium" data-testid="total-jama">
+              ₹ {inr(totals.jama)}
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-muted2">Net (Aaya − Gaya)</div>
             <div
               className="font-mono-data text-lg font-medium"
               style={{ color: totals.baki >= 0 ? "#1B5E20" : "#B71C1C" }}
@@ -683,25 +583,15 @@ export default function RokadPanna() {
         </div>
       </div>
 
-      {/* Two-column ledger — Jama LEFT, Kharch RIGHT (same as DOS cash book) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 cash-book-grid">
-        <Side
-          side="jama"
-          list={jamaList}
-          color="#1B5E20"
-          bg="#E8F5E9"
-          label="Receipt / Jama (आमद) — Money In"
-          icon={ArrowDown}
-        />
-        <Side
-          side="kharch"
-          list={kharchList}
-          color="#B71C1C"
-          bg="#FFEBEE"
-          label="Payment / Kharch (खर्च) — Money Out"
-          icon={ArrowUp}
-        />
-      </div>
+      {/* Passbook-style register: Debit (Gaya) | Credit (Aaya) | Balance — oldest first; DOS T-format stays in Day Book print */}
+      <RokadRegister rows={registerRows} opening={bankSummary?.opening || 0} showBalance={showRunning} totals={totals}
+        onSlip={setSlip} onEdit={startEdit} onTransfer={(contraId) => setTransfer({ contraId })} onDelete={del}
+        onReopen={async (e) => { if (await reopenSettled(e.id, e.party_name)) { load(); loadSummary(); } }} />
+      {bankFilter && !showRunning && (
+        <div className="text-[11px] text-muted2 font-mono-data" data-testid="rokad-balance-note">
+          Running balance chhupa hai — is period me journal/anya entries (₹ {inr(Math.abs(bankSummary?.other || 0))}) bhi is account ko chhoo rahi hain; closing upar dekhein.
+        </div>
+      )}
       </div>
 
       {/* Modal */}
