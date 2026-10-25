@@ -15,6 +15,7 @@ import { VoucherSlip } from "@/components/rokad/VoucherSlip";
 import PartyAutocomplete from "@/components/PartyAutocomplete";
 import { SettleToggle } from "@/components/rokad/SettleToggle";
 import { InvoiceDupHint, describeDup } from "@/components/rokad/InvoiceDupHint";
+import { NoteSuggest } from "@/components/rokad/NoteSuggest";
 import { KhataModal } from "@/components/KhataModal";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 import { backdropClose } from "@/lib/backdrop";
@@ -875,13 +876,8 @@ export default function RokadPanna() {
 
               <div>
                 <label className="lbl">Vivran (Note)</label>
-                <input
-                  className="input-dense"
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Eg: Mandi se gehu kharidi"
-                  data-testid="input-desc"
-                />
+                <NoteSuggest value={form.description} onChange={(v) => setForm((f) => ({ ...f, description: v }))}
+                  partyId={form.party_id} placeholder="Eg: Mandi se gehu kharidi (pehle wale note suggest honge)" testId="input-desc" />
               </div>
             </div>
 

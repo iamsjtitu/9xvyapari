@@ -698,6 +698,25 @@ async def list_rokad(date_from: Optional[str] = None, date_to: Optional[str] = N
     return entries
 
 
+@api.get("/rokad/descriptions")
+async def rokad_descriptions(q: Optional[str] = None, party_id: Optional[str] = None, limit: int = 12, current=Depends(get_current_user)):
+    """Vivran (note) auto-suggest: previously used descriptions — this party's first, then most used / most recent."""
+    match: dict = {"description": {"$nin": [None, ""]}}
+    if q and q.strip():
+        match["description"] = {"$regex": re.escape(q.strip()), "$options": "i"}
+    mine = {"$cond": [{"$eq": ["$party_id", party_id]}, 1, 0]} if party_id else {"$literal": 0}
+    pipeline = [
+        {"$match": match},
+        {"$addFields": {"mine": mine}},
+        {"$group": {"_id": {"$toLower": {"$trim": {"input": "$description"}}}, "text": {"$last": "$description"},
+                    "count": {"$sum": 1}, "last": {"$max": "$date"}, "mine": {"$max": "$mine"}}},
+        {"$sort": {"mine": -1, "count": -1, "last": -1}},
+        {"$limit": max(1, min(int(limit), 30))},
+    ]
+    rows = await db.rokad.aggregate(pipeline).to_list(30)
+    return [{"text": (r.get("text") or "").strip(), "count": r["count"], "last": (r.get("last") or "")[:10], "mine": bool(r.get("mine"))} for r in rows if (r.get("text") or "").strip()]
+
+
 @api.get("/rokad/invoice-check")
 async def rokad_invoice_check(party_id: str, inv_no: str, exclude_id: Optional[str] = None, current=Depends(get_current_user)):
     """Same Invoice No. already entered for this party? (double-payment guard; case-insensitive, trimmed)"""
