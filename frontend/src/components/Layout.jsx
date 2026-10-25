@@ -11,7 +11,7 @@ import AppFooter from "@/components/AppFooter";
 import {
   House, Notebook, UsersThree, Package, Receipt, ChartBar, SignOut, Storefront,
   TreeStructure, IdentificationCard, BookOpenText, CloudArrowUp, Calendar, Power,
-  Truck, Scales, Database, Keyboard, CalendarCheck, BookOpen, HandCoins, Broom, Money } from "@phosphor-icons/react";
+  Truck, Scales, Database, Keyboard, CalendarCheck, BookOpen, HandCoins, Broom, Money, ChartPieSlice } from "@phosphor-icons/react";
 
 const sections = [
   {
@@ -28,6 +28,7 @@ const sections = [
       { to: "/opening-balance", label: "Opening Balance", key: "O", icon: BookOpen, tid: "nav-opening-balance" },
       { to: "/outstanding", label: "Outstanding List", key: "L", icon: HandCoins, tid: "nav-outstanding" },
       { to: "/account-clear", label: "Account Clear", key: "W", icon: Broom, tid: "nav-account-clear" },
+      { to: "/income-expense", label: "Income & Expense (Aay-Vyay)", key: "R", icon: ChartPieSlice, tid: "nav-income-expense" },
       { to: "/gst-returns", label: "GST Returns", key: "X", icon: Receipt, tid: "nav-gst" },
     ],
   },

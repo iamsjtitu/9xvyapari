@@ -310,6 +310,7 @@ class SettingsIn(BaseModel):
     settle_account_id: Optional[str] = None     # default "Account Clear" ledger used by Account Settled
     settle_account_name: Optional[str] = ""
     settle_accounts: Optional[List[SettleLedger]] = None   # all linked Account Clear ledgers (entry form lets user pick one)
+    investment_group_ids: Optional[List[str]] = None       # Aay-Vyay report: which asset groups count as "Investment"
 
 
 # --- App / Router ---
@@ -916,6 +917,145 @@ async def reopen_rokad(rid: str, current=Depends(get_current_user)):
     await db.rokad.update_one({"id": rid}, {"$set": {"settle": False, "updated_at": now_iso()},
                                             "$unset": {"settle_journal_id": "", "settled_amount": ""}})
     return {"ok": True, "removed_amount": removed, "party_id": rok.get("party_id"), "party_name": rok.get("party_name", "")}
+
+
+@api.get("/reports/income-expense")
+async def income_expense_report(period: str = "monthly", date_from: Optional[str] = None, date_to: Optional[str] = None,
+                                current=Depends(get_current_user)):
+    """Aay-Vyay: income & expense heads (group nature income/expense) bucketed weekly / monthly / yearly (FY),
+    with head-wise breakdown ("kahan kahan gaya") per bucket and for the whole range."""
+    if period not in ("weekly", "monthly", "yearly"):
+        raise HTTPException(400, "period: weekly | monthly | yearly")
+    s = await db.settings.find_one({"id": "default"}, {"_id": 0}) or {}
+    today = date.today().isoformat()
+    d_from = date_from or s.get("fy_start") or f"{today[:4]}-04-01"
+    d_to = date_to or today
+    for d in (d_from, d_to):
+        if not _is_date(d):
+            raise HTTPException(400, "Date YYYY-MM-DD format me do")
+    if d_from > d_to:
+        d_from, d_to = d_to, d_from
+    groups = {g["id"]: g for g in await db.account_groups.find({}, {"_id": 0}).to_list(500)}
+    # investment = asset groups the user picked in Settings (default: fixed assets / deposits / loans & advances / cold storage)
+    inv_ids = s.get("investment_group_ids")
+    if inv_ids is None:
+        inv_ids = [g["id"] for g in groups.values() if g.get("nature") == "asset"
+                   and re.search(r"fixed|deposit|loan|advance|invest|cold|fd\b", g.get("name", ""), re.I)
+                   and not re.search(r"staff|salary|cash|bank|party", g.get("name", ""), re.I)]
+    inv_set = set(inv_ids)
+
+    def category(g: dict) -> Optional[str]:
+        if g["id"] in inv_set: return "investment"
+        return g.get("nature") if g.get("nature") in ("income", "expense") else None
+
+    heads: dict = {}
+    for coll in ("parties", "accounts"):
+        async for doc in db[coll].find({}, {"_id": 0, "id": 1, "name": 1, "group_id": 1, "code": 1}):
+            g = groups.get(doc.get("group_id"))
+            cat = category(g) if g else None
+            if cat:
+                heads[doc["id"]] = {"id": doc["id"], "name": doc.get("name", ""), "code": doc.get("code") or 0,
+                                    "group_id": g["id"], "group_name": g["name"], "nature": cat}
+    ids = list(heads)
+    rng = {"date": {"$gte": d_from, "$lte": d_to}}
+    moves: list = []   # (date, head_id, dr_movement)
+    if ids:
+        async for r in db.rokad.find({"party_id": {"$in": ids}, **rng}, {"_id": 0, "date": 1, "party_id": 1, "type": 1, "amount": 1, "ref_bill_id": 1}):
+            if r.get("ref_bill_id"):
+                continue
+            amt = float(r.get("amount") or 0)
+            moves.append((r["date"][:10], r["party_id"], amt if r.get("type") == "kharch" else -amt))
+        async for j in db.journal.find({"lines.account_id": {"$in": ids}, **rng}, {"_id": 0, "date": 1, "lines": 1}):
+            for ln in j.get("lines", []):
+                if ln.get("account_id") in heads:
+                    moves.append((j["date"][:10], ln["account_id"], float(ln.get("debit") or 0) - float(ln.get("credit") or 0)))
+        async for j in db.dos_journal.find({"$or": [{"party_id": {"$in": ids}}, {"counter_party_id": {"$in": ids}}], **rng},
+                                           {"_id": 0, "date": 1, "party_id": 1, "counter_party_id": 1, "debit": 1, "credit": 1}):
+            dr, cr = float(j.get("debit") or 0), float(j.get("credit") or 0)
+            if j.get("party_id") in heads:
+                moves.append((j["date"][:10], j["party_id"], dr - cr))
+            if j.get("counter_party_id") in heads:
+                moves.append((j["date"][:10], j["counter_party_id"], cr - dr))
+        async for b in db.bills.find({"party_id": {"$in": ids}, **rng}, {"_id": 0, "date": 1, "party_id": 1, "bill_type": 1, "total": 1, "payment_received": 1}):
+            net = float(b.get("total") or 0) - float(b.get("payment_received") or 0)
+            moves.append((b["date"][:10], b["party_id"], net if b.get("bill_type") == "sale" else -net))
+
+    # ---- buckets ----
+    fy_start = s.get("fy_start") or f"{today[:4]}-04-01"
+    fm, fd = int(fy_start[5:7]), int(fy_start[8:10])
+    MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+    def bucket_of(iso: str) -> tuple:
+        d = datetime.fromisoformat(iso).date()
+        if period == "monthly":
+            start = d.replace(day=1)
+            end = (start.replace(month=start.month % 12 + 1, day=1) if start.month < 12 else start.replace(year=start.year + 1, month=1, day=1)) - timedelta(days=1)
+            return start.isoformat(), end.isoformat(), f"{MON[d.month - 1]} {d.year}"
+        if period == "weekly":
+            start = d - timedelta(days=d.weekday())
+            end = start + timedelta(days=6)
+            return start.isoformat(), end.isoformat(), f"{start.day:02d} {MON[start.month - 1]} – {end.day:02d} {MON[end.month - 1]} {end.year}"
+        # yearly = financial year from settings (e.g. 01-Apr → 31-Mar)
+        y = d.year if (d.month, d.day) >= (fm, fd) else d.year - 1
+        start = date(y, fm, fd)
+        end = date(y + 1, fm, fd) - timedelta(days=1)
+        return start.isoformat(), end.isoformat(), f"FY {y}-{str(y + 1)[2:]}" if (fm, fd) != (1, 1) else str(y)
+
+    # every bucket in range (even empty ones) so the table reads like a calendar
+    buckets: dict = {}
+    cur = d_from
+    while cur <= d_to:
+        bs, be, label = bucket_of(cur)
+        buckets[bs] = {"key": bs, "label": label, "start": max(bs, d_from), "end": min(be, d_to),
+                       "income": 0.0, "expense": 0.0, "investment": 0.0, "heads": {}}
+        cur = (datetime.fromisoformat(be).date() + timedelta(days=1)).isoformat()
+
+    overall: dict = {}
+    for iso, hid, dr in moves:
+        bs, _, _ = bucket_of(iso)
+        b = buckets.get(bs)
+        if b is None:
+            continue
+        h = heads[hid]
+        val = -dr if h["nature"] == "income" else dr     # income = Cr movement; expense / investment = Dr movement (paisa gaya)
+        b[h["nature"]] += val
+        b["heads"][hid] = b["heads"].get(hid, 0.0) + val
+        overall[hid] = overall.get(hid, 0.0) + val
+
+    def head_rows(acc: dict) -> dict:
+        """{income|expense|investment: [{group_name, total, share, rows:[{id,name,amount,share}]}]} — group-wise, biggest first."""
+        out = {"expense": [], "income": [], "investment": []}
+        by_group: dict = {}
+        for hid, amt in acc.items():
+            if abs(amt) < 0.005:
+                continue
+            h = heads[hid]
+            by_group.setdefault((h["nature"], h["group_id"]), {"group_id": h["group_id"], "group_name": h["group_name"], "rows": []})["rows"].append(
+                {"id": hid, "name": h["name"], "amount": round(amt, 2)})
+        for (nat, _gid), g in by_group.items():
+            g["total"] = round(sum(r["amount"] for r in g["rows"]), 2)
+            g["rows"].sort(key=lambda r: -r["amount"])
+            out[nat].append(g)
+        for nat in out:
+            tot = sum(g["total"] for g in out[nat]) or 0
+            out[nat].sort(key=lambda g: -g["total"])
+            for g in out[nat]:
+                g["share"] = round(g["total"] / tot * 100, 1) if tot else 0.0
+                for r in g["rows"]:
+                    r["share"] = round(r["amount"] / tot * 100, 1) if tot else 0.0
+        return out
+
+    rows = []
+    for b in buckets.values():
+        rows.append({"key": b["key"], "label": b["label"], "start": b["start"], "end": b["end"],
+                     "income": round(b["income"], 2), "expense": round(b["expense"], 2), "investment": round(b["investment"], 2),
+                     "net": round(b["income"] - b["expense"], 2), "heads": head_rows(b["heads"])})
+    ti = round(sum(r["income"] for r in rows), 2); te = round(sum(r["expense"] for r in rows), 2); tv = round(sum(r["investment"] for r in rows), 2)
+    return {"period": period, "date_from": d_from, "date_to": d_to, "firm_name": s.get("firm_name", ""),
+            "rows": rows, "heads": head_rows(overall), "head_count": len(heads),
+            "groups": [{"id": g["id"], "name": g["name"], "nature": g.get("nature", "")} for g in sorted(groups.values(), key=lambda x: x.get("fcode") or 0)],
+            "investment_group_ids": list(inv_ids),
+            "totals": {"income": ti, "expense": te, "investment": tv, "net": round(ti - te, 2)}}
 
 
 @api.get("/reports/account-clear")
