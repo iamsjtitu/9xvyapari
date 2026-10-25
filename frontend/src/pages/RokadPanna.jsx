@@ -70,15 +70,23 @@ export default function RokadPanna() {
   };
   const [form, setForm] = useState(emptyForm);
 
+  // Stale-response guard: a slow older request (other date range) must not overwrite the current one
+  const rangeRef = useRef("");
+  rangeRef.current = `${dateFrom}|${dateTo}`;
   const load = async () => {
+    const key = rangeRef.current;
     const { data } = await api.get(`/rokad?date_from=${dateFrom}&date_to=${dateTo}`);
-    setEntries(data);
+    if (rangeRef.current === key) setEntries(data);
   };
 
   // Opening / closing per cash-bank ledger from the backend (same engine as Balance Sheet → figures match)
   const [summary, setSummary] = useState(null);
-  const loadSummary = () => api.get(`/rokad/accounts-summary?date_from=${dateFrom}&date_to=${dateTo}`)
-    .then((r) => setSummary(r.data)).catch(() => setSummary(null));
+  const loadSummary = () => {
+    const key = rangeRef.current;
+    return api.get(`/rokad/accounts-summary?date_from=${dateFrom}&date_to=${dateTo}`)
+      .then((r) => { if (rangeRef.current === key) setSummary(r.data); })
+      .catch(() => { if (rangeRef.current === key) setSummary(null); });
+  };
 
   useEffect(() => {
     load();
@@ -574,7 +582,7 @@ export default function RokadPanna() {
               style={{ color: totals.baki >= 0 ? "#1B5E20" : "#B71C1C" }}
               data-testid="total-baki"
             >
-              ₹ {inr(totals.baki)}
+              {totals.baki < 0 ? "− " : ""}₹ {inr(Math.abs(totals.baki))}
             </div>
           </div>
         </div>

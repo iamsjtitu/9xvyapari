@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 47: Tested Rokad passbook register + Overdraft Alert (backend pytest 7/7 + Playwright UI). All requested features WORK: headers Debit (Gaya)/Credit (Aaya), no Balance column in 'All' view; all-accounts summary order Account|Opening|Debit (Gaya)|Credit (Aaya)|Closing; selecting CASH IN HAND shows Balance column + opening row, rows chronological, running balance = prev + credit - debit (0 mismatches), Cr suffix positive / Dr negative (verified with a ₹99,99,99,999 overdraft row showing ₹99,02,95,020.00 Dr in red), totals = sums, rokad-closing-cell == bank-closing. Overdraft: huge payment -> confirm 'OVERDRAFT ALERT — CASH IN HAND ... Phir bhi save karein?'; Cancel -> nothing saved (API verified), OK -> saved, then deleted via UI. ₹100 payment and huge receipt -> no confirm. Editing an existing payment to huge amount -> confirm also fires; edit to 150 -> no confirm, saved. Excel: single sheet 'Cash Book' with 'Debit (Gaya)'/'Credit (Aaya)' columns and correct values. Day Book toggle renders DOS sheet, slip/edit/delete work. One minor race found (stale summary). All test data cleaned up.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/rokad", "issue": "cash_account_name is not derived server-side from cash_account_id. Entries created via the API without it show 'A/C : -' on the voucher slip, an empty 'Cash A/C' cell in Excel, and no [account] tag in the register."},
+      {"endpoint": "GET /api/ledgers/{id}/balance", "issue": "The dr_cr field returns 'Dr' for a positive cash balance, which is the opposite of the UI's passbook rule (positive = Cr). The frontend ignores this field, but other consumers would get it wrong."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RokadPanna load()/loadSummary()", "issue": "Race condition: neither request ignores stale responses. Changing From/To quickly (seen in run 1 when both dates were filled within about 100ms of page load) let the initial today..today accounts-summary response arrive last. The page then showed the wrong opening (97,04,979 instead of 96,99,945) and '—' for Debit/Credit in the all-accounts table. bank-opening/bank-closing were wrong and rokad-closing-cell (97,10,013) did not match bank-closing (97,04,979). Not reproducible with normal waits. Fix: use a request-id/AbortController guard or check that the dates still match before calling setSummary/setEntries.", "selector": "[data-testid=all-accounts-summary], [data-testid=bank-opening]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Rokad summary bar", "issues": ["total-baki shows a negative net as '₹ -99,99,96,199.00' (minus sign after ₹), unlike the Dr/Cr style used elsewhere"]},
+      {"screen": "Cash Book Excel", "issues": ["The sheet has no Opening/Balance column even when one account is selected, and the subtitle shows the FY instead of the selected date range/account. Optional enhancement."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_rokad_passbook_overdraft_v47.py", "/app/backend/tests/qa47_setup.py", "/app/test_reports/pytest/pytest_v47.xml"],
+  "action_items": [
+    "Add a stale-response guard to load()/loadSummary() in RokadPanna.jsx so out-of-order responses cannot overwrite the current date range",
+    "(minor) Backend POST/PUT /rokad: fill cash_account_name from cash_account_id when it is missing",
+    "(minor) Align the /ledgers/{id}/balance dr_cr field with the passbook convention, or document it",
+    "(optional) The overdraft check only uses the balance as on the entry date. A back-dated payment that is fine on that date but pushes later balances negative is not flagged."
+  ],
+  "critical_code_review_comments": [
+    "RokadPanna.jsx is 794 lines (over 700). Consider moving the entry form modal into its own component.",
+    "The overdraft check is frontend-only. The API accepts any payment (by design: 'Warning + confirm'), so other entry paths (TransferForm, VoucherSearch edit, bill payments) do not warn.",
+    "_compute_party_balance uses to_list(5000) for bills/rokad/dos_journal, so ledgers with more than 5000 entries would be silently truncated"
+  ],
+  "updated_files": ["/app/backend/tests/test_rokad_passbook_overdraft_v47.py", "/app/backend/tests/qa47_setup.py"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "95% (all requested flows pass; 1 intermittent race condition)"},
+  "test_credentials": "admin / Vyapari@2026 (unchanged)",
+  "seed_data_creation": "Created QA REG PARTY + rokad entries (5000 jama, 1200 kharch, 100->150 kharch, 999999999 kharch/jama) on 2026-06-20 CASH IN HAND. All deleted. CASH IN HAND balance restored to 97,01,179.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The Rokad passbook register and overdraft confirm are verified. Use qa47_setup.py setup/cleanup for seed data. A pre-existing 'TEST_E2E rokad entry' (₹1,234 jama, 2026-05-23, CASH IN HAND) is not ours. Today in the env is 2026-10-25, so the page defaults its dates to that day."
+}

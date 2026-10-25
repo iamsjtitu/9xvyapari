@@ -510,8 +510,9 @@ async def ledger_balance(lid: str, as_on: Optional[str] = None, current=Depends(
             raise HTTPException(404, "Ledger nahi mila")
         bal = await _compute_account_balance(lid, float(p.get("opening_balance") or 0), as_on)
         kind = "account"
+    # dr_cr follows the app-wide PASSBOOK rule (frontend lib/drcr.js): +ve = Cr (lena / paisa hai), -ve = Dr
     return {"id": lid, "name": p.get("name", ""), "code": p.get("code"), "kind": kind, "group_name": p.get("group_name", ""),
-            "balance": round(bal, 2), "dr_cr": "Dr" if bal > 0 else "Cr" if bal < 0 else "", "as_on": as_on}
+            "balance": round(bal, 2), "dr_cr": "Cr" if bal > 0 else "Dr" if bal < 0 else "", "as_on": as_on}
 
 
 def _is_date(s: str) -> bool:
@@ -786,6 +787,11 @@ async def _require_party(doc: dict):
         raise HTTPException(400, "Party nahi mili — list se chunein ya nayi party banayein")
     doc["party_id"] = pid
     doc["party_name"] = (doc.get("party_name") or "").strip() or p["name"]
+    cid = doc.get("cash_account_id")
+    if cid and not (doc.get("cash_account_name") or "").strip():
+        c = await db.parties.find_one({"id": cid}, {"_id": 0, "name": 1}) or await db.accounts.find_one({"id": cid}, {"_id": 0, "name": 1})
+        if c:
+            doc["cash_account_name"] = c["name"]
 
 
 @api.post("/rokad")
@@ -2223,7 +2229,7 @@ async def outstanding_report(as_on: Optional[str] = None, side: str = "all", min
         sec = by_group.setdefault(key, {"group_id": key, "group_name": g.get("name") or p.get("group_name") or "OTHER / BINA GROUP",
                                          "fcode": g.get("fcode") or 9999, "rows": [], "dr_total": 0.0, "cr_total": 0.0})
         sec["rows"].append({"id": p["id"], "code": p.get("code") or 0, "name": p.get("name", ""), "place": p.get("place", ""),
-                            "phone": p.get("phone", ""), "balance": round(bal, 2), "dr_cr": "Dr" if bal > 0 else "Cr",
+                            "phone": p.get("phone", ""), "balance": round(bal, 2), "dr_cr": "Cr" if bal > 0 else "Dr",   # passbook: lena = Cr
                             "last_txn": lt, "days": days, "settled_upto": settled_now.get(p["id"])})
         if bal > 0:
             sec["dr_total"] += bal
