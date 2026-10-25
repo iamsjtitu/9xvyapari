@@ -104,10 +104,11 @@ export default function IncomeExpense() {
   }, [data, sel]);
 
   const quick = (key) => {
-    const y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7));
+    const y = Number(today.slice(0, 4));
+    const fyMD = (settings?.fy_start || `${y}-04-01`).slice(5);   // "04-01"
     if (key === "fy") return setP({ from: defFrom, to: settings?.fy_end || today });
-    if (key === "month") return setP({ from: `${today.slice(0, 7)}-01`, to: today });
-    if (key === "3y") return setP({ period: "yearly", from: `${y - 2}-${String(m).padStart(2, "0")}-01`, to: today });
+    if (key === "month") return setP({ period: period === "yearly" ? "monthly" : period, from: `${today.slice(0, 7)}-01`, to: today });
+    if (key === "3y") { const fyY = Number(defFrom.slice(0, 4)); return setP({ period: "yearly", from: `${fyY - 2}-${fyMD}`, to: settings?.fy_end || today }); }
   };
   const excelSheets = data ? [
     { name: "Summary", subtitle: `${period} · ${fmtDate(data.date_from)} → ${fmtDate(data.date_to)}`,
@@ -116,7 +117,7 @@ export default function IncomeExpense() {
     { name: "Heads", subtitle: scope.label,
       columns: [{ key: "type", label: "Type", width: 12 }, { key: "group", label: "Group", width: 24 }, { key: "head", label: "Head / Ledger", width: 32 }, { key: "amount", label: "Amount", width: 16, num: true }, { key: "share", label: "%", width: 8, num: true }],
       rows: ["expense", "income", "investment"].flatMap((nat) => scope.heads[nat].flatMap((g) => g.rows.map((h) => ({ type: nat.toUpperCase(), group: g.group_name, head: h.name, amount: h.amount, share: h.share })))),
-      groupBy: "type" },
+      groupBy: "type", noGrandTotal: true },
   ] : [];
 
   return (

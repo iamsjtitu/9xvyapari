@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { inr, todayISO } from "@/lib/api";
+import { drcr } from "@/lib/drcr";
 import { Wallet, Bank, ArrowRight } from "@phosphor-icons/react";
 
 const isBank = (r) => /bank|sbi|hdfc|icici|axis|pnb|bob|canara|union|kotak|idbi|upi/i.test(r.name) && !/cash/i.test(r.name);
@@ -49,7 +50,7 @@ export const CashBankBalances = () => {
                   </div>
                 </div>
                 <div className="font-mono-data text-lg font-medium whitespace-nowrap" style={{ color: neg ? "#B71C1C" : "#1B5E20" }} data-testid={`cash-bank-balance-${r.id}`}>
-                  ₹ {inr(Math.abs(r.closing))} <span className="text-xs">{neg ? "Cr" : "Dr"}</span>
+                  ₹ {inr(Math.abs(r.closing))} <span className="text-xs">{drcr(r.closing)}</span>
                 </div>
               </Link>
             );
@@ -57,7 +58,7 @@ export const CashBankBalances = () => {
           <div className="flex items-center justify-between px-5 py-3 bg-parchment/60 font-semibold" data-testid="cash-bank-total">
             <div className="section-title">Kul Cash + Bank</div>
             <div className="font-mono-data text-lg" style={{ color: (data.total?.closing || 0) < 0 ? "#B71C1C" : "#1A1A1A" }}>
-              ₹ {inr(Math.abs(data.total?.closing || 0))} <span className="text-xs">{(data.total?.closing || 0) < 0 ? "Cr" : "Dr"}</span>
+              ₹ {inr(Math.abs(data.total?.closing || 0))} <span className="text-xs">{drcr(data.total?.closing || 0)}</span>
             </div>
           </div>
         </div>

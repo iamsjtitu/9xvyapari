@@ -7,8 +7,8 @@ import { HandCoins } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
 const SIDES = [
-  { v: "dr", l: "Lena hai (Dr)", tid: "os-side-dr" },
-  { v: "cr", l: "Dena hai (Cr)", tid: "os-side-cr" },
+  { v: "dr", l: "Lena hai (Cr)", tid: "os-side-dr" },
+  { v: "cr", l: "Dena hai (Dr)", tid: "os-side-cr" },
   { v: "all", l: "Dono", tid: "os-side-all" },
 ];
 
@@ -89,8 +89,8 @@ export default function Outstanding() {
                 { key: "phone", label: "Phone", width: 14 },
                 { key: "last_txn", label: "Last Txn", width: 12 },
                 { key: "days", label: "Days", width: 7 },
-                { key: "dr", label: "Dr (Lena)", width: 16, num: true },
-                { key: "cr", label: "Cr (Dena)", width: 16, num: true },
+                { key: "dr", label: "Lena (Cr)", width: 16, num: true },
+                { key: "cr", label: "Dena (Dr)", width: 16, num: true },
                 { key: "settled_text", label: "Settled", width: 18 },
               ],
               rows: flatRows.map((r) => ({ ...r, settled_text: r.settled_upto ? `Cleared upto ${r.settled_upto.split("-").reverse().join("-")}` : "" })),
@@ -106,8 +106,8 @@ export default function Outstanding() {
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 print:hidden">
             <div className="card-flat p-4"><div className="section-title">Parties</div><div className="font-mono-data text-2xl" data-testid="os-count">{data.count}</div></div>
-            <div className="card-flat p-4"><div className="section-title">Lena hai (Dr)</div><div className="font-mono-data text-2xl text-[#B71C1C]" data-testid="os-grand-dr">₹ {inr(data.grand_dr)}</div></div>
-            <div className="card-flat p-4"><div className="section-title">Dena hai (Cr)</div><div className="font-mono-data text-2xl text-jama" data-testid="os-grand-cr">₹ {inr(data.grand_cr)}</div></div>
+            <div className="card-flat p-4"><div className="section-title">Lena hai (Cr)</div><div className="font-mono-data text-2xl text-[#B71C1C]" data-testid="os-grand-dr">₹ {inr(data.grand_dr)}</div></div>
+            <div className="card-flat p-4"><div className="section-title">Dena hai (Dr)</div><div className="font-mono-data text-2xl text-jama" data-testid="os-grand-cr">₹ {inr(data.grand_cr)}</div></div>
             <div className="card-flat p-4"><div className="section-title">Groups</div><div className="font-mono-data text-2xl">{data.sections.length}
               {data.hide_settled && data.settled_hidden > 0 && <span className="text-xs text-jama font-heading ml-2" data-testid="os-settled-hidden">· {data.settled_hidden} settled chhupaye</span>}</div></div>
           </div>

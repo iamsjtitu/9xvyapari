@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { inr } from "@/lib/api";
+import { drcr } from "@/lib/drcr";
 
 const Bal = ({ v }) => (
   <span className="font-mono-data" style={{ color: v > 0 ? "#1A1A1A" : v < 0 ? "#B71C1C" : "#9A948A" }}>
-    {v === 0 ? "—" : `₹ ${inr(Math.abs(v))} ${v > 0 ? "Dr" : "Cr"}`}
+    {v === 0 ? "—" : `₹ ${inr(Math.abs(v))} ${drcr(v)}`}
   </span>
 );
 

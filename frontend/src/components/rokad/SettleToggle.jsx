@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api, { inr, formatApiErrorDetail } from "@/lib/api";
+import { drcr } from "@/lib/drcr";
 import { toast } from "sonner";
 import { Broom, LinkSimple, Plus, Star, X } from "@phosphor-icons/react";
 
@@ -122,7 +123,7 @@ export const SettleToggle = ({ form, onChange, onLedgerChange, editEntry }) => {
   const configured = ledgers.length > 0;
   const chosenId = (form.settle_account_id && ledgers.some((l) => l.id === form.settle_account_id)) ? form.settle_account_id : (settings?.settle_account_id || ledgers[0]?.id || "");
   const chosenName = ledgers.find((l) => l.id === chosenId)?.name || settings?.settle_account_name || "Account Clear";
-  const fmtRem = (v) => `₹ ${inr(Math.abs(v))} ${v > 0 ? "Dr" : v < 0 ? "Cr" : ""}`.trim();
+  const fmtRem = (v) => `₹ ${inr(Math.abs(v))} ${drcr(v)}`.trim();
   const dmy = (form.date || "").split("-").reverse().join("-");
 
   return (

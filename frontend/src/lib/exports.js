@@ -205,7 +205,7 @@ function buildSheet(wb, sh, firm, meta) {
     matrix.forEach((vals, r) => writeDataRow(vals, r % 2 === 1, styleOf(sh.rows[r])));
   }
   const lastData = cursor - 1;
-  if (hasSums) writeTotalRow(groupOf ? "GRAND TOTAL" : "TOTAL", firstData, lastData, true);
+  if (hasSums && !sh.noGrandTotal) writeTotalRow(groupOf ? "GRAND TOTAL" : "TOTAL", firstData, lastData, true);
 
   // Footer note
   const fr = ws.getRow(lastData + 3);

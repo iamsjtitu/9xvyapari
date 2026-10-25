@@ -16,6 +16,7 @@ import PartyAutocomplete from "@/components/PartyAutocomplete";
 import { SettleToggle } from "@/components/rokad/SettleToggle";
 import { InvoiceDupHint, describeDup } from "@/components/rokad/InvoiceDupHint";
 import { NoteSuggest } from "@/components/rokad/NoteSuggest";
+import { drcr } from "@/lib/drcr";
 import { KhataModal } from "@/components/KhataModal";
 import { LedgerBalanceHint } from "@/components/LedgerBalanceHint";
 import { backdropClose } from "@/lib/backdrop";
@@ -249,6 +250,11 @@ export default function RokadPanna() {
       const payload = { ...form, amount: parseFloat(form.amount || 0) };
       if (!payload.amount || payload.amount <= 0) {
         toast.error("Amount daalein");
+        return;
+      }
+      if (!payload.party_id) {
+        toast.error("Party chunna zaroori hai — list se chunein ya nayi party banayein");
+        document.querySelector("[data-testid='select-party']")?.focus();
         return;
       }
       payload.inv_no = (payload.inv_no || "").trim();
@@ -562,14 +568,14 @@ export default function RokadPanna() {
             <div>
               <div className="text-[11px] uppercase tracking-wider text-muted2">Opening Balance</div>
               <div className="font-mono-data text-xl font-medium" style={{ color: bankSummary.opening >= 0 ? "#1A1A1A" : "#B71C1C" }} data-testid="bank-opening">
-                ₹ {inr(Math.abs(bankSummary.opening))} {bankSummary.opening >= 0 ? "Dr" : "Cr"}
+                ₹ {inr(Math.abs(bankSummary.opening))} {drcr(bankSummary.opening)}
               </div>
               <div className="text-[10px] text-muted2 font-mono-data">pehle {dateFrom}</div>
             </div>
             <div>
               <div className="text-[11px] uppercase tracking-wider text-muted2">Closing Balance</div>
               <div className="font-mono-data text-xl font-medium" style={{ color: bankSummary.closing >= 0 ? "#1B5E20" : "#B71C1C" }} data-testid="bank-closing">
-                ₹ {inr(Math.abs(bankSummary.closing))} {bankSummary.closing >= 0 ? "Dr" : "Cr"}
+                ₹ {inr(Math.abs(bankSummary.closing))} {drcr(bankSummary.closing)}
               </div>
               <div className="text-[10px] text-muted2 font-mono-data">
                 as on {dateTo}{Math.abs(bankSummary.other) >= 0.005 ? ` · journal/anya ${bankSummary.other > 0 ? "+" : "−"}₹${inr(Math.abs(bankSummary.other))}` : ""}
@@ -613,7 +619,7 @@ export default function RokadPanna() {
                   title="Is account ka cash book kholein" data-testid={`acct-row-${r.id}`}>
                   <td className="font-medium">{r.code ? `${r.code} · ` : ""}{r.name}</td>
                   <td className="num font-mono-data" style={{ color: r.opening < 0 ? "#B71C1C" : "#1A1A1A" }} data-testid={`acct-opening-${r.id}`}>
-                    ₹ {inr(Math.abs(r.opening))} {r.opening < 0 ? "Cr" : "Dr"}
+                    ₹ {inr(Math.abs(r.opening))} {drcr(r.opening)}
                   </td>
                   <td className="num font-mono-data amount-jama">{r.jama ? `₹ ${inr(r.jama)}` : "—"}</td>
                   <td className="num font-mono-data amount-kharch">{r.kharch ? `₹ ${inr(r.kharch)}` : "—"}</td>
@@ -622,7 +628,7 @@ export default function RokadPanna() {
                   )}
                   <td className="num font-mono-data font-medium" style={{ color: r.closing < 0 ? "#B71C1C" : "#1B5E20" }}
                     data-testid={`acct-closing-${r.id}`}>
-                    ₹ {inr(Math.abs(r.closing))} {r.closing < 0 ? "Cr" : "Dr"}
+                    ₹ {inr(Math.abs(r.closing))} {drcr(r.closing)}
                   </td>
                   <td className="print:hidden">
                     <button type="button" className="btn-ghost p-1.5 inline-flex" title="Sirf yeh account print karo (apne page par)"
@@ -634,11 +640,11 @@ export default function RokadPanna() {
               ))}
               <tr className="bg-parchment/60 font-semibold" data-testid="acct-total-row">
                 <td>TOTAL</td>
-                <td className="num font-mono-data">₹ {inr(Math.abs(allAccountsSummary.total.opening))} {allAccountsSummary.total.opening < 0 ? "Cr" : "Dr"}</td>
+                <td className="num font-mono-data">₹ {inr(Math.abs(allAccountsSummary.total.opening))} {drcr(allAccountsSummary.total.opening)}</td>
                 <td className="num font-mono-data amount-jama">₹ {inr(allAccountsSummary.total.jama)}</td>
                 <td className="num font-mono-data amount-kharch">₹ {inr(allAccountsSummary.total.kharch)}</td>
                 {allAccountsSummary.hasOther && <td className="num font-mono-data text-muted2">{allAccountsSummary.total.other > 0 ? "+" : "−"}₹ {inr(Math.abs(allAccountsSummary.total.other))}</td>}
-                <td className="num font-mono-data" data-testid="acct-total-closing">₹ {inr(Math.abs(allAccountsSummary.total.closing))} {allAccountsSummary.total.closing < 0 ? "Cr" : "Dr"}</td>
+                <td className="num font-mono-data" data-testid="acct-total-closing">₹ {inr(Math.abs(allAccountsSummary.total.closing))} {drcr(allAccountsSummary.total.closing)}</td>
                 <td className="print:hidden"></td>
               </tr>
             </tbody>
@@ -857,11 +863,12 @@ export default function RokadPanna() {
               </div>
 
               <div>
-                <label className="lbl">Party (Optional) <span className="normal-case tracking-normal text-muted2">— naam likho, nayi party yahin ban jayegi</span></label>
+                <label className="lbl">Party <span className="text-kharch">*</span> <span className="normal-case tracking-normal text-muted2">— zaroori · naam likho, nayi party yahin ban jayegi</span></label>
                 <PartyAutocomplete
                   value={form.party_name}
                   selectedId={form.party_id}
                   options={partyOptions}
+                  required
                   onPick={(p) => setForm((f) => ({ ...f, party_id: p.id, party_name: p.name }))}
                   onChangeText={(t) => setForm((f) => ({ ...f, party_name: t, party_id: f.party_id && t.trim().toLowerCase() === (parties.find((x) => x.id === f.party_id)?.name || "").trim().toLowerCase() ? f.party_id : "" }))}
                   onCreate={createParty}

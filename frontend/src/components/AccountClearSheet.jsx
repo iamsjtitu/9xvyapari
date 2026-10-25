@@ -36,7 +36,7 @@ export const AccountClearSheet = ({ data, showLedger = false }) => {
       <div className="dos-stmt-row dos-total ac-row" data-testid="ac-sheet-total">
         <span className="dt"></span><span className="rf"></span><span className="pt">TOTAL ({count} entries)</span>{showLedger && <span className="ld"></span>}<span className="rf"></span><span className="iv"></span>
         <span className="am">{inr(total_off)}</span><span className="am">{inr(total_back)}</span>
-        <span className="nr">NET CHHODA: {inr(Math.abs(net))} {net >= 0 ? "Dr" : "Cr"}</span>
+        <span className="nr">NET {net >= 0 ? "CHHODA" : "WAPAS"}: {inr(Math.abs(net))}</span>
       </div>
       <div className="flex justify-between mt-3 text-[10px] uppercase">
         <span>Off = party ka baki chhoda (Dr Account Clear) · Back = humne apna dena chhoda (Cr Account Clear)</span>

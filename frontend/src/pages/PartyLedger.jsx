@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { useParams, Link, useSearchParams, useOutletContext } from "react-router-dom";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
+import { drcr, COL_DEBIT, COL_CREDIT } from "@/lib/drcr";
 import { ArrowLeft, Receipt, Notebook, BookOpen, BookOpenText, Wallet, Printer, CheckCircle, PencilSimple, Trash, NotePencil } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ExportBar } from "@/components/ExportBar";
@@ -18,28 +19,30 @@ const KIND_ICON = {
   rokad: <Notebook size={14} color="#595959" />,
 };
 
-// Build chronological ledger rows (Dr = party owes more / cash a/c receives)
+// Build chronological ledger rows — PASSBOOK columns (see lib/drcr.js):
+//   credit = AAYA (party ko maal/paisa mila · cash a/c me paisa aaya) → balance badhta hai
+//   debit  = GAYA (party ne diya · cash a/c se paisa gaya)           → balance ghatta hai
 function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = [] }) {
   const rows = [];
   bills.forEach((b) => rows.push({
     kind: "bill", id: b.id, date: b.date, ref: b.id, vno: b.bill_no || "",
     label: `${b.bill_type === "sale" ? "Sale" : "Purchase"} Bill ${b.bill_no}`,
-    debit: b.bill_type === "sale" ? b.total : 0, credit: b.bill_type === "purchase" ? b.total : 0,
+    credit: b.bill_type === "sale" ? b.total : 0, debit: b.bill_type === "purchase" ? b.total : 0,
   }));
   rokad.forEach((r) => rows.push({
     kind: "rokad", id: r.id, date: r.date, vno: r.voucher_no || "", inv: r.inv_no || "", created_at: r.created_at || "",
     label: `${r.description || (r.type === "jama" ? "Payment Received" : "Payment Paid")}${r.cash_account_name ? ` · ${r.cash_account_name}` : ""}`,
-    debit: r.type === "kharch" ? r.amount : 0, credit: r.type === "jama" ? r.amount : 0,
+    credit: r.type === "kharch" ? r.amount : 0, debit: r.type === "jama" ? r.amount : 0,
   }));
   cash_rokad.forEach((r) => rows.push({
     kind: "cash", id: r.id, date: r.date, vno: r.voucher_no || "", inv: r.inv_no || "",
     label: `${r.type === "jama" ? "Receipt" : "Payment"} · ${r.party_name || ""}${r.description ? " · " + r.description : ""}`,
-    debit: r.type === "jama" ? r.amount : 0, credit: r.type === "kharch" ? r.amount : 0,
+    credit: r.type === "jama" ? r.amount : 0, debit: r.type === "kharch" ? r.amount : 0,
   }));
   journal.forEach((j, i) => rows.push({
     kind: "journal", id: `${j.id}-${i}`, refId: j.id, date: j.date, vno: j.voucher_no || "", created_at: j.created_at || "",
     label: `Journal${j.narration ? " · " + j.narration : ""}${j.other ? " | vs " + j.other : ""}`,
-    debit: j.debit, credit: j.credit, settles_rokad_id: j.settles_rokad_id || null,
+    credit: j.debit, debit: j.credit, settles_rokad_id: j.settles_rokad_id || null,
   }));
   dos_journal.forEach((j) => {
     const sgnLabel = { SR: "Sale Reg", PR: "Purchase Reg", CB: "Cash Book", JR: "Journal" }[j.sgn] || j.sgn || "DOS";
@@ -47,15 +50,13 @@ function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = 
     rows.push({
       kind: "dos", id: `${j.imported_from}-${j.row_index}`, date: j.date, vno: j.ref_no || "",
       label: `${sgnLabel} · ${j.narration || ""}${counter ? " | vs " + counter : ""}${j.extra ? " (" + j.extra + ")" : ""}`,
-      debit: Number(j.debit || 0), credit: Number(j.credit || 0), ref_no: j.ref_no, sgn: j.sgn,
+      credit: Number(j.debit || 0), debit: Number(j.credit || 0), ref_no: j.ref_no, sgn: j.sgn,
     });
   });
   // same date → entry order (created_at); salary journal (credit) lands before its payment, settlement after its receipt
   rows.sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.created_at || "").localeCompare(b.created_at || ""));
   return rows;
 }
-
-const drcr = (n) => (n < 0 ? "Cr" : n > 0 ? "Dr" : "");
 
 export default function PartyLedger() {
   const { id } = useParams();
@@ -83,7 +84,7 @@ export default function PartyLedger() {
 
   if (!data) return <LoadState error={error} onRetry={() => setAttempt((a) => a + 1)} backTo="/parties" backLabel="Party Khata par wapas" testid="ledger" />;
   const { party, dos_journal = [], journal = [], cash_rokad = [] } = data;
-  const isAccount = data.kind === "account";
+  const isAccount = data.kind === "account" || /CASH\s*&\s*BANK/i.test(data.party?.group_name || "") || (data.cash_rokad || []).length > 0;
   // Edit the voucher behind a ledger line, then come back here (DOS-imported rows are read-only)
   const back = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
   const editHref = (r) => {
@@ -116,7 +117,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
   const opening = data.opening ?? (party.opening_balance || 0);
   const rows = buildRows(data);
   let running = opening;
-  const enriched = rows.map((r) => { running = running + r.debit - r.credit; return { ...r, balance: running }; });
+  const enriched = rows.map((r) => { running = running + r.credit - r.debit; return { ...r, balance: running }; });   // passbook: credit badhata hai
   const quick = [
     { l: "Aaj", d: todayISO(), tid: "ledger-quick-today" },
     { l: "FY Start", d: settings?.fy_start, tid: "ledger-quick-fystart" },
@@ -130,7 +131,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
   return (
     <div className="space-y-5" data-testid="page-party-ledger">
       <div className="flex items-center justify-between flex-wrap gap-2 print:hidden">
-        <Link to={isAccount ? "/accounts" : "/parties"} className="btn-ghost" data-testid="ledger-back-link"><ArrowLeft size={14} /> Wapas</Link>
+        <Link to={data.kind === "account" ? "/accounts" : "/parties"} className="btn-ghost" data-testid="ledger-back-link"><ArrowLeft size={14} /> Wapas</Link>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1" data-testid="ledger-asof-controls">
             <label className="lbl !mb-0 mr-1 whitespace-nowrap">From</label>
@@ -162,8 +163,8 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                 { key: "vno", label: "V.No. / Ref", width: 11 },
                 { key: "inv", label: "INV No.", width: 12 },
                 { key: "label", label: "Particulars", width: 46 },
-                { key: "debit", label: "Debit", width: 15, num: true },
-                { key: "credit", label: "Credit", width: 15, num: true },
+                { key: "debit", label: COL_DEBIT(isAccount), width: 18, num: true },
+                { key: "credit", label: COL_CREDIT(isAccount), width: 18, num: true },
                 { key: "balance_abs", label: "Balance", width: 15, num: true },
                 { key: "drcr", label: "Dr/Cr", width: 6 },
               ],
@@ -179,7 +180,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
 
       {/* Print output = DOS statement (always); on screen only when toggled */}
       <div className={view === "statement" ? "" : "hidden print:block"}>
-        <PartyStatement firmName={settings?.firm_name} party={party} rows={enriched} opening={opening}
+        <PartyStatement firmName={settings?.firm_name} party={party} rows={enriched} opening={opening} isCash={isAccount}
           closing={party.balance} dateFrom={dateFrom} asOn={asOn} settledUpto={data.settled_upto} />
       </div>
 
@@ -204,7 +205,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
           <div className="text-right">
             <div className="section-title">Closing as on {fmtDate(asOn)}</div>
             <div className="font-mono-data text-3xl font-medium mt-1" style={{ color: balColor }} data-testid="party-balance">
-              ₹ {inr(Math.abs(party.balance))} <span className="text-base">{party.balance > 0 ? "Dr" : party.balance < 0 ? "Cr" : ""}</span>
+              ₹ {inr(Math.abs(party.balance))} <span className="text-base">{drcr(party.balance)}</span>
             </div>
             <div className="text-[11px] uppercase tracking-wider text-muted2 mt-1">
               {isAccount || cash_rokad.length > 0
@@ -219,7 +220,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
         <div className="px-4 py-3 border-b border-khaki flex items-center justify-between flex-wrap gap-2">
           <div className="section-title">Transaction History ({periodText})</div>
           <div className="flex items-center gap-3 text-xs text-muted2 font-mono-data">
-            <span data-testid="ledger-opening">Opening{dateFrom ? ` (${fmtDate(dateFrom)} se pehle)` : ""}: ₹ {inr(Math.abs(opening))} {opening < 0 ? "Cr" : "Dr"}</span>
+            <span data-testid="ledger-opening">Opening{dateFrom ? ` (${fmtDate(dateFrom)} se pehle)` : ""}: ₹ {inr(Math.abs(opening))} {drcr(opening)}</span>
             <span>·</span>
             <span data-testid="ledger-entry-count">{enriched.length} entries</span>
             {cash_rokad.length > 0 && <span className="text-jama">· {cash_rokad.length} cash a/c</span>}
@@ -234,8 +235,8 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
               <th style={{ width: 70 }}>V.No.</th>
               <th style={{ width: 100 }}>INV No.</th>
               <th>Vivran</th>
-              <th className="num" style={{ width: 130 }}>Debit (+)</th>
-              <th className="num" style={{ width: 130 }}>Credit (-)</th>
+              <th className="num" style={{ width: 150 }} data-testid="ledger-th-debit">{COL_DEBIT(isAccount)}</th>
+              <th className="num" style={{ width: 150 }} data-testid="ledger-th-credit">{COL_CREDIT(isAccount)}</th>
               <th className="num" style={{ width: 130 }}>Balance</th>
               <th className="print:hidden" style={{ width: 72 }}></th>
             </tr>
@@ -277,8 +278,8 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                       )}
                     </div>
                   </td>
-                  <td className="num amount-kharch whitespace-nowrap">{r.debit ? `₹ ${inr(r.debit)}` : "—"}</td>
-                  <td className="num amount-jama whitespace-nowrap">{r.credit ? `₹ ${inr(r.credit)}` : "—"}</td>
+                  <td className="num amount-kharch whitespace-nowrap" data-testid={`ledger-debit-${r.id}`}>{r.debit ? `₹ ${inr(r.debit)}` : "—"}</td>
+                  <td className="num amount-jama whitespace-nowrap" data-testid={`ledger-credit-${r.id}`}>{r.credit ? `₹ ${inr(r.credit)}` : "—"}</td>
                   <td className="num font-medium whitespace-nowrap" style={{ color: r.balance >= 0 ? "#1A1A1A" : "#1B5E20" }}>
                     ₹ {inr(Math.abs(r.balance))} {r.balance < 0 && <span className="text-[10px] ml-1 text-jama">CR</span>}
                   </td>
@@ -311,7 +312,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
               <tr className="bg-parchment/60 font-semibold" data-testid="ledger-closing-row">
                 <td colSpan={6} className="text-right">CLOSING BALANCE AS ON {fmtDate(asOn)}</td>
                 <td className="num font-mono-data" style={{ color: balColor }}>
-                  ₹ {inr(Math.abs(party.balance))} {party.balance < 0 ? "Cr" : "Dr"}
+                  ₹ {inr(Math.abs(party.balance))} {drcr(party.balance)}
                 </td>
                 <td className="print:hidden"></td>
               </tr>

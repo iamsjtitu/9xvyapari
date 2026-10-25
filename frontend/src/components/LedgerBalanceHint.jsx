@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { inr } from "@/lib/api";
+import { drcr } from "@/lib/drcr";
 import { Scales, ArrowRight } from "@phosphor-icons/react";
 
 // Shows a ledger's live balance as soon as it is selected (party / cash account).
@@ -32,7 +33,7 @@ export const LedgerBalanceHint = ({ ledgerId, delta = 0, className = "", compact
       <Scales size={12} color={colorOf(bal)} weight="bold" />
       {!compact && <span className="text-muted2">Abhi ka balance:</span>}
       <span className="font-semibold" style={{ color: colorOf(bal) }} data-testid={`${testId}-amount`}>
-        ₹ {inr(Math.abs(bal))} {bal < 0 ? "Cr" : bal > 0 ? "Dr" : ""}
+        ₹ {inr(Math.abs(bal))} {drcr(bal)}
       </span>
       <span className="text-muted2">({meaningOf(bal)})</span>
       {live && (
@@ -41,7 +42,7 @@ export const LedgerBalanceHint = ({ ledgerId, delta = 0, className = "", compact
           <span className="text-muted2">{compact ? "" : "is entry ke baad:"}</span>
           <span className="font-semibold px-1 rounded-sm bg-[#FFF8E1] border border-[#F0C674]" style={{ color: colorOf(after) }}
             title="Is amount ke baad ka balance (live)" data-testid={`${testId}-after`}>
-            ₹ {inr(Math.abs(after))} {after < 0 ? "Cr" : after > 0 ? "Dr" : ""}
+            ₹ {inr(Math.abs(after))} {drcr(after)}
           </span>
           <span className="text-muted2">({meaningOf(after)})</span>
         </>

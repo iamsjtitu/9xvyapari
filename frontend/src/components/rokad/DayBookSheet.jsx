@@ -1,4 +1,5 @@
 import { inr } from "@/lib/api";
+import { drcr } from "@/lib/drcr";
 import { BRAND, appVersionLabel } from "@/lib/brand";
 
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
@@ -16,7 +17,7 @@ function buildSides(acct, entries, single = true) {
   const kharchTotal = kharch.reduce((t, r) => t + r.amount, 0);
   const left = [], right = [];
   if (acct.opening >= 0) left.push({ text: "OPENING BALANCE B/F", amount: acct.opening, bold: true });
-  else right.push({ text: "OPENING BALANCE B/F (Cr)", amount: -acct.opening, bold: true });
+  else right.push({ text: "OPENING BALANCE B/F (Dr · overdraft)", amount: -acct.opening, bold: true });
   left.push(...jama);
   right.push(...kharch);
   if (Math.abs(acct.other || 0) >= 0.005) {
@@ -25,7 +26,7 @@ function buildSides(acct, entries, single = true) {
   left.push({ text: `TOTAL ${tag}JAMA (${jama.length})`, amount: jamaTotal, bold: true, total: true, testId: "jama-total" });
   right.push({ text: `TOTAL ${tag}KHARCH (${kharch.length})`, amount: kharchTotal, bold: true, total: true, testId: "kharch-total" });
   if (acct.closing >= 0) right.push({ text: "CLOSING BALANCE C/F", amount: acct.closing, bold: true, closing: true, testId: "closing" });
-  else left.push({ text: "CLOSING BALANCE C/F (Cr)", amount: -acct.closing, bold: true, closing: true, testId: "closing" });
+  else left.push({ text: "CLOSING BALANCE C/F (Dr · overdraft)", amount: -acct.closing, bold: true, closing: true, testId: "closing" });
   return { left, right, jamaTotal, kharchTotal };
 }
 
@@ -68,7 +69,7 @@ export const DayBookSheet = ({ firmName, dateFrom, dateTo, accounts, entries, pa
           <div className={`db-account ${pageBreak ? "db-pagebreak" : ""}`} key={a.id} data-testid={`daybook-account-${a.id}`}>
             <div className="dos-group flex justify-between uppercase">
               <span>A/C: {a.code ? `${a.code} · ` : ""}{a.name}{a.group_name ? ` (${a.group_name})` : ""}</span>
-              <span>Opening {inr(Math.abs(a.opening))} {a.opening < 0 ? "Cr" : "Dr"} → Closing {inr(Math.abs(a.closing))} {a.closing < 0 ? "Cr" : "Dr"}</span>
+              <span>Opening {inr(Math.abs(a.opening))} {drcr(a.opening)} → Closing {inr(Math.abs(a.closing))} {drcr(a.closing)}</span>
             </div>
             <div className="db-t">
               <Side rows={sides.left} title="Jama (Receipts)" testId={`daybook-jama-${a.id}`} />
@@ -85,7 +86,7 @@ export const DayBookSheet = ({ firmName, dateFrom, dateTo, accounts, entries, pa
           {idle.map((a) => (
             <div className="dos-stmt-row db-row" key={a.id} data-testid={`daybook-idle-${a.id}`}>
               <span className="dt">{a.code || ""}</span><span className="pt">{a.name}</span><span className="rf"></span><span className="iv"></span>
-              <span className="am">{inr(Math.abs(a.closing))} {a.closing < 0 ? "Cr" : "Dr"}</span>
+              <span className="am">{inr(Math.abs(a.closing))} {drcr(a.closing)}</span>
             </div>
           ))}
         </div>

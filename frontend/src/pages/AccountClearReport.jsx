@@ -80,7 +80,7 @@ export default function AccountClearReport() {
             <ExportBar filename={`account-clear-${ledgerId ? (data.ledger?.name || "").toLowerCase().replace(/\s+/g, "-") + "-" : ""}${from || "start"}-${to}`} title={`Account Clear Register · ${data.ledger?.name || ""} · ${period}`}
               sheets={[{
                 name: "Account Clear",
-                subtitle: `Chhoda ₹${inr(data.total_off)} · Wapas ₹${inr(data.total_back)} · Net ₹${inr(Math.abs(data.net))} ${data.net >= 0 ? "Dr" : "Cr"} · ${data.count} entries`,
+                subtitle: `Chhoda ₹${inr(data.total_off)} · Wapas ₹${inr(data.total_back)} · Net ₹${inr(Math.abs(data.net))} ${data.net >= 0 ? "chhoda" : "wapas"} · ${data.count} entries`,
                 columns: [
                   { key: "date", label: "Date", width: 12 },
                   { key: "voucher_no", label: "Journal", width: 10 },
@@ -114,7 +114,7 @@ export default function AccountClearReport() {
             <div className="card-flat p-4"><div className="section-title">Entries</div><div className="font-mono-data text-2xl" data-testid="ac-count">{data.count}</div></div>
             <div className="card-flat p-4"><div className="section-title">Chhoda (party ka baki)</div><div className="font-mono-data text-2xl text-[#B71C1C]" data-testid="ac-total-off">₹ {inr(data.total_off)}</div></div>
             <div className="card-flat p-4"><div className="section-title">Wapas (apna dena chhoda)</div><div className="font-mono-data text-2xl text-jama" data-testid="ac-total-back">₹ {inr(data.total_back)}</div></div>
-            <div className="card-flat p-4"><div className="section-title">Net</div><div className="font-mono-data text-2xl" data-testid="ac-net">₹ {inr(Math.abs(data.net))} <span className="text-sm">{data.net >= 0 ? "Dr" : "Cr"}</span></div></div>
+            <div className="card-flat p-4"><div className="section-title">Net</div><div className="font-mono-data text-2xl" data-testid="ac-net">₹ {inr(Math.abs(data.net))} <span className="text-sm">{data.net >= 0 ? "chhoda" : "wapas"}</span></div></div>
           </div>
 
           <div className={view === "sheet" ? "" : "hidden print:block"}>
@@ -162,7 +162,7 @@ export default function AccountClearReport() {
                     <td colSpan={allView ? 6 : 5} className="text-right">TOTAL ({data.count})</td>
                     <td className="num font-mono-data">₹ {inr(data.total_off)}</td>
                     <td className="num font-mono-data">₹ {inr(data.total_back)}</td>
-                    <td colSpan={2} className="text-xs">Net chhoda: ₹ {inr(Math.abs(data.net))} {data.net >= 0 ? "Dr" : "Cr"}</td>
+                    <td colSpan={2} className="text-xs">Net {data.net >= 0 ? "chhoda" : "wapas"}: ₹ {inr(Math.abs(data.net))}</td>
                   </tr>
                 </tfoot>
               )}

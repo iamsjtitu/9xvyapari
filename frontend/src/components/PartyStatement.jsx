@@ -1,12 +1,14 @@
 import { inr } from "@/lib/api";
 import { BRAND, appVersionLabel } from "@/lib/brand";
+import { fmtBal, LEGEND_PARTY, LEGEND_CASH } from "@/lib/drcr";
 
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
-const drcr = (n) => `${inr(Math.abs(n))} ${n < 0 ? "Cr" : n > 0 ? "Dr" : "  "}`;
+const drcr = (n) => (Math.abs(n || 0) < 0.005 ? `${inr(0)}   ` : fmtBal(n, false));   // passbook: +ve = Cr
 const refOf = (r) => r.vno || r.voucher_no || r.ref_no || r.bill_no || "";
 
-// DOS-style printable ledger statement: opening → entries → totals → closing, one page
-export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFrom, asOn, settledUpto }) => {
+// DOS-style printable ledger statement: opening → entries → totals → closing, one page.
+// Columns follow the PASSBOOK rule (lib/drcr.js): Debit = gaya, Credit = aaya, balance Cr = lena / paisa hai.
+export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFrom, asOn, settledUpto, isCash = false }) => {
   const totalDr = rows.reduce((t, r) => t + (r.debit || 0), 0);
   const totalCr = rows.reduce((t, r) => t + (r.credit || 0), 0);
   const period = dateFrom ? `${fmtDate(dateFrom)} To ${fmtDate(asOn)}` : `Upto ${fmtDate(asOn)}`;
@@ -27,7 +29,7 @@ export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFr
       </div>
       <div className="dos-stmt-row dos-head mt-2">
         <span className="dt">Date</span><span className="pt">Particulars</span><span className="rf">V.No</span><span className="iv">INV No</span>
-        <span className="am">Debit</span><span className="am">Credit</span><span className="bl">Balance</span>
+        <span className="am">{isCash ? "Debit (Gaya)" : "Debit (Diya)"}</span><span className="am">{isCash ? "Credit (Aaya)" : "Credit (Mila)"}</span><span className="bl">Balance</span>
       </div>
       <div className="dos-stmt-row dos-open" data-testid="stmt-opening-row">
         <span className="dt">{dateFrom ? fmtDate(dateFrom) : ""}</span>
@@ -64,7 +66,7 @@ export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFr
         <span className="am"></span><span className="am"></span><span className="bl">{drcr(closing)}</span>
       </div>
       <div className="flex justify-between mt-3 text-[10px] uppercase">
-        <span>Dr = Party se lena · Cr = Party ko dena</span>
+        <span data-testid="stmt-legend">{isCash ? LEGEND_CASH : LEGEND_PARTY}</span>
         <span>E.&amp;O.E.</span>
         <span>Printed {new Date().toLocaleString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })} · {BRAND.app} {appVersionLabel()}</span>
       </div>

@@ -2,7 +2,7 @@ import { inr } from "@/lib/api";
 import { BRAND, appVersionLabel } from "@/lib/brand";
 
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
-const SIDE_TITLE = { dr: "LENA HAI (Dr) — Collection List", cr: "DENA HAI (Cr) — Payable List", all: "OUTSTANDING (Dr / Cr)" };
+const SIDE_TITLE = { dr: "LENA HAI (Cr) — Collection List", cr: "DENA HAI (Dr) — Payable List", all: "OUTSTANDING (Lena / Dena)" };
 
 // DOS-style collection-round list: parties with pending balance, grouped by account group
 export const OutstandingSheet = ({ data }) => {
@@ -16,14 +16,14 @@ export const OutstandingSheet = ({ data }) => {
       </div>
       <div className="dos-stmt-row dos-head os-row mt-2">
         <span className="c">Code</span><span className="n">Party</span><span className="pl">Place</span><span className="ph">Phone</span>
-        <span className="lt">Last Txn</span><span className="dy">Days</span><span className="am">Dr (Lena)</span><span className="am">Cr (Dena)</span><span className="tk">Vasooli / Remark</span>
+        <span className="lt">Last Txn</span><span className="dy">Days</span><span className="am">Lena (Cr)</span><span className="am">Dena (Dr)</span><span className="tk">Vasooli / Remark</span>
       </div>
       {sections.length === 0 && <div className="dos-stmt-row os-row"><span className="n">-- koi outstanding nahi --</span></div>}
       {sections.map((sec) => (
         <div key={sec.group_id} className="os-group" data-testid={`os-group-${sec.group_id}`}>
           <div className="dos-group flex justify-between uppercase">
             <span>{sec.group_name} ({sec.rows.length})</span>
-            <span>Dr {inr(sec.dr_total)} · Cr {inr(sec.cr_total)}</span>
+            <span>Lena {inr(sec.dr_total)} · Dena {inr(sec.cr_total)}</span>
           </div>
           {sec.rows.map((r) => (
             <div className="dos-stmt-row os-row" key={r.id} data-testid={`os-row-${r.id}`}>
@@ -47,7 +47,7 @@ export const OutstandingSheet = ({ data }) => {
       <div className="dos-grand" data-testid="os-grand">
         <div className="flex justify-between font-bold uppercase">
           <span>Grand Total · {count} parties</span>
-          <span>Lena (Dr) {inr(grand_dr)} &nbsp;|&nbsp; Dena (Cr) {inr(grand_cr)} &nbsp;|&nbsp; Net {inr(Math.abs(grand_dr - grand_cr))} {grand_dr - grand_cr >= 0 ? "Dr" : "Cr"}</span>
+          <span>Lena (Cr) {inr(grand_dr)} &nbsp;|&nbsp; Dena (Dr) {inr(grand_cr)} &nbsp;|&nbsp; Net {inr(Math.abs(grand_dr - grand_cr))} {grand_dr - grand_cr >= 0 ? "Cr (lena)" : "Dr (dena)"}</span>
         </div>
       </div>
       <div className="flex justify-between mt-3 text-[10px] uppercase">

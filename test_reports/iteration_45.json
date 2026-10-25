@@ -1,0 +1,44 @@
+{
+  "summary": "Tested the Aay-Vyay (Income & Expense) report end-to-end. Backend: 9/10 pytest pass. Monthly, weekly (Mon–Sun, empty weeks included, first week clipped to the range), yearly (FY 2025-26 / FY 2026-27) buckets are correct. Group-wise heads add up to 100%. A journal Dr to an expense head adds to expense, and a jama to an expense head reduces it. Bad period or date gives 400, swapped dates are handled, and investment_group_ids filtering works (a TEST party under FIXED ASSETS showed as investment 7000 and OTHER DEPOSITS was excluded). The 1 failure is an older generic bug in PUT /settings that the new picker now triggers: a partial PUT resets firm_name to '9x Vyapari'. Frontend: all requested flows work — default Monthly FY range, Aug row scoping (₹ 10,200.00 and heads with %), head links, clear selection, weekly (53 rows) and yearly tabs, quick buttons, URL params, investment picker (asset groups only, untick OTHER DEPOSITS takes investment 35,45,022 → 0, then restored), DOS sheet toggle, print stub called, Excel with Summary and Heads sheets, nav item key R, Alt+R works, and /rokad and /trial-balance still load.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "PUT /api/settings", "issue": "SettingsIn.firm_name defaults to '9x Vyapari' (it is not None or ''), so it is never filtered out. Any partial PUT, e.g. the Investment groups picker sending {investment_group_ids:[...]} or SettleToggle sending {settle_accounts...}, overwrites the user's firm name with '9x Vyapari'. Reproduced: set firm_name 'TEST_IE45 FIRM', PUT {investment_group_ids}, GET returns '9x Vyapari'.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/reports/income-expense", "issue": "Bills on heads: a purchase bill on an expense-nature head counts as -net (Cr), so it REDUCES expense. If purchase bills are ever booked against PURCHASE A/C or expense ledgers, the sign is likely wrong. Please check the intended semantics."},
+      {"endpoint": "GET /api/reports/income-expense", "issue": "Once someone saves via the picker, settings store an explicit list, so the default heuristic no longer applies to asset groups created later. Acceptable, but worth a note in the UI."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Investment groups picker → Save", "issue": "Because of the PUT /settings default bug, saving the picker silently resets a custom firm name to '9x Vyapari'. Fix on the backend: make firm_name default None.", "affected_selectors": ["[data-testid='ie-inv-groups-save']"]}
+    ],
+    "design_issues": [
+      {"screen": "/income-expense", "issues": [
+        "'Is mahine' keeps the current period tab. Coming from Yearly, it shows a single 'FY 2026-27' row for this month; consider switching to monthly or weekly.",
+        "'3 saal' sets from = today minus 2 years on the 1st of the month (2024-10-01), so FY 2024-25 is a partial year; consider fy_start of 2 years back (2024-04-01).",
+        "Excel 'Heads' sheet GRAND TOTAL adds expense + income + investment amounts together (25,200 for Aug), which has no meaning; drop it or show it per type only.",
+        "Date inputs use the browser's native date picker. This is consistent with the rest of the app, so it is only a note."
+      ]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_income_expense_v45.py", "/app/test_reports/pytest/pytest_iter45.xml"],
+  "action_items": [
+    "HIGH: in SettingsIn change firm_name default to None (or use model_dump(exclude_unset=True) in PUT /settings) so partial updates from the IE picker or SettleToggle don't reset firm_name",
+    "Decide the sign for purchase bills on expense heads in the income-expense report",
+    "Optional UX: 'Is mahine' → switch to monthly or weekly; '3 saal' → start from the FY start; remove the mixed GRAND TOTAL in the Excel Heads sheet"
+  ],
+  "critical_code_review_comments": [
+    "server.py update_settings: the filter on v not in (None, '') does not protect fields with non-empty defaults (firm_name)",
+    "income_expense_report pulls every party and account plus all groups on each call; fine for now, may need caching or indexes on rokad.party_id/date and journal.lines.account_id later",
+    "server.py is 3300+ lines; reports should be split into a module"
+  ],
+  "updated_files": ["/app/backend/tests/test_income_expense_v45.py"],
+  "success_rate": {"backend": "90% (9/10)", "frontend": "100% of requested flows"},
+  "seed_data_creation": "Temporary rokad entries (description TEST_IE45) in Aug/Sep 2026, 1 journal (narration TEST_IE45) and 1 party 'TEST_IE45 FIXED ASSET'. All deleted (verified 0 left in DB). The 5 main-agent IE-TEST entries were left untouched. settings.investment_group_ids was restored to the original default list [OTHER DEPOSITS, FIXED ASSETS, COLD STORAGE, LOANS & ADVANCES]. It is now stored explicitly (it was unset before). firm_name is '9x Vyapari' (the original).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Today in the container is 2026-10-25, FY 2026-04-01..2027-03-31. Head IDs are in test_income_expense_v45.py (BANK CHARGES., ABHISHEK HARPAL, BHOLENATH TRADERS(SHOP RENT), CASH IN HAND, FIXED ASSETS group). The test self-seeds Aug/Sep 2026 and cleans up. test_settings_partial_put_keeps_firm_name will pass once firm_name defaults to None.",
+  "rca of the issue": "PUT /settings: SettingsIn(firm_name='9x Vyapari' default) → model_dump() includes firm_name even when the client didn't send it → the filter only drops None or '' → $set firm_name='9x Vyapari'. Mitigation: body.model_dump(exclude_unset=True) or firm_name: Optional[str] = None."
+}

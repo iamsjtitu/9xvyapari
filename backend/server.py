@@ -303,7 +303,7 @@ class SettleLedger(BaseModel):
     name: str = ""
 
 class SettingsIn(BaseModel):
-    firm_name: Optional[str] = "9x Vyapari"
+    firm_name: Optional[str] = None   # None → unchanged on partial PUTs (pickers send only their own field)
     fy_start: str = ""   # ISO date
     fy_end: str = ""     # ISO date
     current_date: str = ""
@@ -773,9 +773,14 @@ async def _default_cash_account() -> Optional[dict]:
     return await db.accounts.find_one({"name": {"$regex": "cash", "$options": "i"}}, {"_id": 0, "id": 1, "name": 1})
 
 
+PARTY_REQUIRED_MSG = "Party chunna zaroori hai — bina party ke Rokad entry nahi hogi"
+
+
 @api.post("/rokad")
 async def create_rokad(body: RokadIn, current=Depends(get_current_user)):
     doc = body.model_dump()
+    if not doc.get("party_id"):
+        raise HTTPException(400, PARTY_REQUIRED_MSG)
     if not doc.get("cash_account_id"):
         cash = await _default_cash_account()
         if cash:
@@ -891,6 +896,8 @@ async def update_rokad(rid: str, body: RokadIn, current=Depends(get_current_user
     if existing.get("contra_id"):
         raise HTTPException(400, "Yeh Transfer (contra) entry hai – ise Transfer form se edit karein")
     doc = body.model_dump()
+    if not doc.get("party_id"):
+        raise HTTPException(400, PARTY_REQUIRED_MSG)
     if not doc.get("cash_account_id"):
         cash = await _default_cash_account()
         if cash:
