@@ -598,8 +598,23 @@ async def update_item(iid: str, body: ItemIn, current=Depends(get_current_user))
 
 @api.delete("/items/{iid}")
 async def delete_item(iid: str, current=Depends(get_current_user)):
+    item = await db.items.find_one({"id": iid}, {"_id": 0, "name": 1})
+    if not item:
+        raise HTTPException(404, "Item nahi mila")
+    # Usage guard: an item used in saved bills / cold-storage inward can NOT be deleted (bill history must stay readable)
+    bills = await db.bills.count_documents({"items.item_id": iid})
+    inward = await db.inward.count_documents({"item_id": iid})
+    if bills or inward:
+        where = " aur ".join(filter(None, [f"{bills} bill" if bills else "", f"{inward} cold-storage entry" if inward else ""]))
+        raise HTTPException(400, f"'{item['name']}' {where} me use ho raha hai — delete nahi ho sakta. Pehle wo entries badlein/hatayein.")
     await db.items.delete_one({"id": iid})
     return {"ok": True}
+
+
+@api.get("/items/{iid}/usage")
+async def item_usage(iid: str, current=Depends(get_current_user)):
+    return {"bills": await db.bills.count_documents({"items.item_id": iid}),
+            "inward": await db.inward.count_documents({"item_id": iid})}
 
 
 # ---------- BILLS ----------

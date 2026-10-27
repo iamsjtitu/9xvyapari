@@ -32,11 +32,20 @@ export default function GallaMaster() {
     }
   };
 
-  const del = async (id) => {
-    if (!window.confirm("Delete this item?")) return;
-    await api.delete(`/items/${id}`);
-    toast.success("Item delete kiya gaya");
-    load();
+  const del = async (it) => {
+    const { data: u } = await api.get(`/items/${it.id}/usage`);
+    if (u.bills || u.inward) {
+      toast.error(`'${it.name}' ${[u.bills && `${u.bills} bill`, u.inward && `${u.inward} cold-storage entry`].filter(Boolean).join(" aur ")} me use ho raha hai — delete nahi ho sakta`, { duration: 6000 });
+      return;
+    }
+    if (!window.confirm(`'${it.name}' delete karein? (kisi bill me use nahi hua)`)) return;
+    try {
+      await api.delete(`/items/${it.id}`);
+      toast.success("Item delete kiya gaya");
+      load();
+    } catch (err) {
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
+    }
   };
 
   // Keyboard shortcuts
@@ -50,7 +59,7 @@ export default function GallaMaster() {
   const { rowProps } = useTableNav({
     rows: items,
     onEdit: (it) => { setEditing(it); setForm(it); },
-    onDelete: (it) => del(it.id),
+    onDelete: (it) => del(it),
     enabled: editing === null,
   });
 
@@ -114,7 +123,7 @@ export default function GallaMaster() {
                       <button className="btn-ghost p-1.5" onClick={() => { setEditing(it); setForm(it); }} data-testid={`item-edit-${it.id}`}>
                         <PencilSimple size={14} />
                       </button>
-                      <button className="btn-ghost p-1.5" onClick={() => del(it.id)} data-testid={`item-del-${it.id}`}>
+                      <button className="btn-ghost p-1.5" onClick={() => del(it)} data-testid={`item-del-${it.id}`}>
                         <Trash size={14} />
                       </button>
                     </div>
