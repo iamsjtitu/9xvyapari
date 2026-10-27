@@ -3267,21 +3267,25 @@ async def on_start():
         if weak:
             logger.warning("Admin is using the default password – password change will be required at login")
 
-    # Seed sample galla items if empty
-    if await db.items.count_documents({}) == 0:
-        samples = [
-            {"name": "Gehu (Wheat)", "unit": "Quintal", "rate": 2200, "hsn": "1001"},
-            {"name": "Chana (Gram)", "unit": "Quintal", "rate": 5400, "hsn": "0713"},
-            {"name": "Sarson (Mustard)", "unit": "Quintal", "rate": 5800, "hsn": "1207"},
-            {"name": "Chawal (Rice)", "unit": "Quintal", "rate": 3200, "hsn": "1006"},
-            {"name": "Bajra", "unit": "Quintal", "rate": 2100, "hsn": "1008"},
-            {"name": "Makka (Maize)", "unit": "Quintal", "rate": 1900, "hsn": "1005"},
-        ]
-        for s in samples:
-            s["id"] = str(uuid.uuid4())
-            s["created_at"] = now_iso()
-        await db.items.insert_many(samples)
-        logger.info("Seeded sample galla items")
+    # Seed sample galla items ONLY on the very first run (flag in db.meta) — never re-create after the user deletes them
+    if not await db.meta.find_one({"key": "items_seeded"}):
+        fresh_install = (await db.items.count_documents({}) == 0 and await db.parties.count_documents({}) == 0
+                         and await db.bills.count_documents({}) == 0)
+        if fresh_install:
+            samples = [
+                {"name": "Gehu (Wheat)", "unit": "Quintal", "rate": 2200, "hsn": "1001"},
+                {"name": "Chana (Gram)", "unit": "Quintal", "rate": 5400, "hsn": "0713"},
+                {"name": "Sarson (Mustard)", "unit": "Quintal", "rate": 5800, "hsn": "1207"},
+                {"name": "Chawal (Rice)", "unit": "Quintal", "rate": 3200, "hsn": "1006"},
+                {"name": "Bajra", "unit": "Quintal", "rate": 2100, "hsn": "1008"},
+                {"name": "Makka (Maize)", "unit": "Quintal", "rate": 1900, "hsn": "1005"},
+            ]
+            for s in samples:
+                s["id"] = str(uuid.uuid4())
+                s["created_at"] = now_iso()
+            await db.items.insert_many(samples)
+            logger.info("Seeded sample galla items")
+        await db.meta.update_one({"key": "items_seeded"}, {"$set": {"key": "items_seeded", "at": now_iso()}}, upsert=True)
 
     # Seed default Account Groups – matching original FoxPro GROUPTEM.DBF
     if await db.account_groups.count_documents({}) == 0:
