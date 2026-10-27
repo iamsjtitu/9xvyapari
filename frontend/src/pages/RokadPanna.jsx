@@ -3,7 +3,9 @@ import { useOutletContext, useNavigate, useSearchParams } from "react-router-dom
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, X, ArrowsLeftRight, Printer, ListNumbers } from "@phosphor-icons/react";
 import { reopenSettled } from "@/components/SettledMarker";
-import { RokadRegister } from "@/components/rokad/RokadRegister";
+import { RokadRegister, RokadTFormat } from "@/components/rokad/RokadRegister";
+
+const VIEW_KEY = "rokad.view";   // "t" = DOS T-format (default) · "pb" = passbook register
 import { toast } from "sonner";
 import { ExportBar } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -149,6 +151,8 @@ export default function RokadPanna() {
   }, [visibleEntries]);
 
   // Register rows: chronological (passbook) — date, then voucher no., then entry time
+  const [layout, setLayoutState] = useState(() => (localStorage.getItem(VIEW_KEY) === "pb" ? "pb" : "t"));
+  const setLayout = (v) => { setLayoutState(v); try { localStorage.setItem(VIEW_KEY, v); } catch {} };
   const registerRows = useMemo(() => [...visibleEntries].sort((a, b) =>
     (a.date || "").localeCompare(b.date || "") || ((parseInt(a.voucher_no) || 0) - (parseInt(b.voucher_no) || 0)) || (a.created_at || "").localeCompare(b.created_at || "")),
     [visibleEntries]);
@@ -591,14 +595,30 @@ export default function RokadPanna() {
         </div>
       </div>
 
-      {/* Passbook-style register: Debit (Gaya) | Credit (Aaya) | Balance — oldest first; DOS T-format stays in Day Book print */}
-      <RokadRegister rows={registerRows} opening={bankSummary?.opening || 0} showBalance={showRunning} totals={totals}
-        onSlip={setSlip} onEdit={startEdit} onTransfer={(contraId) => setTransfer({ contraId })} onDelete={del}
-        onReopen={async (e) => { if (await reopenSettled(e.id, e.party_name)) { load(); loadSummary(); } }} />
-      {bankFilter && !showRunning && (
-        <div className="text-[11px] text-muted2 font-mono-data" data-testid="rokad-balance-note">
-          Running balance chhupa hai — is period me journal/anya entries (₹ {inr(Math.abs(bankSummary?.other || 0))}) bhi is account ko chhoo rahi hain; closing upar dekhein.
+      {/* View toggle: classic DOS T-format (Jama | Kharch) or passbook register (Debit | Credit | Balance) — remembered */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-1" role="tablist" data-testid="rokad-view-toggle">
+          <button className={`btn-ghost text-xs px-3 py-1.5 ${layout === "t" ? "!bg-ink !text-parchment" : ""}`} onClick={() => setLayout("t")} data-testid="rokad-view-t" aria-pressed={layout === "t"}>
+            T-Format · Jama | Kharch
+          </button>
+          <button className={`btn-ghost text-xs px-3 py-1.5 ${layout === "pb" ? "!bg-ink !text-parchment" : ""}`} onClick={() => setLayout("pb")} data-testid="rokad-view-pb" aria-pressed={layout === "pb"}>
+            Passbook · Debit | Credit | Balance
+          </button>
         </div>
+        {layout === "pb" && bankFilter && !showRunning && (
+          <div className="text-[11px] text-muted2 font-mono-data" data-testid="rokad-balance-note">
+            Running balance chhupa hai — is period me journal/anya entries (₹ {inr(Math.abs(bankSummary?.other || 0))}) bhi is account ko chhoo rahi hain; closing upar dekhein.
+          </div>
+        )}
+      </div>
+      {layout === "t" ? (
+        <RokadTFormat rows={visibleEntries} totals={totals}
+          onSlip={setSlip} onEdit={startEdit} onTransfer={(contraId) => setTransfer({ contraId })} onDelete={del}
+          onReopen={async (e) => { if (await reopenSettled(e.id, e.party_name)) { load(); loadSummary(); } }} />
+      ) : (
+        <RokadRegister rows={registerRows} opening={bankSummary?.opening || 0} showBalance={showRunning} totals={totals}
+          onSlip={setSlip} onEdit={startEdit} onTransfer={(contraId) => setTransfer({ contraId })} onDelete={del}
+          onReopen={async (e) => { if (await reopenSettled(e.id, e.party_name)) { load(); loadSummary(); } }} />
       )}
       </div>
 
