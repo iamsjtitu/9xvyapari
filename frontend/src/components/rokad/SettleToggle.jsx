@@ -16,7 +16,7 @@ export const SettleAccountPicker = ({ settings, onSaved, compact = false }) => {
   const [parties, setParties] = useState([]);
   const [choice, setChoice] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => { api.get("/parties").then((r) => setParties(r.data)).catch(() => {}); }, []);
+  useEffect(() => { api.get("/parties?lite=1").then((r) => setParties(r.data)).catch(() => {}); }, []);
   const options = useMemo(() => parties.filter((p) => !/cash|bank/i.test(p.group_name || "")), [parties]);
   const linked = useMemo(() => linkedLedgers(settings).map((l) => ({ ...l, name: options.find((p) => p.id === l.id)?.name || l.name })), [settings, options]);
   const defaultId = settings?.settle_account_id || linked[0]?.id || "";

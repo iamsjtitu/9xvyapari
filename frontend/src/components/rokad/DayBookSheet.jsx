@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { inr } from "@/lib/api";
 import { drcr } from "@/lib/drcr";
 import { BRAND, appVersionLabel } from "@/lib/brand";
@@ -46,7 +47,7 @@ const Side = ({ rows, title, testId }) => (
   </div>
 );
 
-export const DayBookSheet = ({ firmName, dateFrom, dateTo, accounts, entries, pageBreak = false }) => {
+const DayBookSheetImpl = ({ firmName, dateFrom, dateTo, accounts, entries, pageBreak = false }) => {
   const period = dateFrom === dateTo ? `Date: ${fmtDate(dateFrom)}` : `${fmtDate(dateFrom)} To ${fmtDate(dateTo)}`;
   // Accounts with no movement in the period are listed compactly (saves paper on the daily print)
   const hasMove = (a) => entries.some((e) => e.cash_account_id === a.id) || Math.abs(a.other || 0) >= 0.005;
@@ -102,4 +103,6 @@ export const DayBookSheet = ({ firmName, dateFrom, dateTo, accounts, entries, pa
   );
 };
 
+// memo: always mounted (hidden print sheet) → must not re-render per keystroke in the entry form
+export const DayBookSheet = memo(DayBookSheetImpl);
 export default DayBookSheet;

@@ -405,8 +405,10 @@ async def me(current=Depends(get_current_user)):
 
 # ---------- PARTIES ----------
 @api.get("/parties")
-async def list_parties(current=Depends(get_current_user)):
-    parties = await db.parties.find({}, {"_id": 0}).sort("name", 1).to_list(2000)
+async def list_parties(lite: int = 0, current=Depends(get_current_user)):
+    parties = await db.parties.find({}, {"_id": 0}).sort("name", 1).to_list(20000)
+    if lite:   # pickers / autocompletes: names + groups only, no balance maths
+        return parties
     # latest Account Settled date per party (settlement journals: party line + Account Clear line)
     sids = await _settle_ids()
     settled_upto: dict = {}
@@ -415,9 +417,10 @@ async def list_parties(current=Depends(get_current_user)):
             aid = ln.get("account_id")
             if aid and aid not in sids:
                 settled_upto[aid] = max(settled_upto.get(aid, ""), (j.get("date") or "")[:10])
-    # compute live balance
+    # live balances — one bulk pass for all parties
+    bals = await _bulk_party_balances(parties=parties)
     for p in parties:
-        bal = await _compute_party_balance(p["id"], p.get("opening_balance", 0.0))
+        bal = bals.get(p["id"], float(p.get("opening_balance") or 0))
         p["balance"] = bal
         p["settled_upto"] = settled_upto.get(p["id"])
         p["settled"] = bool(p["settled_upto"]) and abs(bal) < 0.005   # cleared via Account Settled and still at 0
@@ -525,6 +528,39 @@ def _is_date(s: str) -> bool:
 def _upto(as_on: Optional[str]) -> dict:
     return {"date": {"$lte": as_on}} if as_on else {}
 
+
+async def _bulk_party_balances(as_on: Optional[str] = None, parties: Optional[list] = None) -> dict:
+    """Same maths as _compute_party_balance, but for ALL parties in 6 aggregations (not 5 queries × N parties).
+    Big DOS-imported books (lakhs of entries) went from minutes to well under a second."""
+    if parties is None:
+        parties = await db.parties.find({}, {"_id": 0, "id": 1, "opening_balance": 1}).to_list(50000)
+    bal = {p["id"]: float(p.get("opening_balance") or 0) for p in parties}
+    m = _upto(as_on)
+
+    def add(pid, v):
+        if pid in bal:
+            bal[pid] += float(v or 0)
+
+    async for r in db.bills.aggregate([{"$match": m}, {"$group": {"_id": {"p": "$party_id", "t": "$bill_type"},
+                                       "s": {"$sum": {"$subtract": ["$total", {"$ifNull": ["$payment_received", 0]}]}}}}]):
+        add(r["_id"]["p"], r["s"] if r["_id"]["t"] == "sale" else -r["s"])
+    async for r in db.rokad.aggregate([{"$match": {**m, "ref_bill_id": {"$in": [None, ""]}}},
+                                       {"$group": {"_id": {"p": "$party_id", "t": "$type"}, "s": {"$sum": "$amount"}}}]):
+        add(r["_id"]["p"], -r["s"] if r["_id"]["t"] == "jama" else r["s"])
+    async for r in db.rokad.aggregate([{"$match": {**m, "cash_account_id": {"$nin": [None, ""]}, "$expr": {"$ne": ["$cash_account_id", "$party_id"]}}},
+                                       {"$group": {"_id": {"p": "$cash_account_id", "t": "$type"}, "s": {"$sum": "$amount"}}}]):
+        add(r["_id"]["p"], r["s"] if r["_id"]["t"] == "jama" else -r["s"])
+    async for r in db.journal.aggregate([{"$match": m}, {"$unwind": "$lines"},
+                                         {"$group": {"_id": "$lines.account_id", "d": {"$sum": {"$ifNull": ["$lines.debit", 0]}},
+                                                     "c": {"$sum": {"$ifNull": ["$lines.credit", 0]}}}}]):
+        add(r["_id"], r["d"] - r["c"])
+    dsum = {"d": {"$sum": {"$ifNull": ["$debit", 0]}}, "c": {"$sum": {"$ifNull": ["$credit", 0]}}}
+    async for r in db.dos_journal.aggregate([{"$match": m}, {"$group": {"_id": "$party_id", **dsum}}]):
+        add(r["_id"], r["d"] - r["c"])
+    async for r in db.dos_journal.aggregate([{"$match": {**m, "counter_party_id": {"$nin": [None, ""]}, "$expr": {"$ne": ["$party_id", "$counter_party_id"]}}},
+                                             {"$group": {"_id": "$counter_party_id", **dsum}}]):
+        add(r["_id"], r["c"] - r["d"])   # counter side has the opposite effect
+    return {k: round(v, 2) for k, v in bal.items()}
 
 async def _compute_party_balance(party_id: str, opening: float, as_on: Optional[str] = None) -> float:
     bal = opening
@@ -1323,11 +1359,12 @@ async def dashboard_summary(current=Depends(get_current_user)):
     items_count = await db.items.count_documents({})
 
     # total udhaar (sum of positive party balances)
-    parties = await db.parties.find({}, {"_id": 0}).to_list(5000)
+    parties = await db.parties.find({}, {"_id": 0}).to_list(50000)
     total_udhaar = 0.0
     total_owed = 0.0
+    _bals = await _bulk_party_balances(parties=parties)
     for p in parties:
-        bal = await _compute_party_balance(p["id"], p.get("opening_balance", 0.0))
+        bal = _bals.get(p["id"], float(p.get("opening_balance") or 0))
         if bal > 0:
             total_udhaar += bal
         elif bal < 0:
@@ -1960,8 +1997,9 @@ async def _yearend_snapshot():
                 "opening_before": float(doc.get("opening_balance") or 0), "closing": closing,
                 "carry": carry, "new_opening": closing if carry else 0.0}
 
-    parties = [row(p, await _compute_party_balance(p["id"], p.get("opening_balance", 0.0)))
-               for p in await db.parties.find({}, {"_id": 0}).sort("code", 1).to_list(20000)]
+    _plist = await db.parties.find({}, {"_id": 0}).sort("code", 1).to_list(50000)
+    _bals = await _bulk_party_balances(parties=_plist)
+    parties = [row(p, _bals.get(p["id"], float(p.get("opening_balance") or 0))) for p in _plist]
     accounts = [row(a, await _compute_account_balance(a["id"], a.get("opening_balance", 0.0)))
                 for a in await db.accounts.find({}, {"_id": 0}).sort("code", 1).to_list(5000)]
     counts = {c: await db[c].count_documents({}) for c in ARCHIVE_COLLECTIONS}
@@ -2104,9 +2142,11 @@ async def opening_balances(fy_id: Optional[str] = None, as_on: Optional[str] = N
             raise HTTPException(400, "as_on date YYYY-MM-DD format me do")
         as_on = as_on or datetime.now().date().isoformat()  # local date of the machine running the app
         fy_text = f"{s.get('fy_start')} to {s.get('fy_end')}"
-        for p in await db.parties.find({}, {"_id": 0}).to_list(20000):
+        _plist = await db.parties.find({}, {"_id": 0}).to_list(50000)
+        _bals = await _bulk_party_balances(as_on, parties=_plist)
+        for p in _plist:
             ledgers.append({"id": p["id"], "code": p.get("code") or 0, "name": p.get("name", ""), "group_id": p.get("group_id"),
-                            "balance": await _compute_party_balance(p["id"], float(p.get("opening_balance") or 0), as_on), "kind": "party"})
+                            "balance": _bals.get(p["id"], float(p.get("opening_balance") or 0)), "kind": "party"})
         for a in await db.accounts.find({}, {"_id": 0}).to_list(5000):
             ledgers.append({"id": a["id"], "code": a.get("code") or 0, "name": a.get("name", ""), "group_id": a.get("group_id"),
                             "balance": await _compute_account_balance(a["id"], float(a.get("opening_balance") or 0), as_on), "kind": "account"})
@@ -2226,10 +2266,12 @@ async def outstanding_report(as_on: Optional[str] = None, side: str = "all", min
 
     as_on_date = datetime.fromisoformat(as_on).date()
     by_group: dict = {}
-    for p in await db.parties.find({}, {"_id": 0}).to_list(20000):
+    _plist = await db.parties.find({}, {"_id": 0}).to_list(50000)
+    _bals = await _bulk_party_balances(as_on, parties=_plist)
+    for p in _plist:
         if p.get("group_id") in cash_gids:
             continue
-        bal = await _compute_party_balance(p["id"], float(p.get("opening_balance") or 0), as_on)
+        bal = _bals.get(p["id"], float(p.get("opening_balance") or 0))
         if abs(bal) < 0.005 or abs(bal) < min_amount:
             continue
         if (side == "dr" and bal <= 0) or (side == "cr" and bal >= 0):
@@ -2272,8 +2314,10 @@ async def trial_balance(current=Depends(get_current_user)):
     ledgers = []
 
     # Parties (treat all as ledgers under their group)
-    for p in await db.parties.find({}, {"_id": 0}).to_list(5000):
-        bal = await _compute_party_balance(p["id"], p.get("opening_balance", 0.0))
+    _plist = await db.parties.find({}, {"_id": 0}).to_list(50000)
+    _bals = await _bulk_party_balances(parties=_plist)
+    for p in _plist:
+        bal = _bals.get(p["id"], float(p.get("opening_balance") or 0))
         gid = p.get("group_id")
         g = groups_by_id.get(gid) if gid else None
         ledgers.append({
@@ -3243,6 +3287,13 @@ async def on_start():
     await db.accounts.create_index("id", unique=True)
     await db.journal.create_index("id", unique=True)
     await db.inward.create_index("id", unique=True)
+    # Query indexes — ledger/balance lookups on big DOS-imported books (lakhs of rows) stay fast
+    for coll, keys in (("rokad", ["party_id", "cash_account_id", "date", "contra_id"]), ("bills", ["party_id", "date"]),
+                       ("journal", ["lines.account_id", "date", "settles_rokad_id"]),
+                       ("dos_journal", ["party_id", "counter_party_id", "date"]), ("inward", ["party_id", "item_id", "date"]),
+                       ("parties", ["name", "group_id", "code"])):
+        for k in keys:
+            await db[coll].create_index(k)
     await db.gst_returns.create_index("id", unique=True)
     await db.dos_journal.create_index("id", unique=True)
 

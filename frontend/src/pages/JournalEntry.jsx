@@ -75,7 +75,7 @@ export default function JournalEntry() {
     ...(accountFilter ? { account_id: accountFilter } : {}) } })).data);
   useEffect(() => { load(); }, [dateFrom, dateTo, accountFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    Promise.all([api.get("/accounts"), api.get("/parties")]).then(([a, p]) => {
+    Promise.all([api.get("/accounts"), api.get("/parties?lite=1")]).then(([a, p]) => {
       setAccounts(a.data); setParties(p.data);
     });
   }, []);

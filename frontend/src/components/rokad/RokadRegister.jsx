@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { inr } from "@/lib/api";
 import { drcr, COL_DEBIT, COL_CREDIT } from "@/lib/drcr";
 import { ArrowsLeftRight, ArrowDown, ArrowUp, Printer, PencilSimple, Trash, ArrowCounterClockwise } from "@phosphor-icons/react";
@@ -49,7 +50,7 @@ const DateCells = ({ e }) => (
 
 // Passbook-style Cash Book register: Debit (Gaya) | Credit (Aaya) | Balance (single a/c only)
 // rows must be chronological; running balance = opening + credit − debit (lib/drcr.js rule)
-export const RokadRegister = ({ rows, opening, showBalance, totals, ...actions }) => {
+const RokadRegisterImpl = ({ rows, opening, showBalance, totals, ...actions }) => {
   let running = opening || 0;
   const withBal = rows.map((e) => {
     running += e.type === "jama" ? e.amount : -e.amount;
@@ -155,7 +156,7 @@ const TSide = ({ side, list, total, color, bg, label, icon: Icon, ...actions }) 
 );
 
 // Classic DOS cash book T-format — Jama (receipts) LEFT, Kharch (payments) RIGHT
-export const RokadTFormat = ({ rows, totals, ...actions }) => (
+const RokadTFormatImpl = ({ rows, totals, ...actions }) => (
   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 cash-book-grid" data-testid="rokad-tformat">
     <TSide side="jama" list={rows.filter((e) => e.type === "jama")} total={totals.jama} color="#1B5E20" bg="#E8F5E9"
       label="Receipt / Jama (आमद) — Money In · Credit" icon={ArrowDown} {...actions} />
@@ -163,3 +164,7 @@ export const RokadTFormat = ({ rows, totals, ...actions }) => (
       label="Payment / Kharch (खर्च) — Money Out · Debit" icon={ArrowUp} {...actions} />
   </div>
 );
+
+// memo: typing in the entry form must not re-render thousands of rows
+export const RokadRegister = memo(RokadRegisterImpl);
+export const RokadTFormat = memo(RokadTFormatImpl);

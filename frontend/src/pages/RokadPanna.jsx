@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, X, ArrowsLeftRight, Printer, ListNumbers } from "@phosphor-icons/react";
@@ -97,7 +97,7 @@ export default function RokadPanna() {
   }, [dateFrom, dateTo]);
 
   useEffect(() => {
-    Promise.all([api.get("/parties"), api.get("/accounts")]).then(([p, a]) => {
+    Promise.all([api.get("/parties?lite=1"), api.get("/accounts")]).then(([p, a]) => {
       setParties(p.data);
       // cash/bank accounts = parties under CASH & BANK BALANCE group + accounts collection legacy
       const partyCash = p.data.filter((x) =>
@@ -199,6 +199,7 @@ export default function RokadPanna() {
     // eslint-disable-next-line
   }, [showAdd, accounts, bankFilter, defaultCash]);
 
+  const daybookAccounts = useMemo(() => (summary?.rows ? (bankFilter ? summary.rows.filter((r) => r.id === bankFilter) : summary.rows) : []), [summary, bankFilter]);
   // Per-account opening/closing for the "All" view (backend figures)
   const allAccountsSummary = useMemo(() => {
     if (bankFilter || !summary?.rows?.length) return null;
@@ -238,7 +239,7 @@ export default function RokadPanna() {
     // eslint-disable-next-line
   }, [search]);
 
-  const startEdit = (e) => {
+  const startEdit = useCallback((e) => {
     setEditId(e.id);
     setForm({
       date: (e.date || "").slice(0, 10), type: e.type, amount: String(e.amount ?? ""),
@@ -247,7 +248,7 @@ export default function RokadPanna() {
       voucher_no: e.voucher_no || "", inv_no: e.inv_no || "", chq_no: e.chq_no || "", settle: !!e.settle, settle_account_id: e.settle_account_id || "",
     });
     setShowAdd(true);
-  };
+  }, []);
 
   // Live balance: what this entry (as typed) will do to the party / cash ledger — minus the original when editing
   const liveDelta = useMemo(() => {
@@ -312,7 +313,12 @@ export default function RokadPanna() {
     }
   };
 
-  const del = async (id) => {
+  // Stable handlers → the big tables (memo) don't re-render on every keystroke in the entry form
+  const openTransfer = useCallback((contraId) => setTransfer({ contraId }), []);
+  const reopen = useCallback(async (e) => { if (await reopenSettled(e.id, e.party_name)) { load(); loadSummary(); } },
+    // eslint-disable-next-line
+    [dateFrom, dateTo]);
+  const del = useCallback(async (id) => {
     const entry = entries.find((x) => x.id === id);
     const msg = entry?.contra_id ? "Yeh Transfer entry hai — dono accounts se hat jayegi. Delete karein?" : "Delete this entry?";
     if (!window.confirm(msg)) return;
@@ -325,7 +331,8 @@ export default function RokadPanna() {
     toast.success(entry?.contra_id ? "Transfer (dono legs) delete hua" : "Entry delete ki gayi");
     load();
     loadSummary();
-  };
+    // eslint-disable-next-line
+  }, [entries, dateFrom, dateTo]);
 
   return (
     <div className="space-y-5 cash-book-page" data-testid="page-rokad">
@@ -456,7 +463,7 @@ export default function RokadPanna() {
         )}
         {summary?.rows?.length ? (
           <DayBookSheet firmName={settings?.firm_name} dateFrom={dateFrom} dateTo={dateTo} pageBreak={pageBreak}
-            accounts={bankFilter ? summary.rows.filter((r) => r.id === bankFilter) : summary.rows} entries={entries} />
+            accounts={daybookAccounts} entries={entries} />
         ) : (
           <div className="card-flat p-5 text-sm text-muted2" data-testid="daybook-empty">Day Book ke liye koi cash/bank account nahi mila.</div>
         )}
@@ -613,12 +620,10 @@ export default function RokadPanna() {
       </div>
       {layout === "t" ? (
         <RokadTFormat rows={visibleEntries} totals={totals}
-          onSlip={setSlip} onEdit={startEdit} onTransfer={(contraId) => setTransfer({ contraId })} onDelete={del}
-          onReopen={async (e) => { if (await reopenSettled(e.id, e.party_name)) { load(); loadSummary(); } }} />
+          onSlip={setSlip} onEdit={startEdit} onTransfer={openTransfer} onDelete={del} onReopen={reopen} />
       ) : (
         <RokadRegister rows={registerRows} opening={bankSummary?.opening || 0} showBalance={showRunning} totals={totals}
-          onSlip={setSlip} onEdit={startEdit} onTransfer={(contraId) => setTransfer({ contraId })} onDelete={del}
-          onReopen={async (e) => { if (await reopenSettled(e.id, e.party_name)) { load(); loadSummary(); } }} />
+          onSlip={setSlip} onEdit={startEdit} onTransfer={openTransfer} onDelete={del} onReopen={reopen} />
       )}
       </div>
 

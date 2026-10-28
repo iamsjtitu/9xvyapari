@@ -127,7 +127,7 @@ export default function NayaBill() {
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter]);
   useEffect(() => {
-    Promise.all([api.get("/parties"), api.get("/items")]).then(([p, i]) => {
+    Promise.all([api.get("/parties?lite=1"), api.get("/items")]).then(([p, i]) => {
       setParties(p.data); setItems(i.data);
     });
   }, []);

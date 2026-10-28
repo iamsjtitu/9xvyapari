@@ -23,7 +23,8 @@ export const LedgerBalanceHint = ({ ledgerId, delta = 0, className = "", compact
   if (info.loading) return <div className={`text-[11px] text-muted2 font-mono-data ${className}`} data-testid={testId}>Balance…</div>;
   const bal = info.balance || 0;
   const isParty = info.kind === "party" && !/cash|bank/i.test(info.group_name || "");
-  const colorOf = (b) => (b > 0 ? "#B71C1C" : b < 0 ? "#1B5E20" : "#595959");
+  // party: lena (+) red / dena (−) green · cash-bank: paisa hai (+) ink / overdrawn (−) red
+  const colorOf = (b) => (isParty ? (b > 0 ? "#B71C1C" : b < 0 ? "#1B5E20" : "#595959") : (b < 0 ? "#B71C1C" : "#1A1A1A"));
   const meaningOf = (b) => (isParty ? (b > 0 ? "lena hai" : b < 0 ? "dena hai" : "settled") : (b >= 0 ? "balance" : "overdrawn"));
   const d = Number(delta) || 0;
   const after = Math.round((bal + d) * 100) / 100;
