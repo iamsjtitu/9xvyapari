@@ -207,7 +207,8 @@ export default function RokadPanna() {
   }, [bankFilter, summary]);
 
   const modeTouched = useRef(false); // user picked a Mode by hand → account change must not overwrite it
-  useEffect(() => { if (!showAdd) modeTouched.current = false; }, [showAdd]);
+  const vnoTouched = useRef(false);  // user typed a V.No. by hand → account change must not replace it with the auto number
+  useEffect(() => { if (!showAdd) { modeTouched.current = false; vnoTouched.current = false; } }, [showAdd]);
   const [search, setSearch] = useSearchParams();
   const navigate = useNavigate();
   const returnTo = search.get("return");
@@ -286,14 +287,15 @@ export default function RokadPanna() {
           return;
         }
       }
-      // Overdraft alert: payment that would push this cash/bank a/c below zero (as on entry date) → confirm
+      // Overdraft alert — ONLY when this entry takes the account from plus INTO minus (user's rule: ek account ke liye ek baar;
+      // minus me jaane diya toh us account ki agli entries par phir warning nahi — jab tak balance wapas plus na ho jaye)
       if (payload.type === "kharch" && payload.cash_account_id && liveDelta.cash < 0) {
         const { data: lb } = await api.get(`/ledgers/${payload.cash_account_id}/balance`, { params: { as_on: payload.date } });
-        const after = (lb.balance || 0) + liveDelta.cash;
-        if (after < -0.005) {
+        const have = lb.balance || 0;
+        const after = have + liveDelta.cash;
+        if (have >= -0.005 && after < -0.005) {
           const acct = lb.name || payload.cash_account_name || "Account";
-          const have = lb.balance || 0;
-          const msg = `OVERDRAFT ALERT — ${acct}\n\n${fmtDate(payload.date)} ko account me ${have <= 0 ? "paisa nahi hai" : `sirf ₹ ${inr(have)} hai`}${have < 0 ? ` (pehle se ₹ ${inr(Math.abs(have))} Dr)` : ""}.\nYeh payment ke baad balance ₹ ${inr(Math.abs(after))} Dr (minus) ho jayega.\n\nPhir bhi save karein?`;
+          const msg = `OVERDRAFT ALERT — ${acct}\n\n${fmtDate(payload.date)} ko account me ${have <= 0 ? "paisa nahi hai" : `sirf ₹ ${inr(have)} hai`}.\nYeh payment ke baad balance ₹ ${inr(Math.abs(after))} Dr (minus) ho jayega.\n\nPhir bhi save karein? (Haan = is account ke minus me rehne tak dobara nahi poochenge)`;
           if (!window.confirm(msg)) return;
         }
       }
@@ -730,9 +732,11 @@ export default function RokadPanna() {
                     onChange={(e) => {
                       const id = e.target.value; // read synchronously — after an await the controlled select has already reset
                       const a = accounts.find((x) => x.id === id);
+                      // keep a hand-typed V.No. (vnoTouched); only auto numbers get refreshed for the new a/c
+                      const keepVno = vnoTouched.current;
                       setForm((f) => ({ ...f, cash_account_id: id, cash_account_name: a ? a.name : "",
-                        mode: a && !modeTouched.current ? modeForAccount(a) : f.mode, voucher_no: "" }));
-                      if (!a) return;
+                        mode: a && !modeTouched.current ? modeForAccount(a) : f.mode, voucher_no: keepVno ? f.voucher_no : "" }));
+                      if (!a || keepVno) return;
                       api.get(`/cash-accounts/${a.id}/next-voucher`)
                         .then(({ data }) => setForm((f) => (f.cash_account_id !== a.id || f.voucher_no ? f : { ...f, voucher_no: data.next_voucher || "" })))
                         .catch(() => {});
@@ -753,7 +757,7 @@ export default function RokadPanna() {
                   <input
                     className="input-dense num"
                     value={form.voucher_no}
-                    onChange={(e) => setForm({ ...form, voucher_no: e.target.value })}
+                    onChange={(e) => { vnoTouched.current = !!e.target.value; setForm({ ...form, voucher_no: e.target.value }); }}
                     placeholder="Auto (per cash a/c)"
                     data-testid="input-voucher-no"
                   />
@@ -778,7 +782,7 @@ export default function RokadPanna() {
                   <input
                     className="input-dense"
                     value={form.chq_no}
-                    onChange={(e) => setForm({ ...form, chq_no: e.target.value, mode: e.target.value ? "Cheque" : form.mode })}
+                    onChange={(e) => { modeTouched.current = true; setForm({ ...form, chq_no: e.target.value, mode: e.target.value ? "Cheque" : form.mode }); }}
                     placeholder="Cheque number"
                     data-testid="input-chq-no"
                   />

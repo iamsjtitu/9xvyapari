@@ -1,0 +1,34 @@
+{
+  "summary": "Iteration 48: regression for bulk party balances + /parties?lite=1 + Rokad form typing responsiveness. Backend 9/9 pytest pass (test_bulk_balances_v48.py). Main agent's check_bulk_balances.py re-run: 0 mismatches for 530 parties at as_on None/2026-06-30/2026-04-30 (bulk 0.004s vs per-party ~0.8s). /api/parties 0.13s, lite 0.9s over network (same 530 ids, no balance key). Sampled /parties balances match /ledgers/{id}/balance. Rokad receipt 700 + payment 200 on a TEST party gives -500 in /parties and /ledgers balance, and the party appears in outstanding?side=cr with 500. Cleaned up. Outstanding side=dr rows all match /parties balances; grand_dr = sum of rows. Dashboard, year-end preview and TB all return 200. Frontend: on /rokad (17 rows, 2026-04-01..10-31), every keystroke registered right after opening Nayi Entry in Amount, Voucher, Invoice, Cheque, Party autocomplete and Vivran. No focus loss and the modal stays open. Type toggle and Cash select work. Passbook view renders 17 rows; edit opens prefilled ('Rokad Entry Edit') and typing works there. The CASH IN HAND hint shows '₹ 97,01,179.00 Cr' in ink rgb(26,26,26); the overdrawn bank shows red. /parties, /outstanding, /trial-balance and the Dashboard render figures.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/reports/trial-balance", "issue": "Does not balance: grand_dr 1,149,473,343.81 vs grand_cr 40,264,393,384.00. Not caused by this change: iteration 46 had the same imbalance, and the bulk balances equal the old per-party function (0 mismatches). Likely legacy DOS-imported data, e.g. HELP HARI BABA 10,00,00,000 and D.TARAI SONU GOYAL 29,33,33,016 in outstanding."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Rokad form - Cash/Bank select", "issue": "Picking a Cash a/c after typing a Cheque No. resets mode from Cheque back to Cash; chq_no typing doesn't set modeTouched. It also replaces a manually typed Voucher No. (V9876) with the auto next voucher ('1'), because onChange sets voucher_no:''. Probably by design, but the user loses typed input.", "selector": "[data-testid='select-cash-account']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Console", "issues": ["React warning '<span> cannot be a child of <option>' (hydration warning) in a select somewhere. Minor."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_bulk_balances_v48.py", "/app/test_reports/pytest/pytest_v48.xml", "/app/backend/tests/check_bulk_balances.py"],
+  "action_items": [
+    "Optional: in RokadPanna select-cash-account onChange, keep the user's typed voucher_no, and keep mode='Cheque' if chq_no is set (or set modeTouched when a cheque no. is typed)",
+    "Optional: look into the legacy-data trial balance imbalance (pre-existing)"
+  ],
+  "critical_code_review_comments": [
+    "_bulk_party_balances: rokad ref_bill_id filter uses $in [None,''], which matches missing/null/empty; equivalent to old truthiness check unless ref_bill_id can be other falsy values like 0/false. Verified 0 mismatches on current data.",
+    "server.py is 3400+ lines; should be split into routers",
+    "list_parties still scans every settlement journal on each non-lite call; fine now but could be aggregated"
+  ],
+  "updated_files": ["/app/backend/tests/test_bulk_balances_v48.py"],
+  "success_rate": {"backend": "100%", "frontend": "100% (1 low-priority UX note)"},
+  "seed_data_creation": "TEST_QA48_* party + 2 rokad entries created and deleted inside test_rokad_flow",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run test_bulk_balances_v48.py with REACT_APP_BACKEND_URL exported. TB imbalance is pre-existing legacy data. CASH IN HAND party id 3811380b-f2ca-407b-9478-e77b69909c25. In the party autocomplete, don't press Escape (it closes the modal); the dropdown overlays the Vivran field."
+}
