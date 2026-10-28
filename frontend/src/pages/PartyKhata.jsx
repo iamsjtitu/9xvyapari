@@ -34,10 +34,15 @@ export default function PartyKhata() {
   const startEdit = (p) => setEditing(p);
 
   const [inUse, setInUse] = useState(null);
-  const del = async (id) => {
-    if (!window.confirm("Delete this ledger?")) return;
+  const del = async (p) => {
+    // Usage first: a party with bills / Rokad / journal / DOS / staff / Account Clear links can NOT be deleted — no confirm, show where it is used
     try {
-      await api.delete(`/parties/${id}`);
+      const { data: u } = await api.get(`/ledgers/${p.id}/usage`);
+      if (u.total) { setInUse({ ...u, name: p.name, message: `"${p.name}" delete nahi ho sakta — ${u.total} jagah use ho raha hai. Pehle woh entries hatayein ya kisi aur ledger par shift karein.` }); return; }
+    } catch { /* fall through — server DELETE still guards */ }
+    if (!window.confirm(`"${p.name}" delete karein? (koi entry isko use nahi kar rahi)`)) return;
+    try {
+      await api.delete(`/parties/${p.id}`);
       toast.success("Deleted"); load();
     } catch (err) {
       const info = inUseInfo(err);
@@ -71,7 +76,7 @@ export default function PartyKhata() {
   const { rowProps } = useTableNav({
     rows: filtered,
     onEdit: (p) => startEdit(p),
-    onDelete: (p) => del(p.id),
+    onDelete: (p) => del(p),
     enabled: editing === null,
   });
 
@@ -216,7 +221,7 @@ export default function PartyKhata() {
                     <button className="btn-ghost p-1.5" onClick={() => startEdit(p)} data-testid={`party-edit-${p.id}`}>
                       <PencilSimple size={14} />
                     </button>
-                    <button className="btn-ghost p-1.5" onClick={() => del(p.id)} data-testid={`party-del-${p.id}`}>
+                    <button className="btn-ghost p-1.5" onClick={() => del(p)} data-testid={`party-del-${p.id}`}>
                       <Trash size={14} />
                     </button>
                   </div>

@@ -3,7 +3,7 @@ import { Prohibit, X } from "@phosphor-icons/react";
 import { backdropClose } from "@/lib/backdrop";
 import { useEscClose } from "@/hooks/useEscClose";
 
-const LABELS = { rokad: "Rokad entries", bills: "Bills", journal: "Journal entries", dos_journal: "DOS (purani) entries", inward: "Inward entries" };
+const LABELS = { rokad: "Rokad entries", bills: "Bills", journal: "Journal entries", dos_journal: "DOS (purani) entries", inward: "Inward entries", staff: "Staff ledger", settings: "Account Clear link (Settings)" };
 
 // Shown when DELETE returns 409: the ledger is referenced by entries
 export const LedgerInUseDialog = ({ info, onClose }) => {

@@ -468,8 +468,11 @@ async def _ledger_usage(lid: str) -> dict:
         "bills": await db.bills.count_documents(bills_q),
         "journal": await db.journal.count_documents({"lines.account_id": lid}),
         "dos_journal": await db.dos_journal.count_documents({"$or": [{"party_id": lid}, {"counter_party_id": lid}]}),
-        "inward": await db.inward.count_documents({"cold_storage_id": lid}),
+        "inward": await db.inward.count_documents({"$or": [{"cold_storage_id": lid}, {"party_id": lid}]}),
+        "staff": await db.staff.count_documents({"ledger_id": lid}),
     }
+    # Linked as an "Account Clear" ledger in Settings → unlink there first
+    counts["settings"] = 1 if lid in await _settle_ids() else 0
     samples = []
     async for r in db.rokad.find(cash_or_party, {"_id": 0}).sort("date", -1).limit(5):
         role = "Cash A/C" if r.get("cash_account_id") == lid else "Party"
@@ -482,14 +485,25 @@ async def _ledger_usage(lid: str) -> dict:
     async for j in db.journal.find({"lines.account_id": lid}, {"_id": 0}).sort("date", -1).limit(5):
         samples.append({"kind": "journal", "date": j.get("date"), "amount": j.get("total"),
                         "text": f"Journal {j.get('voucher_no', '')} · {j.get('narration', '')}"})
+    if len(samples) < 5:
+        async for j in db.dos_journal.find({"$or": [{"party_id": lid}, {"counter_party_id": lid}]}, {"_id": 0}).sort("date", -1).limit(5):
+            amt = float(j.get("debit") or 0) or float(j.get("credit") or 0)
+            samples.append({"kind": "dos", "date": j.get("date"), "amount": amt,
+                            "text": f"DOS {j.get('sgn') or ''} {j.get('ref_no') or ''} · {j.get('narration') or j.get('account_name') or ''}".strip()})
     return {"total": sum(counts.values()), "counts": counts, "samples": samples[:8]}
 
 
 async def _ensure_ledger_unused(lid: str, name: str):
     usage = await _ledger_usage(lid)
     if usage["total"]:
-        raise HTTPException(409, {"message": f'"{name}" delete nahi ho sakta — {usage["total"]} entries isko use kar rahi hain. '
-                                             "Pehle woh entries hatayein ya kisi aur account par shift karein.",
+        c = usage["counts"]
+        if c.get("settings"):
+            hint = "Yeh Settings me 'Account Clear' ledger ke roop me link hai — pehle wahan se unlink karein."
+        elif c.get("staff"):
+            hint = "Yeh kisi Staff ka ledger hai — pehle Staff Master me us staff ko hatayein ya doosra ledger dein."
+        else:
+            hint = "Pehle woh entries hatayein ya kisi aur account par shift karein."
+        raise HTTPException(409, {"message": f'"{name}" delete nahi ho sakta — {usage["total"]} jagah use ho raha hai. {hint}',
                                   "name": name, **usage})
 
 
