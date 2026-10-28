@@ -17,7 +17,10 @@ export const ConfirmHost = () => {
   const prevFocus = useRef(null);
 
   useEffect(() => {
-    _show = (r) => new Promise((resolve) => { prevFocus.current = document.activeElement; setReq({ ...r, resolve }); });
+    // a second confirmBox while one is open → the earlier one answers "Nahi" so no Promise hangs
+    _show = (r) => new Promise((resolve) => {
+      setReq((cur) => { if (cur) cur.resolve(false); else prevFocus.current = document.activeElement; return { ...r, resolve }; });
+    });
     return () => { _show = null; };
   }, []);
 

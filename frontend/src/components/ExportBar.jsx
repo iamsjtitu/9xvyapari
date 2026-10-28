@@ -1,11 +1,11 @@
 import { useEffect } from "react";
 import { Printer, FilePdf, FileXls } from "@phosphor-icons/react";
-import { exportToExcel, triggerPrint, setPdfName } from "@/lib/exports";
+import { exportToExcel, triggerPrint, setPdfName, safeFileName } from "@/lib/exports";
 
 // pdfName: readable file name for the PDF (party / account name); falls back to `filename`
 export function ExportBar({ filename, pdfName, sheets, title, hidePrint, className = "" }) {
   const name = pdfName || filename;
-  useEffect(() => { setPdfName(name); return () => { if (window.__pdfName === (name || "").slice(0, 120)) window.__pdfName = ""; }; }, [name]);
+  useEffect(() => { setPdfName(name); return () => { if (window.__pdfName === safeFileName(name)) window.__pdfName = ""; }; }, [name]);
   const print = () => triggerPrint({ filename: name });
   return (
     <div className={`flex gap-2 print:hidden ${className}`} data-testid="export-bar">

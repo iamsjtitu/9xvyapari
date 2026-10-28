@@ -1,0 +1,27 @@
+{
+  "summary": "Frontend-only test of the in-app ConfirmHost (all window.confirm replaced) + PDF file names. page.on('dialog') was registered for 3 full Playwright runs: 0 native dialogs fired. Confirm dialog works on Rokad delete (Cancel / Esc / backdrop → kept; Enter / OK → deleted), Rokad OVERDRAFT ALERT (AXIS SK TRADERS 57,691.30, pay 60,000 → 'Confirm karein' + correct message; Cancel/Esc keeps the Rokad modal open with nothing saved, no route change; OK saves), Party delete (unused party), Item delete (Esc keeps, Enter deletes), Journal delete (Cancel keeps, OK deletes). Titles are correct: 'Pakka delete karein?' for delete messages, 'Confirm karein' for overdraft. Focus comes back and typing works straight away: typing into input-amount ~150ms after an Enter-confirm registered '4567'; after an overdraft Cancel, typing in Voucher No. worked. Typing in the Rokad form registered every keystroke in Amount, V.No, Invoice, Cheque, Party and Vivran, including forms opened with F5/F6 from the Dashboard. PDF titles: Rokad 'Cash Book 28-10-2026', AXIS filter 'AXIS SK TRADERS. - Cash Book 28-10-2026', ledger 'TEST_CONF_PARTY - Ledger 01-04-2026 to 28-10-2026', Account Clear 'Account Clear Register 01-04-2026 to 28-10-2026'. With window.print stubbed, the PDF button called it once and nothing threw. Regression: receipt save and a payment within balance showed no confirm; edit works; Day Book toggle works; party in use → ledger-in-use-dialog with no confirm first; all 5 Staff pages load. Not tested: Bill delete, SettledMarker reopen, Accounts/Groups/Inward/Staff deletes, ImportDBF, FY undo. Those are the same confirmBox pattern, checked in code only.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/seed_v49.py"],
+  "action_items": [
+    "Optional: ExportBar unmount cleanup compares window.__pdfName with name.slice(0,120), but setPdfName stores safeFileName(name). A name containing / : * ? \" < > | or several spaces is never cleared, so a later Ctrl+P on a page without an ExportBar could reuse the old name. Compare with safeFileName(name) instead.",
+    "Optional: ConfirmHost keeps only one request. If confirmBox is called while another is open, the first Promise never resolves. Queue the requests, or resolve the earlier one with false.",
+    "Optional: useEscClose (TransferForm, LedgerInUseDialog, StaffMaster/StaffSalary modals) listens in the capture phase on window, so it runs before ConfirmHost's Esc handler. No current call site opens confirmBox while one of these modals is open. If that ever happens, Esc would close the modal underneath and leave the confirm open. Skip Esc in useEscClose when [data-testid=confirm-dialog] is present."
+  ],
+  "critical_code_review_comments": [
+    "No window.confirm / alert / prompt calls remain in src. The only window.confirm is the fallback in confirmBox for when the host is not mounted.",
+    "Pressing Esc in the confirm calls preventDefault + stopPropagation, so the Rokad Esc-close shortcut and useEscapeBack do not run. Checked: the Rokad modal stays open and the route does not change.",
+    "The btn-pdf title shows the raw name, while Electron writes safeFileName(name). They differ only for names with special characters."
+  ],
+  "updated_files": ["/app/backend/tests/seed_v49.py (new helper, test only)"],
+  "success_rate": {"backend": "N/A (skipped as requested)", "frontend": "100%"},
+  "seed_data_creation": "Created TEST_CONF_PARTY, TEST_DEL_PARTY, TEST_J_A, TEST_J_B, TEST_DEL_ITEM, journal TEST_J49 and rokad entries (123 receipt on CASH IN HAND, 60,000 overdraft and 50→75 payment on AXIS). All were deleted afterwards; AXIS balance is back to 57,691.30.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "App date is 2026-10-28. AXIS SK TRADERS id f2db8037-37fb-4cf1-a307-28fce859909d (+57,691.30); CASH IN HAND 3811380b-f2ca-407b-9478-e77b69909c25. select-bank-filter option values are cash account ids. Row action testids: rokad-del-/rokad-edit-<id>, party-del-<id>, item-del-<id>, journal-del-<id>. POST /api/journal {date, narration, lines:[{account_id, account_name, debit, credit}]}. seed_v49.py cleanup deletes TEST_ parties and items. daybook-pagebreak only shows with no bank filter and more than one account row.",
+  "rca of the issue": "Native window.confirm in Electron/Windows left the inputs unresponsive after the dialog closed. All call sites are now the in-app confirmBox. In the browser, typing works immediately after a confirm closes. The real Electron/Windows focus behaviour cannot be checked in this environment."
+}

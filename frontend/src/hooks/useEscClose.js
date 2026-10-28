@@ -6,6 +6,7 @@ export function useEscClose(onClose, enabled = true) {
     if (!enabled) return undefined;
     const h = (e) => {
       if (e.key !== "Escape") return;
+      if (document.querySelector("[data-testid='confirm-dialog']")) return;   // confirm box on top owns Esc
       e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
       onClose?.();
     };
