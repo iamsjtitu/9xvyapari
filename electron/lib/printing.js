@@ -4,28 +4,31 @@ const path = require("path");
 const log = require("electron-log");
 const { refocus } = require("./focus");
 
+const safeName = (s) => String(s || "").replace(/[\\/:*?"<>|\n\r\t]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 120) || "Print";
+
 // Electron has no built-in print preview: render the page to PDF and show it in Chromium's PDF viewer
-async function openPrintPreview(webContents, { landscape = false, title = "Print" } = {}) {
+async function openPrintPreview(webContents, { landscape = false, title = "Print", filename = "" } = {}) {
   const pdf = await webContents.printToPDF({
     printBackground: true,
     landscape,
     pageSize: "A4",
     preferCSSPageSize: true,
   });
-  const dir = path.join(app.getPath("temp"), "9x-vyapari-print");
+  // own folder per preview → the PDF viewer's "Save" offers "<Party / Account name>.pdf", not print-<timestamp>.pdf
+  const dir = path.join(app.getPath("temp"), "9x-vyapari-print", String(Date.now()));
   fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, `print-${Date.now()}.pdf`);
+  const file = path.join(dir, `${safeName(filename || title)}.pdf`);
   fs.writeFileSync(file, pdf);
 
   const parent = BrowserWindow.fromWebContents(webContents);
   const win = new BrowserWindow({
-    width: 1100, height: 850, parent: parent || undefined, title: `${title} – Print Preview`,
+    width: 1100, height: 850, parent: parent || undefined, title: `${safeName(filename || title)} – Print Preview`,
     autoHideMenuBar: true, backgroundColor: "#525659",
     webPreferences: { plugins: true, contextIsolation: true, nodeIntegration: false },
   });
   win.setMenuBarVisibility(false);
   win.on("closed", () => {
-    fs.unlink(file, () => {});
+    fs.rm(dir, { recursive: true, force: true }, () => {});
     refocus(parent);  // give keyboard focus back to the app page
   });
   await win.loadURL(`file://${file}#toolbar=1&view=FitH`);

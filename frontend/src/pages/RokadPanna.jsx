@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { confirmBox } from "@/components/ConfirmHost";
 import { useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, X, ArrowsLeftRight, Printer, ListNumbers } from "@phosphor-icons/react";
@@ -41,7 +42,11 @@ export default function RokadPanna() {
   const [view, setView] = useState("list");                // list | daybook (DOS print preview)
   const [pageBreak, setPageBreak] = useState(false);       // daybook: har account alag page par
   // "Sirf yeh account" → filter + DOS sheet + print (ek account ka day book apne page par)
-  const printOnly = (id) => { setBankFilter(id); setView("daybook"); setTimeout(() => triggerPrint(), 400); };
+  const printOnly = (id) => {
+    setBankFilter(id); setView("daybook");
+    const name = accounts.find((a) => a.id === id)?.name || "Account";
+    setTimeout(() => triggerPrint({ filename: `${name} - Day Book ${fmtDate(dateFrom)}${dateTo !== dateFrom ? " to " + fmtDate(dateTo) : ""}` }), 400);
+  };
   const [dateFrom, setDateFrom] = useState(todayISO());
   const [dateTo, setDateTo] = useState(todayISO());
   const [bankFilter, setBankFilter] = useState("");        // "" = all
@@ -283,7 +288,7 @@ export default function RokadPanna() {
         const { data } = await api.get("/rokad/invoice-check", { params: { party_id: payload.party_id, inv_no: payload.inv_no, ...(editId ? { exclude_id: editId } : {}) } });
         const dups = data.duplicates || [];
         setInvDups(dups);
-        if (dups.length && !window.confirm(`Invoice No. "${payload.inv_no}" is party ke liye pehle hi ${dups.length} entry me hai:\n${dups.slice(0, 3).map(describeDup).join("\n")}\n\nDouble payment ho sakta hai. Phir bhi save karein?`)) {
+        if (dups.length && !(await confirmBox(`Invoice No. "${payload.inv_no}" is party ke liye pehle hi ${dups.length} entry me hai:\n${dups.slice(0, 3).map(describeDup).join("\n")}\n\nDouble payment ho sakta hai. Phir bhi save karein?`))) {
           return;
         }
       }
@@ -296,7 +301,7 @@ export default function RokadPanna() {
         if (have >= -0.005 && after < -0.005) {
           const acct = lb.name || payload.cash_account_name || "Account";
           const msg = `OVERDRAFT ALERT — ${acct}\n\n${fmtDate(payload.date)} ko account me ${have <= 0 ? "paisa nahi hai" : `sirf ₹ ${inr(have)} hai`}.\nYeh payment ke baad balance ₹ ${inr(Math.abs(after))} Dr (minus) ho jayega.\n\nPhir bhi save karein? (Haan = is account ke minus me rehne tak dobara nahi poochenge)`;
-          if (!window.confirm(msg)) return;
+          if (!(await confirmBox(msg))) return;
         }
       }
       const { data } = editId ? await api.put(`/rokad/${editId}`, payload) : await api.post("/rokad", payload);
@@ -323,7 +328,7 @@ export default function RokadPanna() {
   const del = useCallback(async (id) => {
     const entry = entries.find((x) => x.id === id);
     const msg = entry?.contra_id ? "Yeh Transfer entry hai — dono accounts se hat jayegi. Delete karein?" : "Delete this entry?";
-    if (!window.confirm(msg)) return;
+    if (!(await confirmBox(msg))) return;
     try {
       await api.delete(`/rokad/${id}`);
     } catch (err) {
@@ -346,7 +351,8 @@ export default function RokadPanna() {
           </h1>
         </div>
         <div className="flex items-end gap-3">
-          <ExportBar filename={`cash-book-${dateFrom}-to-${dateTo}`} sheets={[
+          <ExportBar filename={`cash-book-${dateFrom}-to-${dateTo}`}
+            pdfName={`${selectedBank ? selectedBank.name + " - " : ""}Cash Book ${fmtDate(dateFrom)}${dateTo !== dateFrom ? " to " + fmtDate(dateTo) : ""}`} sheets={[
             {
               name: "Cash Book",
               columns: [

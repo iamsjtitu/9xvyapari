@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { confirmBox } from "@/components/ConfirmHost";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, Trash, BookOpenText, X, PencilSimple } from "@phosphor-icons/react";
@@ -128,7 +129,7 @@ export default function JournalEntry() {
   };
 
   const del = async (id) => {
-    if (!window.confirm("Delete this entry?")) return;
+    if (!(await confirmBox("Delete this entry?"))) return;
     try {
       await api.delete(`/journal/${id}`);
     } catch (err) {

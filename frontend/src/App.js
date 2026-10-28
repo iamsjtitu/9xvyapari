@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import Layout from "@/components/Layout";
 import UpdateBanner from "@/components/UpdateBanner";
 import { useRefocusOnWindowFocus } from "@/hooks/useRefocusOnWindowFocus";
+import { ConfirmHost } from "@/components/ConfirmHost";
 import { useEnterToNext } from "@/hooks/useEnterToNext";
 import { installSoundHooks } from "@/lib/sound";
 
@@ -70,6 +71,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Sonner position="bottom-right" richColors offset={72} />
+        <ConfirmHost />
         <UpdateBanner />
         <Routes>
           <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />

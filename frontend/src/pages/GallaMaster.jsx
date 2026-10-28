@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { confirmBox } from "@/components/ConfirmHost";
 import api, { inr, formatApiErrorDetail } from "@/lib/api";
 import { Plus, PencilSimple, Trash, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -38,7 +39,7 @@ export default function GallaMaster() {
       toast.error(`'${it.name}' ${[u.bills && `${u.bills} bill`, u.inward && `${u.inward} cold-storage entry`].filter(Boolean).join(" aur ")} me use ho raha hai — delete nahi ho sakta`, { duration: 6000 });
       return;
     }
-    if (!window.confirm(`'${it.name}' delete karein? (kisi bill me use nahi hua)`)) return;
+    if (!(await confirmBox(`'${it.name}' delete karein? (kisi bill me use nahi hua)`))) return;
     try {
       await api.delete(`/items/${it.id}`);
       toast.success("Item delete kiya gaya");

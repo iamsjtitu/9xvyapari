@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { confirmBox } from "@/components/ConfirmHost";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { Plus, PencilSimple, Trash, X, TreeStructure } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -46,7 +47,7 @@ export default function AccountGroups() {
   };
 
   const del = async (id) => {
-    if (!window.confirm("Delete this group?")) return;
+    if (!(await confirmBox("Delete this group?"))) return;
     try {
       await api.delete(`/account-groups/${id}`);
       toast.success("Deleted"); load();

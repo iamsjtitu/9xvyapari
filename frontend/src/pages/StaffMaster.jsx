@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { confirmBox } from "@/components/ConfirmHost";
 import { Link } from "react-router-dom";
 import api, { inr, formatApiErrorDetail, todayISO } from "@/lib/api";
 import { toast } from "sonner";
@@ -71,7 +72,7 @@ export default function StaffMaster() {
   useEffect(() => { load(); }, []);
 
   const del = async (s) => {
-    if (!window.confirm(`${s.name} ko delete karein? (Agar entries hain toh Inactive karna padega)`)) return;
+    if (!(await confirmBox(`${s.name} ko delete karein? (Agar entries hain toh Inactive karna padega)`))) return;
     try { await api.delete(`/staff/${s.id}`); toast.success("Staff delete ho gaya (ledger rakha gaya)"); load(); }
     catch (err) { toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message); }
   };

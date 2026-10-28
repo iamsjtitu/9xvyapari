@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { confirmBox } from "@/components/ConfirmHost";
 import { Link, useNavigate } from "react-router-dom";
 import api, { inr, formatApiErrorDetail } from "@/lib/api";
 import { Plus, PencilSimple, Trash, X, MagnifyingGlass, BookOpen } from "@phosphor-icons/react";
@@ -43,7 +44,7 @@ export default function Accounts() {
   };
 
   const del = async (id) => {
-    if (!window.confirm("Delete this account?")) return;
+    if (!(await confirmBox("Delete this account?"))) return;
     try {
       await api.delete(`/accounts/${id}`);
       toast.success("Deleted"); load();

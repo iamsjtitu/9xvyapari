@@ -1,4 +1,5 @@
 import api, { inr, formatApiErrorDetail } from "@/lib/api";
+import { confirmBox } from "@/components/ConfirmHost";
 import { drcr } from "@/lib/drcr";
 import { toast } from "sonner";
 import { CheckCircle, ArrowCounterClockwise, Warning } from "@phosphor-icons/react";
@@ -7,7 +8,7 @@ const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
 
 // Undo an Account Settled adjustment (confirm → POST /rokad/{id}/reopen). Resolves true when done.
 export const reopenSettled = async (rokadId, partyName = "") => {
-  const ok = window.confirm(`${partyName ? partyName + " ka " : ""}Account Settled hataayein?\nAdjustment journal delete hoga aur party ka baki ledger me wapas aa jayega.`);
+  const ok = await confirmBox(`${partyName ? partyName + " ka " : ""}Account Settled hataayein?\nAdjustment journal delete hoga aur party ka baki ledger me wapas aa jayega.`);
   if (!ok) return false;
   try {
     const { data } = await api.post(`/rokad/${rokadId}/reopen`);

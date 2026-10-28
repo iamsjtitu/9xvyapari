@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { confirmBox } from "@/components/ConfirmHost";
 import { Link } from "react-router-dom";
 import api, { inr, formatApiErrorDetail } from "@/lib/api";
 import { Plus, PencilSimple, Trash, MagnifyingGlass } from "@phosphor-icons/react";
@@ -40,7 +41,7 @@ export default function PartyKhata() {
       const { data: u } = await api.get(`/ledgers/${p.id}/usage`);
       if (u.total) { setInUse({ ...u, name: p.name, message: `"${p.name}" delete nahi ho sakta — ${u.total} jagah use ho raha hai. Pehle woh entries hatayein ya kisi aur ledger par shift karein.` }); return; }
     } catch { /* fall through — server DELETE still guards */ }
-    if (!window.confirm(`"${p.name}" delete karein? (koi entry isko use nahi kar rahi)`)) return;
+    if (!(await confirmBox(`"${p.name}" delete karein? (koi entry isko use nahi kar rahi)`))) return;
     try {
       await api.delete(`/parties/${p.id}`);
       toast.success("Deleted"); load();

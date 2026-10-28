@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { confirmBox } from "@/components/ConfirmHost";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, Trash, Receipt, X, MagnifyingGlass, PencilSimple } from "@phosphor-icons/react";
@@ -297,7 +298,7 @@ export default function NayaBill() {
   };
 
   const del = async (id) => {
-    if (!window.confirm("Delete this bill?")) return;
+    if (!(await confirmBox("Delete this bill?"))) return;
     await api.delete(`/bills/${id}`);
     toast.success("Deleted"); load();
   };

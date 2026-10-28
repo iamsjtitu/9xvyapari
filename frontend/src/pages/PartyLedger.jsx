@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
+import { confirmBox } from "@/components/ConfirmHost";
 import { useParams, Link, useSearchParams, useOutletContext } from "react-router-dom";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { drcr, COL_DEBIT, COL_CREDIT } from "@/lib/drcr";
@@ -100,12 +101,12 @@ export default function PartyLedger() {
     if (!url) return;
     const amt = r.debit || r.credit || 0;
     const what = r.kind === "bill" ? "Bill" : r.kind === "journal" ? "Journal voucher" : "Rokad entry";
-    if (!window.confirm(`${what} delete karein?
+    if (!(await confirmBox(`${what} delete karein?
 
 ${fmtDate((r.date || "").slice(0, 10))} · ${r.label}
 ₹ ${inr(amt)}
 
-Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer entry ho toh dono legs hat jayenge; Account Settled ho toh uska adjustment bhi)" : ""}.`)) return;
+Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer entry ho toh dono legs hat jayenge; Account Settled ho toh uska adjustment bhi)" : ""}.`))) return;
     try {
       await api.delete(url);
       toast.success(`${what} delete ho gaya · ₹ ${inr(amt)}`);
@@ -154,6 +155,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
             <Printer size={14} /> {view === "statement" ? "Ledger View" : "Statement (Print)"}
           </button>
           <ExportBar filename={`ledger-${party.name.replace(/[^a-z0-9]/gi, "_")}-${dateFrom || "start"}-${asOn}`}
+            pdfName={`${party.name} - Ledger ${dateFrom ? fmtDate(dateFrom) + " to " : "upto "}${fmtDate(asOn)}`}
             title={`Ledger · ${party.name}${party.group_name ? ` (${party.group_name})` : ""} · ${periodText}`}
             sheets={[{
               name: `Ledger of ${party.name}`,

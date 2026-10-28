@@ -25,6 +25,7 @@ export const SalarySlip = ({ rec, staff, onClose }) => {
   const c = rec.counts || {};
   const monthly = (staff?.salary_type || rec.salary_type) === "monthly";
   const rate = staff?.salary ?? rec.salary;
+  const slipName = `${rec.staff_name || staff?.name || "Staff"} - Salary Slip ${rec.month ? monthLabel(rec.month) : ""}`.trim();
   const row = (k, v, k2, v2) => (
     <div className="vs-row">
       <span className="vs-k">{k}</span><span className="vs-v">{v ?? "-"}</span>
@@ -38,8 +39,8 @@ export const SalarySlip = ({ rec, staff, onClose }) => {
         <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-khaki print:hidden">
           <div className="font-heading font-semibold">SALARY SLIP · {rec.staff_name} · {monthLabel(rec.month)}</div>
           <div className="flex gap-2">
-            <button className="btn-primary" onClick={() => triggerPrint()} data-testid="salary-slip-print"><Printer size={14} /> Print</button>
-            <button className="btn-outline" onClick={() => triggerPrint()} data-testid="salary-slip-pdf"><FilePdf size={14} /> PDF</button>
+            <button className="btn-primary" onClick={() => triggerPrint({ filename: slipName })} data-testid="salary-slip-print"><Printer size={14} /> Print</button>
+            <button className="btn-outline" onClick={() => triggerPrint({ filename: slipName })} data-testid="salary-slip-pdf"><FilePdf size={14} /> PDF</button>
             <button className="btn-ghost p-1.5" onClick={onClose} title="Band (Esc)" data-testid="salary-slip-close"><X size={16} /></button>
           </div>
         </div>

@@ -263,12 +263,18 @@ function detectOrientation() {
   return "portrait";
 }
 
-export function triggerPrint() {
+// Name used for the PDF file (Electron preview → Save). ExportBar / slips set it; Ctrl+P falls back to it.
+export const safeFileName = (s) => String(s || "").replace(/[\\/:*?"<>|\n\r\t]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 120);
+export function setPdfName(name) { if (typeof window !== "undefined") window.__pdfName = safeFileName(name); }
+
+export function triggerPrint(opts = {}) {
+  const o = opts && typeof opts === "object" && !("nativeEvent" in opts) ? opts : {};   // onClick passes the event → ignore
   const orientation = detectOrientation();
   injectPageRule(orientation);
+  const filename = safeFileName(o.filename || window.__pdfName || document.title || "9x Vyapari");
   // Desktop app: Electron has no print preview → open our PDF preview window instead
   if (window.vyapari?.printPreview) {
-    setTimeout(() => window.vyapari.printPreview({ landscape: orientation === "landscape", title: document.title }), 30);
+    setTimeout(() => window.vyapari.printPreview({ landscape: orientation === "landscape", title: filename, filename }), 30);
     return;
   }
   // give browser time to apply the new stylesheet

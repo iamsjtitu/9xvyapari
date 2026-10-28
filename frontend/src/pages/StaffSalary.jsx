@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { confirmBox } from "@/components/ConfirmHost";
 import { Link } from "react-router-dom";
 import api, { inr, formatApiErrorDetail, todayISO } from "@/lib/api";
 import { toast } from "sonner";
@@ -76,7 +77,7 @@ export default function StaffSalary() {
   useEffect(() => { monthRef.current = month; setData(null); load(month); }, [month]);
 
   const unpay = async (r) => {
-    if (!window.confirm(`${r.name} ki ${monthLabel(month)} salary entry delete karein?\nSalary journal aur payment (Rokad) dono hat jayenge.`)) return;
+    if (!(await confirmBox(`${r.name} ki ${monthLabel(month)} salary entry delete karein?\nSalary journal aur payment (Rokad) dono hat jayenge.`))) return;
     try { await api.delete(`/staff/salary/${r.paid.id}`); toast.success("Salary entry delete ho gayi"); load(); }
     catch (err) { toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message); }
   };

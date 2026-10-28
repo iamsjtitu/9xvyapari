@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { confirmBox } from "@/components/ConfirmHost";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { FileArrowUp, Database, CheckCircle, Warning, Lightning } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -55,7 +56,7 @@ export default function ImportDBF() {
   const fileRef = useRef(null);
 
   const migrateAll = async () => {
-    if (!window.confirm(
+    if (!(await confirmBox(
       "Pura DOS data migrate karein?\n\n" +
       "Yeh /tmp/galla_audit/FOXPRO2/WS2026/ se sabhi DBF files ek baar me import karega:\n" +
       "• Master Ledger (LEDGR)\n" +
@@ -66,7 +67,7 @@ export default function ImportDBF() {
       "• Bills (TRANSTEM)\n" +
       "• Journal / Transaction History (AN.DBF)\n\n" +
       "Yeh idempotent hai — dobara chalane par duplicates nahi banenge."
-    )) return;
+    ))) return;
     setMigrating(true);
     setMigrationResult(null);
     try {
@@ -110,7 +111,7 @@ export default function ImportDBF() {
       toast.info(`${preview.detected_key}.DBF — import abhi supported nahi. Preview hi available hai.`);
       return;
     }
-    if (!window.confirm(`${preview.count} rows ko ${def.target} me import karein?`)) return;
+    if (!(await confirmBox(`${preview.count} rows ko ${def.target} me import karein?`))) return;
     setImporting(true);
     try {
       const body = { rows: preview.rows, ...(def.payload || {}) };

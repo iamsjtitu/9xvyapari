@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { confirmBox } from "@/components/ConfirmHost";
 import api, { inr, todayISO, formatApiErrorDetail } from "@/lib/api";
 import { Plus, Trash, X, Truck } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -91,7 +92,7 @@ export default function Inward() {
   };
 
   const del = async (id) => {
-    if (!window.confirm("Delete this entry?")) return;
+    if (!(await confirmBox("Delete this entry?"))) return;
     await api.delete(`/inward/${id}`);
     toast.success("Deleted"); load();
   };

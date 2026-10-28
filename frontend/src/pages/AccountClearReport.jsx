@@ -77,7 +77,8 @@ export default function AccountClearReport() {
             <Printer size={14} /> {view === "sheet" ? "List View" : "Register (Print)"}
           </button>
           {data && (
-            <ExportBar filename={`account-clear-${ledgerId ? (data.ledger?.name || "").toLowerCase().replace(/\s+/g, "-") + "-" : ""}${from || "start"}-${to}`} title={`Account Clear Register · ${data.ledger?.name || ""} · ${period}`}
+            <ExportBar filename={`account-clear-${ledgerId ? (data.ledger?.name || "").toLowerCase().replace(/\s+/g, "-") + "-" : ""}${from || "start"}-${to}`}
+              pdfName={`${ledgerId && data.ledger?.name ? data.ledger.name + " - " : ""}Account Clear Register ${from ? from.split("-").reverse().join("-") + " to " : "upto "}${(to || "").split("-").reverse().join("-")}`} title={`Account Clear Register · ${data.ledger?.name || ""} · ${period}`}
               sheets={[{
                 name: "Account Clear",
                 subtitle: `Chhoda ₹${inr(data.total_off)} · Wapas ₹${inr(data.total_back)} · Net ₹${inr(Math.abs(data.net))} ${data.net >= 0 ? "chhoda" : "wapas"} · ${data.count} entries`,

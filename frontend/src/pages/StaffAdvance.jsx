@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { confirmBox } from "@/components/ConfirmHost";
 import { Link } from "react-router-dom";
 import api, { inr, formatApiErrorDetail, todayISO } from "@/lib/api";
 import { toast } from "sonner";
@@ -44,7 +45,7 @@ export default function StaffAdvance() {
     finally { setBusy(false); }
   };
   const del = async (e) => {
-    if (!window.confirm(`${e.staff_name} ka advance ₹${inr(e.amount)} (${e.date.split("-").reverse().join("-")}) delete karein?`)) return;
+    if (!(await confirmBox(`${e.staff_name} ka advance ₹${inr(e.amount)} (${e.date.split("-").reverse().join("-")}) delete karein?`))) return;
     try { await api.delete(`/rokad/${e.id}`); toast.success("Advance entry delete hui"); load(); }
     catch (err) { toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message); }
   };

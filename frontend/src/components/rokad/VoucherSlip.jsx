@@ -22,6 +22,7 @@ export const VoucherSlip = ({ entry, onClose }) => {
 
   const jama = entry.type === "jama";
   const title = entry.contra_id ? "CONTRA VOUCHER" : jama ? "RECEIPT VOUCHER" : "PAYMENT VOUCHER";
+  const slipName = `${entry.party_name || entry.cash_account_name || "Voucher"} - ${jama ? "Receipt" : "Payment"} V.No ${entry.voucher_no || ""} ${fmtDate(entry.date)}`;
   const firm = (settings?.firm_name || "9x Vyapari").toUpperCase();
   const fy = settings?.fy_start ? `FY ${fmtDate(settings.fy_start)} - ${fmtDate(settings.fy_end)}` : "";
   const row = (k, v, k2, v2) => (
@@ -37,8 +38,8 @@ export const VoucherSlip = ({ entry, onClose }) => {
         <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-khaki print:hidden">
           <div className="font-heading font-semibold">{title} · V.{entry.voucher_no || "—"}{entry.inv_no ? ` · INV ${entry.inv_no}` : ""}</div>
           <div className="flex gap-2">
-            <button className="btn-primary" onClick={() => triggerPrint()} data-testid="slip-print"><Printer size={14} /> Print</button>
-            <button className="btn-outline" onClick={() => triggerPrint()} data-testid="slip-pdf"><FilePdf size={14} /> PDF</button>
+            <button className="btn-primary" onClick={() => triggerPrint({ filename: slipName })} data-testid="slip-print"><Printer size={14} /> Print</button>
+            <button className="btn-outline" onClick={() => triggerPrint({ filename: slipName })} data-testid="slip-pdf"><FilePdf size={14} /> PDF</button>
             <button className="btn-ghost p-1.5" onClick={onClose} title="Band (Esc)" data-testid="slip-close"><X size={16} /></button>
           </div>
         </div>

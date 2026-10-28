@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { confirmBox } from "@/components/ConfirmHost";
 import { Link } from "react-router-dom";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { ClosingPreviewTable } from "./ClosingPreviewTable";
@@ -18,7 +19,7 @@ export const FiscalYearHistory = ({ history, onChanged }) => {
   };
 
   const undo = async () => {
-    if (!window.confirm("Aakhri year-end UNDO karein?\n\nPurane saal ki saari entries wapas aa jayengi aur opening balances pehle jaise ho jayenge.")) return;
+    if (!(await confirmBox("Aakhri year-end UNDO karein?\n\nPurane saal ki saari entries wapas aa jayengi aur opening balances pehle jaise ho jayenge."))) return;
     setBusy(true);
     try {
       const { data } = await api.post("/year-end/undo");

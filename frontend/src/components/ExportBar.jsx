@@ -1,17 +1,22 @@
+import { useEffect } from "react";
 import { Printer, FilePdf, FileXls } from "@phosphor-icons/react";
-import { exportToExcel, triggerPrint } from "@/lib/exports";
+import { exportToExcel, triggerPrint, setPdfName } from "@/lib/exports";
 
-export function ExportBar({ filename, sheets, title, hidePrint, className = "" }) {
+// pdfName: readable file name for the PDF (party / account name); falls back to `filename`
+export function ExportBar({ filename, pdfName, sheets, title, hidePrint, className = "" }) {
+  const name = pdfName || filename;
+  useEffect(() => { setPdfName(name); return () => { if (window.__pdfName === (name || "").slice(0, 120)) window.__pdfName = ""; }; }, [name]);
+  const print = () => triggerPrint({ filename: name });
   return (
     <div className={`flex gap-2 print:hidden ${className}`} data-testid="export-bar">
       {!hidePrint && (
-        <button className="btn-outline" onClick={triggerPrint} data-testid="btn-print"
+        <button className="btn-outline" onClick={print} data-testid="btn-print"
           title="Print (Ctrl+P)">
           <Printer size={15} weight="bold" /> Print
         </button>
       )}
-      <button className="btn-outline" onClick={triggerPrint} data-testid="btn-pdf"
-        title="Save as PDF (Print → Destination: Save as PDF)">
+      <button className="btn-outline" onClick={print} data-testid="btn-pdf"
+        title={`Save as PDF — file: ${name}.pdf`}>
         <FilePdf size={15} weight="bold" color="#B71C1C" /> PDF
       </button>
       <button className="btn-outline" onClick={() => exportToExcel(filename, sheets, { title })}
