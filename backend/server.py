@@ -849,17 +849,19 @@ async def _require_party(doc: dict):
     pid = (doc.get("party_id") or "").strip()
     if not pid:
         raise HTTPException(400, PARTY_REQUIRED_MSG)
-    p = await db.parties.find_one({"id": pid}, {"_id": 0, "name": 1}) or await db.accounts.find_one({"id": pid}, {"_id": 0, "name": 1})
+    p = await db.parties.find_one({"id": pid}, {"_id": 0, "name": 1, "group_id": 1}) or await db.accounts.find_one({"id": pid}, {"_id": 0, "name": 1, "group_id": 1})
     if not p:
         raise HTTPException(400, "Party nahi mili — list se chunein ya nayi party banayein")
     doc["party_id"] = pid
     doc["party_name"] = (doc.get("party_name") or "").strip() or p["name"]
+    # "Kiska?" reference: only meaningful when the party is an income/expense ledger; name always from the record
     rid = (doc.get("ref_party_id") or "").strip()
+    doc["ref_party_id"], doc["ref_party_name"] = None, ""
     if rid and rid != pid:
+        grp = await db.account_groups.find_one({"id": p.get("group_id")}, {"_id": 0, "nature": 1}) if p.get("group_id") else None
         rp = await db.parties.find_one({"id": rid}, {"_id": 0, "name": 1})
-        doc["ref_party_id"], doc["ref_party_name"] = (rid, (doc.get("ref_party_name") or "").strip() or rp["name"]) if rp else (None, "")
-    else:
-        doc["ref_party_id"], doc["ref_party_name"] = None, ""
+        if rp and grp and grp.get("nature") in ("income", "expense"):
+            doc["ref_party_id"], doc["ref_party_name"] = rid, rp["name"]
     cid = doc.get("cash_account_id")
     if cid and not (doc.get("cash_account_name") or "").strip():
         c = await db.parties.find_one({"id": cid}, {"_id": 0, "name": 1}) or await db.accounts.find_one({"id": cid}, {"_id": 0, "name": 1})

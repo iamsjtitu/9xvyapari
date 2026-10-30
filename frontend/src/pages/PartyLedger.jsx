@@ -39,7 +39,7 @@ function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = 
   }));
   rokad.forEach((r) => rows.push({
     kind: "rokad", id: r.id, date: r.date, vno: r.voucher_no || "", inv: r.inv_no || "", created_at: r.created_at || "",
-    label: `${r.description || (r.type === "jama" ? "Payment Received" : "Payment Paid")}${r.cash_account_name ? ` · ${r.cash_account_name}` : ""}`,
+    label: `${r.description || (r.type === "jama" ? "Payment Received" : "Payment Paid")}${r.ref_party_name ? ` · ${r.ref_party_name} ka` : ""}${r.cash_account_name ? ` · ${r.cash_account_name}` : ""}`,
     credit: r.type === "kharch" ? r.amount : 0, debit: r.type === "jama" ? r.amount : 0,
   }));
   cash_rokad.forEach((r) => rows.push({
@@ -180,11 +180,12 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                 { key: "credit", label: COL_CREDIT(isAccount), width: 18, num: true },
                 { key: "balance_abs", label: "Balance", width: 15, num: true },
                 { key: "drcr", label: "Dr/Cr", width: 6 },
-                ...(memoTotal ? [{ key: "memo_amt", label: "Memo (byaj etc.)", width: 16, num: true }] : []),
+                ...(memoTotal ? [{ key: "memo_dr", label: "Memo Debit (byaj etc.)", width: 16, num: true }, { key: "memo_cr", label: "Memo Credit (byaj etc.)", width: 16, num: true }] : []),
               ],
               rows: [
                 { date: dateFrom || "", vno: "", label: `OPENING BALANCE${dateFrom ? " (B/F)" : ""}`, debit: "", credit: "", balance_abs: Math.abs(opening), drcr: drcr(opening), _style: "opening" },
-                ...enriched.map((r) => ({ ...r, debit: r.debit || "", credit: r.credit || "", balance_abs: Math.abs(r.balance), drcr: drcr(r.balance), memo_amt: r.memo ? r.memo.amount : "" })),
+                ...enriched.map((r) => ({ ...r, debit: r.debit || "", credit: r.credit || "", balance_abs: Math.abs(r.balance), drcr: drcr(r.balance),
+                  memo_dr: r.memo?.side === "debit" ? r.memo.amount : "", memo_cr: r.memo?.side === "credit" ? r.memo.amount : "" })),
                 { date: asOn, vno: "", label: `CLOSING BALANCE AS ON ${fmtDate(asOn)}`, debit: "", credit: "", balance_abs: Math.abs(party.balance), drcr: drcr(party.balance), _style: "closing" },
               ],
               rowStyle: (r) => r._style || null,

@@ -284,6 +284,7 @@ export default function RokadPanna() {
     e.preventDefault();
     try {
       const payload = { ...form, amount: parseFloat(form.amount || 0) };
+      if (!isIncomeExpenseLedger) { payload.ref_party_id = ""; payload.ref_party_name = ""; }   // stale "kiska" never rides along
       if (!payload.amount || payload.amount <= 0) {
         toast.error("Amount daalein");
         return;
@@ -813,7 +814,8 @@ export default function RokadPanna() {
                   selectedId={form.party_id}
                   options={partyOptions}
                   required
-                  onPick={(p) => setForm((f) => ({ ...f, party_id: p.id, party_name: p.name }))}
+                  onPick={(p) => setForm((f) => ({ ...f, party_id: p.id, party_name: p.name,
+                    ...(["income", "expense"].includes(natureOf(p)) ? {} : { ref_party_id: "", ref_party_name: "" }) }))}
                   onChangeText={(t) => setForm((f) => ({ ...f, party_name: t, party_id: f.party_id && t.trim().toLowerCase() === (parties.find((x) => x.id === f.party_id)?.name || "").trim().toLowerCase() ? f.party_id : "" }))}
                   onCreate={createParty}
                   placeholder="Party ka naam likhein (auto suggest)..."
