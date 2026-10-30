@@ -1165,10 +1165,11 @@ async def byaj_report(date_from: Optional[str] = None, date_to: Optional[str] = 
         if d and not _is_date(d):
             raise HTTPException(400, "Date YYYY-MM-DD format me do")
     st = await db.settings.find_one({"id": "default"}, {"_id": 0}) or {}
-    ledgers = []
+    ledgers, seen = [], set()
     for coll in (db.parties, db.accounts):
         async for p in coll.find({"name": {"$regex": BYAJ_LEDGER_RX.pattern, "$options": "i"}}, {"_id": 0, "id": 1, "name": 1, "group_name": 1}):
-            ledgers.append(p)
+            if p["id"] not in seen:
+                seen.add(p["id"]); ledgers.append(p)
     out = {"firm_name": st.get("firm_name", ""), "date_from": date_from, "date_to": date_to, "ledgers": ledgers,
            "groups": [], "count": 0, "total_received": 0.0, "total_paid": 0.0, "net": 0.0}
     if not ledgers:

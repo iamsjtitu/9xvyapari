@@ -1,0 +1,27 @@
+{
+  "summary": "Byaj Report (interest by 'Kiska?' reference party) tested end-to-end (backend + frontend) plus Rokad 'Kiska?' picker and party-ledger memo regression. All requested checks PASS. Backend: 6/6 pytest (totals 56700/8000/48700, count 5, group order LABBU, SURAJ [BARTAN], BINA NAAM last with ref_party_id null, per-group received/paid/net/count, date_from=2026-07-01 returns only the R2 26000 SURAJ entry, inclusive single-day range, 400 on invalid date, 401 without auth). Frontend: nav item + Alt+1 open /byaj-report, default range 2026-04-01 to 2026-10-30, summary cards '3 · 5' / ₹ 56,700.00 / ₹ 8,000.00 / ₹ 48,700.00 aaya, T-blocks in correct order with rows on the correct Jama/Kharch side, unnamed amber block + note shown last, party link goes to /parties/<id>, date controls (from, Shuru se, Aaj, FY End, to) update URL and reload data correctly, Register (Print) toggle shows byaj-sheet with matching party/side/grand totals and toggles back, Excel downloads byaj-report-2026-04-01-2026-12-31.xlsx, Print/PDF call window.print without errors, pencil opens 'Rokad Entry Edit' for R3 (4500, LABBU ref) and Escape/close returns to /byaj-report?from=2026-04-01&to=2026-12-31. Rokad picker: after choosing INTEREST RECEIVED, ref-party-box shows and the first options are LABBU and SURAJ [BARTAN] tagged BYAJ, and the selected ledger itself is left out. SURAJ ledger shows memo rows for R1/R2, closing balance ₹ 26,00,000.00 Cr. No page errors. No entries were saved.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Byaj Report party header", "issues": ["Grammar: '· 1 entries' should read '1 entry' when count is 1 (LABBU/BINA NAAM headers show counts)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_byaj_report_v51.py", "/app/test_reports/pytest/pytest_v51.xml"],
+  "action_items": [
+    "Optional: singular/plural for the entries count in ByajPartyBlock header.",
+    "Optional: test_rokad_ref_party_v50.py is now stale (hardcoded QA fixtures INTEREST RECEIVED QA / SURAJ QA were deleted, so 10/12 fail with 'Party nahi mili'). Re-seed it or skip it so regression runs stay clean."
+  ],
+  "critical_code_review_comments": [
+    "byaj_report only reads db.rokad. Interest posted through Journal/Passbook/bank entries on INTEREST ledgers is left out of the report silently. Either document this or include journals.",
+    "BYAJ_LEDGER_RX matches 'interest' anywhere in the name, so a ledger like 'INTEREST FREE LOAN - X' would be pulled in. This was the user's choice and is acceptable, but a ledger-list override (setting) would make it safer.",
+    "Ledgers are gathered from both db.parties and db.accounts with no de-dup by id. If the same id ever exists in both collections it is listed twice (the $in query still works)."
+  ],
+  "updated_files": ["/app/backend/tests/test_byaj_report_v51.py"],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100%"},
+  "seed_data_creation": "None created. Used main agent fixtures from /tmp/demo_ids. A Rokad form was filled (amount 111) but not saved; confirmed 0 rokad entries on 2026-10-30.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Byaj report test: /app/backend/tests/test_byaj_report_v51.py (reads ids from /tmp/demo_ids, so it depends on the main agent's fixtures). PDF button = window.print (no file download). Rokad edit deep link /rokad?edit=<id>&return=<url>: Escape closes the form and navigates back to the return URL."
+}

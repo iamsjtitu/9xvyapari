@@ -66,7 +66,7 @@ const ByajPartyBlockImpl = ({ g, editReturn }) => {
           ) : (
             <span className="font-heading font-semibold text-base uppercase tracking-wide text-amber-900" data-testid="byaj-party-unnamed">{g.ref_party_name}</span>
           )}
-          <span className={`text-[11px] ${unnamed ? "text-amber-800" : "text-parchment/60"}`}>· {g.count} entries</span>
+          <span className={`text-[11px] ${unnamed ? "text-amber-800" : "text-parchment/60"}`}>· {g.count} {g.count === 1 ? "entry" : "entries"}</span>
         </div>
         <div className="flex items-center gap-4 font-mono-data text-sm whitespace-nowrap">
           <span data-testid={`byaj-party-received-${gid}`}><span className={`text-[10px] uppercase mr-1 ${unnamed ? "text-amber-800" : "text-parchment/60"}`}>Aaya</span><span style={{ color: unnamed ? "#1B5E20" : "#A5D6A7" }}>₹ {inr(g.received)}</span></span>
