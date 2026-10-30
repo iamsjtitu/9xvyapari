@@ -1,0 +1,24 @@
+{
+  "summary": "Frontend-only testing of the new Party Ledger T-format (Jama | Kharch) for BYAJ-group ledgers. Every requested check passed: the default layout is picked by group, LABBU's T-format numbers are correct, the toggle choice is remembered per kind in localStorage across reloads and across BYAJ ledgers, print shows PartyTStatement in T layout and PartyStatement in Ledger layout, the edit link opens the Rokad edit form, delete asks for confirmation and Cancel keeps the entry, Excel export works, Print/PDF throw no errors, Cash/Bank ledgers show no toggle, and the Byaj Report and Rokad pages still work. No page errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Party Ledger T-format", "issues": ["Memo row Vivran is cut off ('INTEREST RECEIVED · M...') in the 50/50 side tables at 1920px. The full text is only in the title tooltip. Low priority."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "PartyLedger.jsx: layoutPick is component state and is not reset when :id changes. If the user moves from a BYAJ party to a normal party without the component remounting (e.g. an in-app Link between two /parties/:id routes), the old pick is carried over. Suggest resetting layoutPick in a useEffect on [id], or deriving it only from localStorage.",
+    "PartyTFormat memo rows have no edit/delete actions because editHref returns null for kind 'memo'. This is acceptable, but a pencil linking to /rokad?edit=<refId> would help users fix a wrong byaj memo directly from the ledger.",
+    "On the INTEREST RECEIVED (income) ledger the header reads 'WE OWE PARTY' for the ₹4,500 Dr balance. This wording comes from the generic party logic and is misleading for an income head. Cosmetic."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "None. Used the main agent's fixtures from /tmp/demo_ids (not modified or deleted; the delete dialog was cancelled).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Fixture IDs: LABBU 84b75061-a4c6-4983-9e7a-3c65247f5b1e, INTEREST RECEIVED eae69f80-46a1-4f03-8a64-2bc4909632db, memo rokad 1c5276f7..., rokad 50000 382a7dfa..., rokad 100000 d947e9db.... Normal party used: 8f68f73a-126c-499d-b041-cec542289f5e (ANIL KBJ, SALES PARTY). localStorage key party.ledger.layout.byaj was left at 't'. ConfirmHost buttons: confirm-cancel / confirm-ok. btn-pdf calls window.print, so it never produces a download."
+}

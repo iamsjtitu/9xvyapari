@@ -82,6 +82,7 @@ export default function PartyLedger() {
   const [attempt, setAttempt] = useState(0);
   const [view, setView] = useState("ledger"); // ledger | statement (DOS print preview)
   const [layoutPick, setLayoutPick] = useState(null); // "t" | "ledger" | null → default by group (remembered per group kind)
+  useEffect(() => { setLayoutPick(null); }, [id]);
 
   useEffect(() => {
     let alive = true;
@@ -102,6 +103,7 @@ export default function PartyLedger() {
   const back = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
   const editHref = (r) => {
     if (r.kind === "rokad" || r.kind === "cash") return `/rokad?edit=${r.id}&return=${back}`;
+    if (r.kind === "memo") return `/rokad?edit=${r.refId}&return=${back}`;
     if (r.kind === "journal") return r.settles_rokad_id ? `/rokad?edit=${r.settles_rokad_id}&return=${back}` : `/journal?edit=${r.refId}&return=${back}`;
     if (r.kind === "bill") return `/bills?edit=${r.ref}&return=${back}`;
     return null;
@@ -109,10 +111,10 @@ export default function PartyLedger() {
   // Delete the voucher behind a ledger line without leaving the page (confirm first)
   const deleteRow = async (r) => {
     if (r.settles_rokad_id) { if (await reopenSettled(r.settles_rokad_id, party.name)) setAttempt((a) => a + 1); return; }
-    const url = r.kind === "rokad" || r.kind === "cash" ? `/rokad/${r.id}` : r.kind === "journal" ? `/journal/${r.refId}` : r.kind === "bill" ? `/bills/${r.ref}` : null;
+    const url = r.kind === "rokad" || r.kind === "cash" ? `/rokad/${r.id}` : r.kind === "memo" ? `/rokad/${r.refId}` : r.kind === "journal" ? `/journal/${r.refId}` : r.kind === "bill" ? `/bills/${r.ref}` : null;
     if (!url) return;
-    const amt = r.debit || r.credit || 0;
-    const what = r.kind === "bill" ? "Bill" : r.kind === "journal" ? "Journal voucher" : "Rokad entry";
+    const amt = r.memo?.amount || r.debit || r.credit || 0;
+    const what = r.kind === "bill" ? "Bill" : r.kind === "journal" ? "Journal voucher" : r.kind === "memo" ? "Byaj (Rokad) entry" : "Rokad entry";
     if (!(await confirmBox(`${what} delete karein?
 
 ${fmtDate((r.date || "").slice(0, 10))} · ${r.label}
