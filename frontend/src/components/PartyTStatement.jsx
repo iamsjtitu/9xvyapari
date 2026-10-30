@@ -16,16 +16,16 @@ const Side = ({ side, t, title, asOn, dateFrom, moolLabel }) => {
         <div className="dos-stmt-row db-row db-bold"><span className="dt">{dateFrom ? fmtDate(dateFrom) : ""}</span><span className="pt">OPENING BALANCE B/F</span><span className="rf"></span><span className="iv"></span><span className="am">{inr(t.bf.amount)}</span></div>
       )}
       {list.map((r) => (
-        <div className={`dos-stmt-row db-row ${r.memo ? "dos-memo" : ""}`} key={`${r.kind}-${r.id}`}>
+        <div className="dos-stmt-row db-row" key={`${r.kind}-${r.id}`}>
           <span className="dt">{fmtDate((r.date || "").slice(0, 10))}</span>
-          <span className="pt" title={r.label}>{r.memo ? `[BYAJ] ${r.label.replace(/ \(memo[^)]*\)$/, "")}` : r.label}</span>
+          <span className="pt" title={r.label}>{r.memo ? r.label.replace(/ \(memo[^)]*\)$/, "") : r.label}</span>
           <span className="rf">{r.vno || r.ref_no || ""}</span>
           <span className="iv">{r.inv || ""}</span>
-          <span className="am">{r.memo ? `(${inr(r.amount)})` : inr(r.amount)}</span>
+          <span className="am">{inr(r.amount)}</span>
         </div>
       ))}
       <div className="dos-stmt-row db-row db-bold db-daytotal"><span className="dt"></span><span className="pt">{moolLabel} ({list.filter((r) => !r.memo).length})</span><span className="rf"></span><span className="iv"></span><span className="am">{inr(mool)}</span></div>
-      {memo > 0 && <div className="dos-stmt-row db-row dos-memo"><span className="dt"></span><span className="pt">BYAJ / MEMO TOTAL (mool me nahi)</span><span className="rf"></span><span className="iv"></span><span className="am">({inr(memo)})</span></div>}
+      {memo > 0 && <div className="dos-stmt-row db-row db-bold"><span className="dt"></span><span className="pt">TOTAL BYAJ ({list.filter((r) => r.memo).length}) · mool me nahi</span><span className="rf"></span><span className="iv"></span><span className="am">{inr(memo)}</span></div>}
       {t.cf.side === side && (
         <div className="dos-stmt-row db-row db-bold db-closing"><span className="dt">{fmtDate(asOn)}</span><span className="pt">CLOSING BALANCE C/F · {drcr(t.cf.negative ? -t.cf.amount : t.cf.amount)}</span><span className="rf"></span><span className="iv"></span><span className="am">{inr(t.cf.amount)}</span></div>
       )}
@@ -54,7 +54,7 @@ export const PartyTStatement = ({ firmName, party, rows, opening, closing, isCas
         <span>{inr(Math.abs(closing))} {drcr(closing)} · {isCash ? (closing >= 0 ? "BALANCE" : "OVERDRAWN") : closing > 0 ? "PARTY OWES US (LENA)" : closing < 0 ? "WE OWE PARTY (DENA)" : "SETTLED"}</span>
       </div>
       <div className="flex justify-between mt-3 text-[10px] uppercase">
-        <span>(Byaj) = memo — party ke mool me nahi juda</span><span>E.&amp;O.E.</span>
+        <span>Byaj lines = sirf jaankari — party ke mool me nahi judti</span><span>E.&amp;O.E.</span>
         <span>Printed {new Date().toLocaleString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })} · {BRAND.app} {appVersionLabel()}</span>
       </div>
     </div>

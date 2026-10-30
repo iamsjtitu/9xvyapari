@@ -48,18 +48,17 @@ const Side = ({ side, t, color, bg, label, icon: Icon, asOn, dateFrom, editHref,
             <tr><td colSpan={6} className="text-center text-muted2 py-6 text-sm">Koi entry nahi.</td></tr>
           )}
           {list.map((r) => (
-            <tr key={`${r.kind}-${r.id}`} className={r.memo ? "italic bg-parchment/30" : ""} data-testid={r.memo ? `ledger-t-memo-${r.refId}` : `ledger-t-row-${r.id}`}>
+            <tr key={`${r.kind}-${r.id}`} data-testid={r.memo ? `ledger-t-memo-${r.refId}` : `ledger-t-row-${r.id}`}>
               <td className="font-mono-data text-xs text-muted2 whitespace-nowrap">{fmtDate((r.date || "").slice(0, 10))}</td>
               <td className="font-mono-data text-xs text-terracotta whitespace-nowrap">{r.kind === "bill" && r.vno ? `Bill ${r.vno}` : r.vno || r.ref_no || "—"}</td>
               <td className="font-mono-data text-xs text-jama whitespace-nowrap">{r.inv || ""}</td>
               <td className="cell-grow" title={r.label}>
                 <div className="truncate min-w-0">
-                  {r.memo && <span className="kbd !text-[9px] !px-1 !py-0 mr-1 not-italic" title="Memo — sirf jaankari, mool par asar nahi">BYAJ · MEMO</span>}
-                  {r.kind === "bill" ? <Link to={`/bills/${r.ref}`} className="text-terracotta hover:underline">{r.label}</Link> : <span className={r.memo ? "text-muted2" : ""}>{r.memo ? r.label.replace(/ \(memo[^)]*\)$/, "") : r.label}</span>}
+                  {r.kind === "bill" ? <Link to={`/bills/${r.ref}`} className="text-terracotta hover:underline">{r.label}</Link> : <span>{r.memo ? r.label.replace(/ \(memo[^)]*\)$/, "") : r.label}</span>}
                 </div>
               </td>
-              <td className="num font-mono-data whitespace-nowrap" style={{ color, opacity: r.memo ? 0.75 : 1 }} data-testid={`ledger-t-amount-${r.id}`}>
-                {r.memo ? `(₹ ${inr(r.amount)})` : `₹ ${inr(r.amount)}`}
+              <td className="num font-mono-data whitespace-nowrap" style={{ color }} data-testid={`ledger-t-amount-${r.id}`}>
+                ₹ {inr(r.amount)}
               </td>
               <td className="print:hidden">
                 {editHref(r) && (
@@ -78,9 +77,9 @@ const Side = ({ side, t, color, bg, label, icon: Icon, asOn, dateFrom, editHref,
             <td className="num font-mono-data" style={{ color }}>₹ {inr(mool)}</td><td className="print:hidden"></td>
           </tr>
           {memo > 0 && (
-            <tr className="italic text-xs text-muted2" data-testid={`ledger-t-memo-total-${side}`}>
-              <td colSpan={4} className="text-right">BYAJ / MEMO TOTAL — mool me nahi juda</td>
-              <td className="num font-mono-data">(₹ {inr(memo)})</td><td className="print:hidden"></td>
+            <tr className="bg-parchment/40 font-semibold" data-testid={`ledger-t-memo-total-${side}`}>
+              <td colSpan={4} className="text-right text-xs uppercase">Total Byaj ({list.filter((r) => r.memo).length}) <span className="normal-case font-normal text-muted2">· mool me nahi juda</span></td>
+              <td className="num font-mono-data" style={{ color }}>₹ {inr(memo)}</td><td className="print:hidden"></td>
             </tr>
           )}
           {t.cf.side === side && (
