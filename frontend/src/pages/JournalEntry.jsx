@@ -97,9 +97,23 @@ export default function JournalEntry() {
     return { d, c, diff: +(d - c).toFixed(2) };
   }, [form.lines]);
 
-  const updateLine = (i, patch) => setForm({
-    ...form, lines: form.lines.map((l, idx) => idx === i ? { ...l, ...patch } : l),
-  });
+  // Typing an amount on one line auto-fills the opposite side on the counter line (empty or previously auto-filled)
+  // so a 2-line voucher balances itself: Credit 37,800 → the other line gets Debit 37,800.
+  const updateLine = (i, patch, { amount = false } = {}) => {
+    let lines = form.lines.map((l, idx) => (idx === i ? { ...l, ...patch, ...(amount ? { auto: false } : {}) } : l));
+    if (amount) {
+      const targets = lines.map((l, idx) => idx).filter((idx) => idx !== i && (lines[idx].auto || (!lines[idx].debit && !lines[idx].credit)));
+      if (targets.length === 1) {
+        const t = targets[0];
+        let d = 0, c = 0;
+        lines.forEach((l, idx) => { if (idx !== t) { d += parseFloat(l.debit || 0); c += parseFloat(l.credit || 0); } });
+        const diff = +(d - c).toFixed(2);
+        const fill = diff > 0 ? { debit: "", credit: String(diff) } : diff < 0 ? { debit: String(-diff), credit: "" } : { debit: "", credit: "" };
+        lines = lines.map((l, idx) => (idx === t ? { ...l, ...fill, auto: true } : l));
+      }
+    }
+    setForm({ ...form, lines });
+  };
   const addLine = () => setForm({
     ...form, lines: [...form.lines, { account_id: "", account_name: "", debit: "", credit: "" }],
   });
@@ -309,11 +323,11 @@ export default function JournalEntry() {
                       </td>
                       <td>
                         <input type="number" step="0.01" className="input-dense num" value={l.debit} data-testid={`jline-debit-${idx}`}
-                          onChange={(e) => updateLine(idx, { debit: e.target.value, credit: e.target.value ? "" : l.credit })} />
+                          onChange={(e) => updateLine(idx, { debit: e.target.value, credit: e.target.value ? "" : l.credit }, { amount: true })} />
                       </td>
                       <td>
                         <input type="number" step="0.01" className="input-dense num" value={l.credit} data-testid={`jline-credit-${idx}`}
-                          onChange={(e) => updateLine(idx, { credit: e.target.value, debit: e.target.value ? "" : l.debit })} />
+                          onChange={(e) => updateLine(idx, { credit: e.target.value, debit: e.target.value ? "" : l.debit }, { amount: true })} />
                       </td>
                       <td>
                         {form.lines.length > 2 && (
