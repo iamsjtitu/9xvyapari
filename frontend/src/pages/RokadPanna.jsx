@@ -84,8 +84,13 @@ export default function RokadPanna() {
   const natureOf = (p) => groups.find((g) => g.id === p?.group_id)?.nature || "";
   const selectedParty = useMemo(() => parties.find((p) => p.id === form.party_id), [parties, form.party_id]);
   const isIncomeExpenseLedger = ["income", "expense"].includes(natureOf(selectedParty));
-  const refPartyOptions = useMemo(() => parties.filter((p) => p.id !== form.party_id && !/cash|bank/i.test(p.group_name || "")
-    && !["income", "expense"].includes(natureOf(p))), [parties, groups, form.party_id]); // eslint-disable-line
+  // "Kiska?" candidates: every ledger except cash/bank & the selected one; same-group ledgers (eg. BYAJ) listed first
+  const refPartyOptions = useMemo(() => {
+    const gid = selectedParty?.group_id || "";
+    const pool = parties.filter((p) => p.id !== form.party_id && !/cash|bank/i.test(p.group_name || ""));
+    const same = pool.filter((p) => gid && p.group_id === gid).map((p) => ({ ...p, hint: p.group_name }));
+    return [...same, ...pool.filter((p) => !(gid && p.group_id === gid))];
+  }, [parties, form.party_id, selectedParty]);
 
   // Stale-response guard: a slow older request (other date range) must not overwrite the current one
   const rangeRef = useRef("");
@@ -825,7 +830,8 @@ export default function RokadPanna() {
                 {isIncomeExpenseLedger && (
                   <div className="mt-3 p-3 rounded-sm border border-dashed border-khaki bg-parchment/40" data-testid="ref-party-box">
                     <label className="lbl">
-                      Kiska {natureOf(selectedParty) === "income" ? "aaya" : "gaya"}? — reference party <span className="normal-case tracking-normal text-muted2">(optional)</span>
+                      Kiska {natureOf(selectedParty) === "income" ? "aaya" : "gaya"}? — reference party <span className="normal-case tracking-normal text-muted2">(optional)
+                        {selectedParty?.group_name ? <> · <b>{selectedParty.group_name}</b> ke ledgers upar dikhenge</> : null}</span>
                     </label>
                     <PartyAutocomplete
                       value={form.ref_party_name}

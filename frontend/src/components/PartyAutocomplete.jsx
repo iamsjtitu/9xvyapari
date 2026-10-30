@@ -198,8 +198,8 @@ export default function PartyAutocomplete({
                   </span>
                 )}
                 <span className="font-medium text-ink truncate">{opt.name}</span>
-                {opt.place && (
-                  <span className="text-[10px] text-muted2 ml-auto truncate">{opt.place}</span>
+                {(opt.place || opt.hint) && (
+                  <span className="text-[10px] text-muted2 ml-auto truncate">{opt.place || opt.hint}</span>
                 )}
               </button>
             );
