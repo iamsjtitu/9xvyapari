@@ -1192,9 +1192,14 @@ async def byaj_due(month: Optional[str] = None, current=Depends(get_current_user
     if not ids:
         return out
     parties = await db.parties.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "name": 1, "group_name": 1, "remark": 1, "opening_balance": 1, "phone": 1}).to_list(5000)
-    bals = await _bulk_party_balances(parties=parties)
+    # past month → balances & "last byaj" as they stood at that month's end
+    y, mth = int(month[:4]), int(month[5:7])
+    month_end = (date(y + (mth == 12), (mth % 12) + 1, 1) - timedelta(days=1)).isoformat()
+    as_on = None if month_end >= today else month_end
+    out["as_on"] = as_on or today
+    bals = await _bulk_party_balances(as_on=as_on, parties=parties)
     this_month, last = {}, {}
-    async for r in db.rokad.find({"party_id": {"$in": lids}, "ref_party_id": {"$in": ids}}, {"_id": 0, "ref_party_id": 1, "date": 1, "type": 1, "amount": 1}).sort([("date", -1), ("created_at", -1)]):
+    async for r in db.rokad.find({"party_id": {"$in": lids}, "ref_party_id": {"$in": ids}, **_upto(as_on)}, {"_id": 0, "ref_party_id": 1, "date": 1, "type": 1, "amount": 1}).sort([("date", -1), ("created_at", -1)]):
         rid = r["ref_party_id"]
         last.setdefault(rid, r)                      # first seen = latest
         if (r.get("date") or "")[:7] == month:

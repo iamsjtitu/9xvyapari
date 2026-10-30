@@ -242,15 +242,17 @@ export default function RokadPanna() {
   useEffect(() => {
     const t = search.get("new");
     if (t !== "jama" && t !== "kharch") return;
-    const wantParty = search.get("party"), wantRef = search.get("ref"), amount = search.get("amount");
+    const wantParty = search.get("party"), wantRef = search.get("ref"), amount = search.get("amount"), wantDate = search.get("date");
     if ((wantParty || wantRef) && parties.length === 0) return;   // wait for the party list, then prefill
     const p = wantParty ? parties.find((x) => x.id === wantParty) : null;
     const r = wantRef ? parties.find((x) => x.id === wantRef) : null;
-    setForm((f) => ({ ...f, type: t, date: showAdd ? f.date : dateTo,   // form already open → sirf type badlo, data rahe
+    const okDate = /^\d{4}-\d{2}-\d{2}$/.test(wantDate || "") ? wantDate : null;
+    if (okDate) { setDateFrom(okDate); setDateTo(okDate); }
+    setForm((f) => ({ ...f, type: t, date: okDate || (showAdd ? f.date : dateTo),   // form already open → sirf type badlo, data rahe
       ...(p ? { party_id: p.id, party_name: p.name } : {}), ...(r ? { ref_party_id: r.id, ref_party_name: r.name } : {}),
       ...(amount && Number(amount) > 0 ? { amount: String(amount) } : {}) }));
     setShowAdd(true);
-    setSearch((prev) => { const n = new URLSearchParams(prev); ["new", "party", "ref", "amount"].forEach((k) => n.delete(k)); return n; }, { replace: true });
+    setSearch((prev) => { const n = new URLSearchParams(prev); ["new", "party", "ref", "amount", "date"].forEach((k) => n.delete(k)); return n; }, { replace: true });
     // eslint-disable-next-line
   }, [search, parties]);
 

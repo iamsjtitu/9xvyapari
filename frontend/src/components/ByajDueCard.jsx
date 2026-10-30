@@ -1,23 +1,31 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import api, { inr } from "@/lib/api";
-import { Percent, CheckCircle, Plus, ArrowRight, CaretDown, CaretUp } from "@phosphor-icons/react";
+import api, { inr, todayISO } from "@/lib/api";
+import { Percent, CheckCircle, Plus, ArrowRight, CaretDown, CaretUp, CaretLeft, CaretRight } from "@phosphor-icons/react";
 
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
 const monthLabel = (ym) => new Date(`${ym}-01T00:00:00`).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+const shiftMonth = (ym, n) => { const [y, m] = ym.split("-").map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+const monthEnd = (ym) => { const [y, m] = ym.split("-").map(Number); return `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`; };
 
-// Dashboard card: byaj parties jinka is mahine ka byaj abhi tak nahi aaya (ya nahi diya)
+// Dashboard card: byaj parties jinka is mahine ka byaj abhi tak nahi aaya (ya nahi diya); ‹ › se pichhle mahine bhi dekho
 export const ByajDueCard = () => {
   const [info, setInfo] = useState(null);
+  const [month, setMonth] = useState(null);        // null → server's current month
   const [showDone, setShowDone] = useState(false);
-  useEffect(() => { api.get("/reports/byaj/due").then((r) => setInfo(r.data)).catch(() => setInfo({ pending: [], done: [], ledgers: [] })); }, []);
+  useEffect(() => {
+    api.get("/reports/byaj/due", { params: month ? { month } : {} }).then((r) => setInfo(r.data)).catch(() => setInfo({ pending: [], done: [], ledgers: [] }));
+  }, [month]);
   if (info === null) return <div className="card-flat p-4 h-[88px] animate-pulse" data-testid="byaj-due-loading" />;
-  if (!info.ledgers?.length || (info.pending.length === 0 && info.done.length === 0)) return null;
+  if (!info.ledgers?.length || (!month && info.pending.length === 0 && info.done.length === 0)) return null;
 
-  const { pending, done, totals, month } = info;
+  const { pending, done, totals } = info;
+  const cur = todayISO().slice(0, 7);
+  const ym = info.month;
+  const isCurrent = ym === cur;
   const entryHref = (p) => {
     const ledger = p.side === "dena" ? (info.expense_ledger_id || info.default_ledger_id) : info.default_ledger_id;
-    return `/rokad?new=${p.side === "dena" ? "kharch" : "jama"}${ledger ? `&party=${ledger}` : ""}&ref=${p.id}${p.expected ? `&amount=${p.expected}` : ""}&return=${encodeURIComponent("/")}`;
+    return `/rokad?new=${p.side === "dena" ? "kharch" : "jama"}${ledger ? `&party=${ledger}` : ""}&ref=${p.id}${p.expected ? `&amount=${p.expected}` : ""}${isCurrent ? "" : `&date=${monthEnd(ym)}`}&return=${encodeURIComponent("/")}`;
   };
 
   return (
@@ -27,15 +35,28 @@ export const ByajDueCard = () => {
           <Percent size={18} weight="bold" color={pending.length ? "#B45309" : "#1B5E20"} />
           <div>
             <div className="font-heading font-semibold text-sm" data-testid="byaj-due-title">
-              {pending.length ? `Byaj Due — ${pending.length} party ka ${monthLabel(month)} ka byaj baaki` : `Byaj — ${monthLabel(month)} ka sab byaj aa gaya`}
+              {pending.length
+                ? `Byaj Due — ${pending.length} party ka ${monthLabel(ym)} ka byaj ${isCurrent ? "baaki" : "nahi aaya tha"}`
+                : `Byaj — ${monthLabel(ym)} ka sab byaj aa gaya`}
             </div>
             <div className="text-[11px] text-muted2">
               {pending.length > 0 && totals.expected_total > 0 && <span data-testid="byaj-due-expected">Expected ₹ {inr(totals.expected_total)} (remark ke % se) · </span>}
               {done.length > 0 && <span>{done.length} party se aa chuka: ₹ {inr(totals.received_total)}{totals.paid_total ? ` · diya ₹ ${inr(totals.paid_total)}` : ""}</span>}
+              {pending.length === 0 && done.length === 0 && <span>Is mahine koi byaj entry nahi.</span>}
             </div>
           </div>
         </div>
-        <Link to="/byaj-report" className="text-xs text-terracotta hover:underline font-heading inline-flex items-center gap-1" data-testid="byaj-due-report-link">Byaj Report <ArrowRight size={12} /></Link>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1" data-testid="byaj-month-picker">
+            <button type="button" className="btn-ghost p-1" onClick={() => setMonth(shiftMonth(ym, -1))} title="Pichhla mahina" data-testid="byaj-month-prev"><CaretLeft size={14} weight="bold" /></button>
+            <input type="month" className="input-dense h-8 text-xs !w-[150px]" value={ym} max={cur} onChange={(e) => e.target.value && setMonth(e.target.value <= cur ? e.target.value : cur)} data-testid="byaj-month-input" />
+            <button type="button" className="btn-ghost p-1 disabled:opacity-30" disabled={isCurrent} onClick={() => setMonth(shiftMonth(ym, 1))} title="Agla mahina" data-testid="byaj-month-next"><CaretRight size={14} weight="bold" /></button>
+            {!isCurrent && (
+              <button type="button" className="kbd !text-[11px] px-2 py-1 cursor-pointer hover:bg-khaki/60" onClick={() => setMonth(null)} data-testid="byaj-month-current">Is mahina</button>
+            )}
+          </div>
+          <Link to="/byaj-report" className="text-xs text-terracotta hover:underline font-heading inline-flex items-center gap-1" data-testid="byaj-due-report-link">Byaj Report <ArrowRight size={12} /></Link>
+        </div>
       </div>
       {pending.length > 0 && (
         <table className="dense w-full" data-testid="byaj-due-table">
@@ -70,7 +91,7 @@ export const ByajDueCard = () => {
       {done.length > 0 && (
         <div className="px-4 py-2 text-xs border-t border-khaki">
           <button type="button" className="inline-flex items-center gap-1 text-jama hover:underline" onClick={() => setShowDone((v) => !v)} data-testid="byaj-due-toggle-done">
-            <CheckCircle size={14} weight="bold" /> Is mahine aa gaya ({done.length}) {showDone ? <CaretUp size={12} /> : <CaretDown size={12} />}
+            <CheckCircle size={14} weight="bold" /> {isCurrent ? "Is mahine" : monthLabel(ym) + " me"} aa gaya ({done.length}) {showDone ? <CaretUp size={12} /> : <CaretDown size={12} />}
           </button>
           {showDone && (
             <ul className="mt-1.5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-0.5" data-testid="byaj-due-done-list">
