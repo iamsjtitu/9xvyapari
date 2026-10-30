@@ -15,7 +15,10 @@ export const ByajDueCard = () => {
   if (!info.ledgers?.length || (info.pending.length === 0 && info.done.length === 0)) return null;
 
   const { pending, done, totals, month } = info;
-  const entryHref = (p) => `/rokad?new=${p.side === "dena" ? "kharch" : "jama"}${info.default_ledger_id ? `&party=${info.default_ledger_id}` : ""}&ref=${p.id}${p.expected ? `&amount=${p.expected}` : ""}&return=${encodeURIComponent("/")}`;
+  const entryHref = (p) => {
+    const ledger = p.side === "dena" ? (info.expense_ledger_id || info.default_ledger_id) : info.default_ledger_id;
+    return `/rokad?new=${p.side === "dena" ? "kharch" : "jama"}${ledger ? `&party=${ledger}` : ""}&ref=${p.id}${p.expected ? `&amount=${p.expected}` : ""}&return=${encodeURIComponent("/")}`;
+  };
 
   return (
     <div className={`card-flat overflow-hidden border-l-4 ${pending.length ? "border-l-[#F59E0B]" : "border-l-jama"}`} data-testid="byaj-due-card">

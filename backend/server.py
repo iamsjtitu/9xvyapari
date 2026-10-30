@@ -1170,15 +1170,18 @@ async def _byaj_ledgers() -> list:
 @api.get("/reports/byaj/due")
 async def byaj_due(month: Optional[str] = None, current=Depends(get_current_user)):
     """Dashboard reminder: byaj parties (tagged via "Kiska?" or sitting in a BYAJ-named group) who have NO byaj entry this month."""
-    today = datetime.now(timezone.utc).date().isoformat()
+    today = date.today().isoformat()
     month = month or today[:7]
     if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
         raise HTTPException(400, "Month YYYY-MM format me do")
     ledgers = await _byaj_ledgers()
     lids = [l["id"] for l in ledgers]
     groups = {g["id"]: g async for g in db.account_groups.find({}, {"_id": 0, "id": 1, "name": 1, "nature": 1})}
-    default_ledger = next((l for l in ledgers if (groups.get(l.get("group_id")) or {}).get("nature") == "income" or re.search(r"receiv|income|aaya|mila", l["name"], re.I)), ledgers[0] if ledgers else None)
-    out = {"month": month, "today": today, "ledgers": ledgers, "default_ledger_id": default_ledger["id"] if default_ledger else None,
+    nature = lambda l: (groups.get(l.get("group_id")) or {}).get("nature")  # noqa: E731
+    income_l = next((l for l in ledgers if nature(l) == "income" or re.search(r"receiv|income|aaya|mila", l["name"], re.I)), ledgers[0] if ledgers else None)
+    expense_l = next((l for l in ledgers if nature(l) == "expense" or re.search(r"paid|expense|diya|gaya", l["name"], re.I)), income_l)
+    out = {"month": month, "today": today, "ledgers": ledgers, "default_ledger_id": income_l["id"] if income_l else None,
+           "expense_ledger_id": expense_l["id"] if expense_l else None,
            "pending": [], "done": [], "totals": {"pending_count": 0, "expected_total": 0.0, "received_total": 0.0, "paid_total": 0.0}}
     if not ledgers:
         return out
@@ -1204,6 +1207,8 @@ async def byaj_due(month: Optional[str] = None, current=Depends(get_current_user
             continue                                  # settled & nothing this month → no byaj due
         rate_m = re.search(r"(\d+(?:\.\d+)?)\s*%", p.get("remark") or "")
         rate = float(rate_m.group(1)) if rate_m else None
+        if rate is not None and re.search(r"year|yearly|annual|saal|sal|p\.?a\.?\b", p.get("remark") or "", re.I):
+            rate = round(rate / 12, 4)                # "12% yearly" → 1% per month
         lr = last.get(p["id"])
         row = {"id": p["id"], "name": p["name"], "group_name": p.get("group_name") or "", "remark": p.get("remark") or "", "phone": p.get("phone") or "",
                "balance": bal, "side": "lena" if bal > 0 else "dena" if bal < 0 else "nil",

@@ -1,0 +1,19 @@
+{
+  "summary": "Iteration 53: Byaj Due Reminder (backend + Dashboard card + Rokad prefill/save/return) and T-Format-everywhere Party/Account ledger. Backend 8/8 pytest pass. Frontend: all requested flows pass - card title/expected/rows/last/links/done-list; Byaj entry prefill (Receipt, 4500, INTEREST RECEIVED, ref LABBU, URL params stripped to return=%2F), save -> back to '/' with 2 pending & LABBU under 'Is mahine aa gaya'; entry deleted via API (404 after) and card back to 3 pending. T-format default for RAMESH and CASH IN HAND (account labels, B/F left, C/F right Cr, grand totals equal 97,33,679.00), shared localStorage key remembered across reload and ledgers. Regression: Byaj Report and Statement (Print) T/Ledger variants OK.",
+  "backend_issues": {"critical": [], "minor": [
+    {"endpoint": "GET /api/reports/byaj/due", "issue": "'today'/default month computed from UTC date (datetime.now(timezone.utc)); in IST between 00:00-05:30 on the 1st the card shows previous month. Use local date like other endpoints."},
+    {"endpoint": "GET /api/reports/byaj/due", "issue": "Rate parsed as first 'N%' in remark and always treated as monthly; '12% yearly' remark would give 12x expected. Consider honoring yearly/annual keyword."}
+  ]},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [
+    {"flow": "ByajDueCard entryHref for side 'dena'", "issue": "For dena (we owe byaj) rows the link uses new=kharch but still prefills default_ledger_id = INTEREST RECEIVED (income); should pick an INTEREST PAID ledger when available. Not exercised by fixtures (all rows lena).", "affected_selectors": ["byaj-due-entry-<id>"]}
+  ], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_byaj_due_v53.py", "/app/test_reports/pytest/pytest_v53.xml"],
+  "action_items": ["(minor) Use local date for byaj/due default month", "(minor) Pick interest-paid ledger for dena rows in ByajDueCard entryHref", "(optional) yearly-rate handling in remark parsing"],
+  "critical_code_review_comments": ["server.py is 3552 lines - should be split into routers", "ByajDueCard swallows API errors (catch -> hidden card) with no error state"],
+  "updated_files": ["/app/backend/tests/test_byaj_due_v53.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Created one Rokad entry via UI (4500 INTEREST RECEIVED ref LABBU, CASH IN HAND, v.no 4, 2026-10-30, id 974fb4f5-...) and deleted it via DELETE /api/rokad/<id>; fixtures untouched. localStorage party.ledger.layout left as 't'.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Fixtures in /tmp/demo_ids. Statement toggle testid btn-toggle-statement (label switches to 'Ledger View' when open). PartyTFormat footer text is CSS-uppercased ('TOTAL AAYA'). Cash account select auto-preselects last-used CASH IN HAND."
+}
