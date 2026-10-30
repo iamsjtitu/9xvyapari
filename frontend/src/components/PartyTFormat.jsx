@@ -105,9 +105,9 @@ export function PartyTFormat({ rows, opening, closing, isAccount, asOn, dateFrom
   const common = { t, asOn, dateFrom, editHref, onDelete };
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 cash-book-grid" data-testid="ledger-tformat">
-      <Side side="left" color="#1B5E20" bg="#E8F5E9" icon={ArrowDown} moolLabel="Total Jama (mool)"
+      <Side side="left" color="#1B5E20" bg="#E8F5E9" icon={ArrowDown} moolLabel={isAccount ? "Total Aaya" : "Total Jama (mool)"}
         label={isAccount ? "Aaya / Jama (आमद) — Money In · Credit" : "Jama (आमद) — Party ne diya · wapas / byaj"} {...common} />
-      <Side side="right" color="#B71C1C" bg="#FFEBEE" icon={ArrowUp} moolLabel="Total Kharch (mool)"
+      <Side side="right" color="#B71C1C" bg="#FFEBEE" icon={ArrowUp} moolLabel={isAccount ? "Total Gaya" : "Total Kharch (mool)"}
         label={isAccount ? "Gaya / Kharch (खर्च) — Money Out · Debit" : "Kharch (खर्च) — Party ko diya · udhaar / maal"} {...common} />
     </div>
   );

@@ -1158,6 +1158,71 @@ async def income_expense_report(period: str = "monthly", date_from: Optional[str
 
 BYAJ_LEDGER_RX = re.compile(r"interest|byaj|vyaj|ब्याज", re.I)
 
+async def _byaj_ledgers() -> list:
+    """Ledgers whose NAME says interest/byaj (parties + legacy accounts, de-duped)."""
+    out, seen = [], set()
+    for coll in (db.parties, db.accounts):
+        async for p in coll.find({"name": {"$regex": BYAJ_LEDGER_RX.pattern, "$options": "i"}}, {"_id": 0, "id": 1, "name": 1, "group_name": 1, "group_id": 1}):
+            if p["id"] not in seen:
+                seen.add(p["id"]); out.append(p)
+    return out
+
+@api.get("/reports/byaj/due")
+async def byaj_due(month: Optional[str] = None, current=Depends(get_current_user)):
+    """Dashboard reminder: byaj parties (tagged via "Kiska?" or sitting in a BYAJ-named group) who have NO byaj entry this month."""
+    today = datetime.now(timezone.utc).date().isoformat()
+    month = month or today[:7]
+    if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
+        raise HTTPException(400, "Month YYYY-MM format me do")
+    ledgers = await _byaj_ledgers()
+    lids = [l["id"] for l in ledgers]
+    groups = {g["id"]: g async for g in db.account_groups.find({}, {"_id": 0, "id": 1, "name": 1, "nature": 1})}
+    default_ledger = next((l for l in ledgers if (groups.get(l.get("group_id")) or {}).get("nature") == "income" or re.search(r"receiv|income|aaya|mila", l["name"], re.I)), ledgers[0] if ledgers else None)
+    out = {"month": month, "today": today, "ledgers": ledgers, "default_ledger_id": default_ledger["id"] if default_ledger else None,
+           "pending": [], "done": [], "totals": {"pending_count": 0, "expected_total": 0.0, "received_total": 0.0, "paid_total": 0.0}}
+    if not ledgers:
+        return out
+    ref_ids = [r for r in await db.rokad.distinct("ref_party_id", {"party_id": {"$in": lids}}) if r]
+    byaj_gids = [gid for gid, g in groups.items() if BYAJ_LEDGER_RX.search(g.get("name") or "")]
+    grp_ids = [p["id"] async for p in db.parties.find({"group_id": {"$in": byaj_gids}}, {"_id": 0, "id": 1})] if byaj_gids else []
+    ids = list((set(ref_ids) | set(grp_ids)) - set(lids))
+    if not ids:
+        return out
+    parties = await db.parties.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "name": 1, "group_name": 1, "remark": 1, "opening_balance": 1, "phone": 1}).to_list(5000)
+    bals = await _bulk_party_balances(parties=parties)
+    this_month, last = {}, {}
+    async for r in db.rokad.find({"party_id": {"$in": lids}, "ref_party_id": {"$in": ids}}, {"_id": 0, "ref_party_id": 1, "date": 1, "type": 1, "amount": 1}).sort([("date", -1), ("created_at", -1)]):
+        rid = r["ref_party_id"]
+        last.setdefault(rid, r)                      # first seen = latest
+        if (r.get("date") or "")[:7] == month:
+            m = this_month.setdefault(rid, {"received": 0.0, "paid": 0.0})
+            m["received" if r.get("type") == "jama" else "paid"] += float(r.get("amount") or 0)
+    for p in parties:
+        bal = bals.get(p["id"], 0.0)
+        m = this_month.get(p["id"])
+        if abs(bal) < 0.005 and not m:
+            continue                                  # settled & nothing this month → no byaj due
+        rate_m = re.search(r"(\d+(?:\.\d+)?)\s*%", p.get("remark") or "")
+        rate = float(rate_m.group(1)) if rate_m else None
+        lr = last.get(p["id"])
+        row = {"id": p["id"], "name": p["name"], "group_name": p.get("group_name") or "", "remark": p.get("remark") or "", "phone": p.get("phone") or "",
+               "balance": bal, "side": "lena" if bal > 0 else "dena" if bal < 0 else "nil",
+               "rate": rate, "expected": round(abs(bal) * rate / 100, 2) if rate else None,
+               "last_date": (lr or {}).get("date"), "last_amount": (lr or {}).get("amount"), "last_type": (lr or {}).get("type"),
+               "month_received": round((m or {}).get("received", 0.0), 2), "month_paid": round((m or {}).get("paid", 0.0), 2)}
+        if m:
+            out["done"].append(row)
+            out["totals"]["received_total"] += row["month_received"]; out["totals"]["paid_total"] += row["month_paid"]
+        else:
+            out["pending"].append(row)
+            out["totals"]["expected_total"] += row["expected"] or 0.0
+    out["pending"].sort(key=lambda r: -abs(r["balance"]))
+    out["done"].sort(key=lambda r: r["name"].upper())
+    out["totals"]["pending_count"] = len(out["pending"])
+    for k in ("expected_total", "received_total", "paid_total"):
+        out["totals"][k] = round(out["totals"][k], 2)
+    return out
+
 @api.get("/reports/byaj")
 async def byaj_report(date_from: Optional[str] = None, date_to: Optional[str] = None, current=Depends(get_current_user)):
     """Interest received / paid (Rokad entries on ledgers whose NAME says interest/byaj) grouped by the "Kiska?" reference party."""
@@ -1165,11 +1230,7 @@ async def byaj_report(date_from: Optional[str] = None, date_to: Optional[str] = 
         if d and not _is_date(d):
             raise HTTPException(400, "Date YYYY-MM-DD format me do")
     st = await db.settings.find_one({"id": "default"}, {"_id": 0}) or {}
-    ledgers, seen = [], set()
-    for coll in (db.parties, db.accounts):
-        async for p in coll.find({"name": {"$regex": BYAJ_LEDGER_RX.pattern, "$options": "i"}}, {"_id": 0, "id": 1, "name": 1, "group_name": 1}):
-            if p["id"] not in seen:
-                seen.add(p["id"]); ledgers.append(p)
+    ledgers = await _byaj_ledgers()
     out = {"firm_name": st.get("firm_name", ""), "date_from": date_from, "date_to": date_to, "ledgers": ledgers,
            "groups": [], "count": 0, "total_received": 0.0, "total_paid": 0.0, "net": 0.0}
     if not ledgers:

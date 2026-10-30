@@ -8,6 +8,7 @@ import {
 import { CashBankBalances } from "@/components/CashBankBalances";
 import { LoadState } from "@/components/LoadState";
 import { AttendanceReminderCard } from "@/components/staff/AttendanceReminderCard";
+import { ByajDueCard } from "@/components/ByajDueCard";
 
 const Stat = ({ icon: Icon, label, value, accent, testid }) => (
   <div className="card-flat p-4" data-testid={testid}>
@@ -84,6 +85,7 @@ export default function Dashboard() {
       </div>
 
       <AttendanceReminderCard />
+      <ByajDueCard />
 
       {/* Today */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">

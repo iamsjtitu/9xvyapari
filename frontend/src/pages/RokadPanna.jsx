@@ -237,15 +237,22 @@ export default function RokadPanna() {
     if (returnTo) navigate(returnTo);  // opened from a ledger → go back there
   };
 
-  // /rokad?new=kharch|jama → open a fresh voucher of that type (F5 = Payment, F6 = Receipt from anywhere in the app)
+  // /rokad?new=kharch|jama[&party=<ledgerId>&ref=<partyId>&amount=] → open a fresh voucher of that type (F5 = Payment, F6 = Receipt;
+  // Dashboard "Byaj entry" prefills INTEREST ledger + Kiska party + expected amount)
   useEffect(() => {
     const t = search.get("new");
     if (t !== "jama" && t !== "kharch") return;
-    setForm((f) => ({ ...f, type: t, date: showAdd ? f.date : dateTo }));   // form already open → sirf type badlo, data rahe
+    const wantParty = search.get("party"), wantRef = search.get("ref"), amount = search.get("amount");
+    if ((wantParty || wantRef) && parties.length === 0) return;   // wait for the party list, then prefill
+    const p = wantParty ? parties.find((x) => x.id === wantParty) : null;
+    const r = wantRef ? parties.find((x) => x.id === wantRef) : null;
+    setForm((f) => ({ ...f, type: t, date: showAdd ? f.date : dateTo,   // form already open → sirf type badlo, data rahe
+      ...(p ? { party_id: p.id, party_name: p.name } : {}), ...(r ? { ref_party_id: r.id, ref_party_name: r.name } : {}),
+      ...(amount && Number(amount) > 0 ? { amount: String(amount) } : {}) }));
     setShowAdd(true);
-    setSearch((prev) => { const n = new URLSearchParams(prev); n.delete("new"); return n; }, { replace: true });
+    setSearch((prev) => { const n = new URLSearchParams(prev); ["new", "party", "ref", "amount"].forEach((k) => n.delete(k)); return n; }, { replace: true });
     // eslint-disable-next-line
-  }, [search]);
+  }, [search, parties]);
 
   // /rokad?edit=<id>[&return=/parties/<pid>] → open that voucher for editing (from Party / Account ledger)
   useEffect(() => {

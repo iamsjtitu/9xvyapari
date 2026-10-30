@@ -13,8 +13,7 @@ import { LoadState } from "@/components/LoadState";
 import { SettledMarkerRow, SettledBadge, reopenSettled } from "@/components/SettledMarker";
 
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
-const BYAJ_GROUP_RX = /byaj|interest|vyaj|ब्याज/i;   // ledgers under a BYAJ-type group open in T-format by default
-const layoutKey = (byaj) => `party.ledger.layout.${byaj ? "byaj" : "other"}`;
+const LAYOUT_KEY = "party.ledger.layout";   // "t" (default, Jama | Kharch) or "ledger" (Debit | Credit | Balance) — remembered for all ledgers
 
 const KIND_ICON = {
   bill: <Receipt size={14} color="#8B2520" />,
@@ -146,9 +145,8 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
     ? (party.balance < 0 ? "#B71C1C" : party.balance > 0 ? "#1A1A1A" : "#595959")  // cash/bank: Dr = paisa haath me, Cr (overdrawn) = red
     : (party.balance > 0 ? "#B71C1C" : party.balance < 0 ? "#1B5E20" : "#595959");
   const periodText = dateFrom ? `${fmtDate(dateFrom)} → ${fmtDate(asOn)}` : `upto ${fmtDate(asOn)}`;
-  const isByaj = BYAJ_GROUP_RX.test(party.group_name || "");
-  const layout = isAccount ? "ledger" : (layoutPick || localStorage.getItem(layoutKey(isByaj)) || (isByaj ? "t" : "ledger"));
-  const setLayout = (v) => { setLayoutPick(v); try { localStorage.setItem(layoutKey(isByaj), v); } catch {} };
+  const layout = layoutPick || localStorage.getItem(LAYOUT_KEY) || "t";
+  const setLayout = (v) => { setLayoutPick(v); try { localStorage.setItem(LAYOUT_KEY, v); } catch {} };
 
   return (
     <div className="space-y-5" data-testid="page-party-ledger">
@@ -171,12 +169,10 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
               </button>
             ))}
           </div>
-          {!isAccount && (
-            <div className="flex items-center gap-1" role="tablist" data-testid="ledger-view-toggle">
-              <button type="button" className={`btn-ghost text-xs px-3 py-1.5 ${layout === "t" ? "!bg-ink !text-parchment" : ""}`} onClick={() => setLayout("t")} data-testid="ledger-view-t" aria-pressed={layout === "t"}>T-Format · Jama | Kharch</button>
-              <button type="button" className={`btn-ghost text-xs px-3 py-1.5 ${layout === "ledger" ? "!bg-ink !text-parchment" : ""}`} onClick={() => setLayout("ledger")} data-testid="ledger-view-ledger" aria-pressed={layout === "ledger"}>Ledger · Debit | Credit</button>
-            </div>
-          )}
+          <div className="flex items-center gap-1" role="tablist" data-testid="ledger-view-toggle">
+            <button type="button" className={`btn-ghost text-xs px-3 py-1.5 ${layout === "t" ? "!bg-ink !text-parchment" : ""}`} onClick={() => setLayout("t")} data-testid="ledger-view-t" aria-pressed={layout === "t"}>T-Format · Jama | Kharch</button>
+            <button type="button" className={`btn-ghost text-xs px-3 py-1.5 ${layout === "ledger" ? "!bg-ink !text-parchment" : ""}`} onClick={() => setLayout("ledger")} data-testid="ledger-view-ledger" aria-pressed={layout === "ledger"}>Ledger · Debit | Credit</button>
+          </div>
           <button type="button" className={view === "statement" ? "btn-primary" : "btn-outline"} onClick={() => setView(view === "statement" ? "ledger" : "statement")}
             title="DOS-style statement (print layout)" data-testid="btn-toggle-statement">
             <Printer size={14} /> {view === "statement" ? "Ledger View" : "Statement (Print)"}
