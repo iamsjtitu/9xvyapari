@@ -32,7 +32,7 @@ function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = 
   // debit/credit stay 0 so totals & running balance are untouched; `memo` carries the side + amount for display
   memo_rokad.forEach((r) => rows.push({
     kind: "memo", id: `memo-${r.id}`, refId: r.id, date: r.date, vno: r.voucher_no || "", inv: r.inv_no || "", created_at: r.created_at || "",
-    label: `${r.party_name || ""}${r.description ? " · " + r.description : ""}${r.cash_account_name ? ` · ${r.cash_account_name}` : ""} (memo — balance par asar nahi)`,
+    label: `${r.party_name || ""}${r.description ? " · " + r.description : ""}${r.cash_account_name ? ` · ${r.cash_account_name}` : ""}`,
     credit: 0, debit: 0, memo: { side: r.type === "jama" ? "debit" : "credit", amount: r.amount, head: r.party_name || "" },   // same column as a normal receipt/payment of this party
   }));
   bills.forEach((b) => rows.push({
@@ -192,7 +192,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                 { key: "credit", label: COL_CREDIT(isAccount), width: 18, num: true },
                 { key: "balance_abs", label: "Balance", width: 15, num: true },
                 { key: "drcr", label: "Dr/Cr", width: 6 },
-                ...(memoTotal ? [{ key: "memo_dr", label: "Memo Debit (byaj etc.)", width: 16, num: true }, { key: "memo_cr", label: "Memo Credit (byaj etc.)", width: 16, num: true }] : []),
+                ...(memoTotal ? [{ key: "memo_dr", label: "Byaj Debit", width: 16, num: true }, { key: "memo_cr", label: "Byaj Credit", width: 16, num: true }] : []),
               ],
               rows: [
                 { date: dateFrom || "", vno: "", label: `OPENING BALANCE${dateFrom ? " (B/F)" : ""}`, debit: "", credit: "", balance_abs: Math.abs(opening), drcr: drcr(opening), _style: "opening" },
@@ -301,7 +301,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
             ) : (
               enriched.map((r) => (
                 <Fragment key={`${r.kind}-${r.id}`}>
-                <tr className={r.memo ? "italic bg-parchment/30" : ""} data-testid={r.memo ? `ledger-memo-row-${r.refId}` : undefined}>
+                <tr data-testid={r.memo ? `ledger-memo-row-${r.refId}` : undefined}>
                   <td className="font-mono-data text-muted2 whitespace-nowrap">{fmtDate((r.date || "").slice(0, 10))}</td>
                   <td className="font-mono-data text-xs text-terracotta whitespace-nowrap" title={r.kind === "bill" ? "Bill No." : r.kind === "journal" ? "Journal Voucher No." : r.kind === "dos" ? "DOS Ref" : "Rokad Voucher No."}
                     data-testid={`ledger-vno-${r.id}`}>{r.kind === "bill" && r.vno ? `Bill ${r.vno}` : r.vno || r.ref_no || "—"}</td>
@@ -317,23 +317,18 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                           {r.label.replace(/^[A-Za-z ]+· /, "")}
                           {r.ref_no && <span className="text-[10px] text-muted2 font-mono-data ml-1">[#{r.ref_no}]</span>}
                         </span>
-                      ) : r.memo ? (
-                        <span className="truncate min-w-0 text-muted2">
-                          <span className="kbd !text-[9px] !px-1 !py-0 mr-1 not-italic" title="Memo — sirf jaankari, balance par asar nahi">MEMO</span>
-                          {r.label}
-                        </span>
                       ) : (
                         <span className="truncate min-w-0">{r.label}</span>
                       )}
                     </div>
                   </td>
-                  <td className={`num whitespace-nowrap ${r.memo ? "text-muted2" : "amount-kharch"}`} data-testid={`ledger-debit-${r.id}`}>
-                    {r.memo?.side === "debit" ? `(₹ ${inr(r.memo.amount)})` : r.debit ? `₹ ${inr(r.debit)}` : "—"}
+                  <td className="num whitespace-nowrap amount-kharch" data-testid={`ledger-debit-${r.id}`}>
+                    {r.memo?.side === "debit" ? `₹ ${inr(r.memo.amount)}` : r.debit ? `₹ ${inr(r.debit)}` : "—"}
                   </td>
-                  <td className={`num whitespace-nowrap ${r.memo ? "text-muted2" : "amount-jama"}`} data-testid={`ledger-credit-${r.id}`}>
-                    {r.memo?.side === "credit" ? `(₹ ${inr(r.memo.amount)})` : r.credit ? `₹ ${inr(r.credit)}` : "—"}
+                  <td className="num whitespace-nowrap amount-jama" data-testid={`ledger-credit-${r.id}`}>
+                    {r.memo?.side === "credit" ? `₹ ${inr(r.memo.amount)}` : r.credit ? `₹ ${inr(r.credit)}` : "—"}
                   </td>
-                  <td className="num font-medium whitespace-nowrap" style={{ color: r.memo ? "#8a8a8a" : r.balance >= 0 ? "#1A1A1A" : "#1B5E20" }}>
+                  <td className="num font-medium whitespace-nowrap" style={{ color: r.balance >= 0 ? "#1A1A1A" : "#1B5E20" }}>
                     ₹ {inr(Math.abs(r.balance))} <span className={`text-[10px] ml-1 ${r.balance < 0 ? "text-kharch" : "text-muted2"}`} data-testid={`ledger-bal-${r.id}`}>{drcr(r.balance)}</span>
                   </td>
                   <td className="print:hidden">
@@ -363,10 +358,10 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
           {enriched.length > 0 && (
             <tfoot>
               {memoTotal > 0 && (
-                <tr className="text-xs italic text-muted2" data-testid="ledger-memo-total-row">
-                  <td colSpan={4} className="text-right">MEMO TOTAL (byaj etc. — balance me nahi juda)</td>
-                  <td className="num font-mono-data">{memoOut ? `(₹ ${inr(memoOut)})` : "—"}</td>
-                  <td className="num font-mono-data">{memoIn ? `(₹ ${inr(memoIn)})` : "—"}</td>
+                <tr className="bg-parchment/40 font-semibold" data-testid="ledger-memo-total-row">
+                  <td colSpan={4} className="text-right text-xs uppercase">Total Byaj <span className="normal-case font-normal text-muted2">· balance me nahi juda</span></td>
+                  <td className="num font-mono-data amount-kharch">{memoOut ? `₹ ${inr(memoOut)}` : "—"}</td>
+                  <td className="num font-mono-data amount-jama">{memoIn ? `₹ ${inr(memoIn)}` : "—"}</td>
                   <td></td>
                   <td className="print:hidden"></td>
                 </tr>
