@@ -257,7 +257,7 @@ function detectOrientation() {
       path.includes("/bills") || path.includes("/parties") ||
       path.includes("/inward") || path.includes("/journal") ||
       path.includes("/opening-balance") || path.includes("/outstanding") ||
-      path.includes("/account-clear") || path.includes("/staff/") || path.includes("/income-expense")) {
+      path.includes("/account-clear") || path.includes("/staff/") || path.includes("/income-expense") || path.includes("/byaj-report")) {
     return "landscape";
   }
   return "portrait";

@@ -40,6 +40,7 @@ import Inward from "@/pages/Inward";
 import TrialBalance from "@/pages/TrialBalance";
 import ImportDBF from "@/pages/ImportDBF";
 import GSTReturns from "@/pages/GSTReturns";
+import ByajReport from "@/pages/ByajReport";
 import "@/App.css";
 
 function Protected({ children }) {
@@ -105,6 +106,7 @@ function App() {
             <Route path="outstanding" element={<Outstanding />} />
             <Route path="account-clear" element={<AccountClearReport />} />
             <Route path="income-expense" element={<IncomeExpense />} />
+            <Route path="byaj-report" element={<ByajReport />} />
             <Route path="staff" element={<StaffMaster />} />
             <Route path="staff/attendance" element={<StaffAttendance />} />
             <Route path="staff/salary" element={<StaffSalary />} />

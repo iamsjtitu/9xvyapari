@@ -1156,6 +1156,53 @@ async def income_expense_report(period: str = "monthly", date_from: Optional[str
             "totals": {"income": ti, "expense": te, "investment": tv, "net": round(ti - te, 2)}}
 
 
+BYAJ_LEDGER_RX = re.compile(r"interest|byaj|vyaj|ब्याज", re.I)
+
+@api.get("/reports/byaj")
+async def byaj_report(date_from: Optional[str] = None, date_to: Optional[str] = None, current=Depends(get_current_user)):
+    """Interest received / paid (Rokad entries on ledgers whose NAME says interest/byaj) grouped by the "Kiska?" reference party."""
+    for d in (date_from, date_to):
+        if d and not _is_date(d):
+            raise HTTPException(400, "Date YYYY-MM-DD format me do")
+    st = await db.settings.find_one({"id": "default"}, {"_id": 0}) or {}
+    ledgers = []
+    for coll in (db.parties, db.accounts):
+        async for p in coll.find({"name": {"$regex": BYAJ_LEDGER_RX.pattern, "$options": "i"}}, {"_id": 0, "id": 1, "name": 1, "group_name": 1}):
+            ledgers.append(p)
+    out = {"firm_name": st.get("firm_name", ""), "date_from": date_from, "date_to": date_to, "ledgers": ledgers,
+           "groups": [], "count": 0, "total_received": 0.0, "total_paid": 0.0, "net": 0.0}
+    if not ledgers:
+        return out
+    q: dict = {"party_id": {"$in": [l["id"] for l in ledgers]}}
+    rng = {}
+    if date_from: rng["$gte"] = date_from
+    if date_to: rng["$lte"] = date_to
+    if rng: q["date"] = rng
+    groups: dict = {}
+    async for r in db.rokad.find(q, {"_id": 0}).sort([("date", 1), ("created_at", 1)]):
+        key = r.get("ref_party_id") or ""
+        g = groups.setdefault(key, {"ref_party_id": key or None, "ref_party_name": r.get("ref_party_name") or "", "received": 0.0, "paid": 0.0, "entries": []})
+        amt = float(r.get("amount") or 0)
+        if r.get("type") == "jama": g["received"] += amt
+        else: g["paid"] += amt
+        g["entries"].append({"id": r["id"], "date": (r.get("date") or "")[:10], "type": r.get("type"), "amount": amt,
+                             "voucher_no": r.get("voucher_no") or "", "inv_no": r.get("inv_no") or "", "chq_no": r.get("chq_no") or "",
+                             "ledger_id": r.get("party_id"), "ledger_name": r.get("party_name") or "", "description": r.get("description") or "",
+                             "cash_account_name": r.get("cash_account_name") or "", "mode": r.get("mode") or ""})
+        out["count"] += 1
+    if "" in groups:
+        groups[""]["ref_party_name"] = "BINA NAAM — 'Kiska?' nahi bhara"
+    for g in groups.values():
+        g["received"] = round(g["received"], 2); g["paid"] = round(g["paid"], 2); g["net"] = round(g["received"] - g["paid"], 2)
+        g["count"] = len(g["entries"])
+    named = sorted((g for k, g in groups.items() if k), key=lambda g: g["ref_party_name"].upper())
+    out["groups"] = named + ([groups[""]] if "" in groups else [])
+    out["total_received"] = round(sum(g["received"] for g in out["groups"]), 2)
+    out["total_paid"] = round(sum(g["paid"] for g in out["groups"]), 2)
+    out["net"] = round(out["total_received"] - out["total_paid"], 2)
+    return out
+
+
 @api.get("/reports/account-clear")
 async def account_clear_report(date_from: Optional[str] = None, date_to: Optional[str] = None, ledger_id: Optional[str] = None,
                                current=Depends(get_current_user)):
