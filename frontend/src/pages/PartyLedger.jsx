@@ -7,10 +7,14 @@ import { ArrowLeft, Receipt, Notebook, BookOpen, BookOpenText, Wallet, Printer, 
 import { toast } from "sonner";
 import { ExportBar } from "@/components/ExportBar";
 import { PartyStatement } from "@/components/PartyStatement";
+import { PartyTFormat } from "@/components/PartyTFormat";
+import { PartyTStatement } from "@/components/PartyTStatement";
 import { LoadState } from "@/components/LoadState";
 import { SettledMarkerRow, SettledBadge, reopenSettled } from "@/components/SettledMarker";
 
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
+const BYAJ_GROUP_RX = /byaj|interest|vyaj|ब्याज/i;   // ledgers under a BYAJ-type group open in T-format by default
+const layoutKey = (byaj) => `party.ledger.layout.${byaj ? "byaj" : "other"}`;
 
 const KIND_ICON = {
   bill: <Receipt size={14} color="#8B2520" />,
@@ -77,6 +81,7 @@ export default function PartyLedger() {
   const [error, setError] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const [view, setView] = useState("ledger"); // ledger | statement (DOS print preview)
+  const [layoutPick, setLayoutPick] = useState(null); // "t" | "ledger" | null → default by group (remembered per group kind)
 
   useEffect(() => {
     let alive = true;
@@ -139,6 +144,9 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
     ? (party.balance < 0 ? "#B71C1C" : party.balance > 0 ? "#1A1A1A" : "#595959")  // cash/bank: Dr = paisa haath me, Cr (overdrawn) = red
     : (party.balance > 0 ? "#B71C1C" : party.balance < 0 ? "#1B5E20" : "#595959");
   const periodText = dateFrom ? `${fmtDate(dateFrom)} → ${fmtDate(asOn)}` : `upto ${fmtDate(asOn)}`;
+  const isByaj = BYAJ_GROUP_RX.test(party.group_name || "");
+  const layout = isAccount ? "ledger" : (layoutPick || localStorage.getItem(layoutKey(isByaj)) || (isByaj ? "t" : "ledger"));
+  const setLayout = (v) => { setLayoutPick(v); try { localStorage.setItem(layoutKey(isByaj), v); } catch {} };
 
   return (
     <div className="space-y-5" data-testid="page-party-ledger">
@@ -161,6 +169,12 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
               </button>
             ))}
           </div>
+          {!isAccount && (
+            <div className="flex items-center gap-1" role="tablist" data-testid="ledger-view-toggle">
+              <button type="button" className={`btn-ghost text-xs px-3 py-1.5 ${layout === "t" ? "!bg-ink !text-parchment" : ""}`} onClick={() => setLayout("t")} data-testid="ledger-view-t" aria-pressed={layout === "t"}>T-Format · Jama | Kharch</button>
+              <button type="button" className={`btn-ghost text-xs px-3 py-1.5 ${layout === "ledger" ? "!bg-ink !text-parchment" : ""}`} onClick={() => setLayout("ledger")} data-testid="ledger-view-ledger" aria-pressed={layout === "ledger"}>Ledger · Debit | Credit</button>
+            </div>
+          )}
           <button type="button" className={view === "statement" ? "btn-primary" : "btn-outline"} onClick={() => setView(view === "statement" ? "ledger" : "statement")}
             title="DOS-style statement (print layout)" data-testid="btn-toggle-statement">
             <Printer size={14} /> {view === "statement" ? "Ledger View" : "Statement (Print)"}
@@ -195,8 +209,12 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
 
       {/* Print output = DOS statement (always); on screen only when toggled */}
       <div className={view === "statement" ? "" : "hidden print:block"}>
-        <PartyStatement firmName={settings?.firm_name} party={party} rows={enriched} opening={opening} isCash={isAccount}
-          closing={party.balance} dateFrom={dateFrom} asOn={asOn} settledUpto={data.settled_upto} />
+        {layout === "t" ? (
+          <PartyTStatement firmName={settings?.firm_name} party={party} rows={enriched} opening={opening} closing={party.balance} isCash={isAccount} dateFrom={dateFrom} asOn={asOn} />
+        ) : (
+          <PartyStatement firmName={settings?.firm_name} party={party} rows={enriched} opening={opening} isCash={isAccount}
+            closing={party.balance} dateFrom={dateFrom} asOn={asOn} settledUpto={data.settled_upto} />
+        )}
       </div>
 
       <div className={view === "statement" ? "hidden" : "space-y-5 print:hidden"}>
@@ -231,6 +249,19 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
         </div>
       </div>
 
+      {layout === "t" ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2 px-1">
+            <div className="section-title">Transaction History ({periodText}) · T-Format</div>
+            <div className="flex items-center gap-3 text-xs text-muted2 font-mono-data">
+              <span data-testid="ledger-opening">Opening{dateFrom ? ` (${fmtDate(dateFrom)} se pehle)` : ""}: ₹ {inr(Math.abs(opening))} {drcr(opening)}</span>
+              <span>·</span>
+              <span data-testid="ledger-entry-count">{enriched.length} entries</span>
+            </div>
+          </div>
+          <PartyTFormat rows={enriched} opening={opening} closing={party.balance} isAccount={isAccount} asOn={asOn} dateFrom={dateFrom} editHref={editHref} onDelete={deleteRow} />
+        </div>
+      ) : (
       <div className="card-flat overflow-hidden">
         <div className="px-4 py-3 border-b border-khaki flex items-center justify-between flex-wrap gap-2">
           <div className="section-title">Transaction History ({periodText})</div>
@@ -353,6 +384,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
           )}
         </table>
       </div>
+      )}
       </div>
     </div>
   );
