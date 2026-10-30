@@ -17,6 +17,11 @@ const RowInfo = ({ e }) => (
         </span>
       )}
       <span className="truncate min-w-0">{e.party_name || "—"}</span>
+      {e.ref_party_name && (
+        <span className="text-[10px] text-muted2 whitespace-nowrap" title="Reference party (memo — balance par asar nahi)" data-testid={`rokad-ref-${e.id}`}>
+          · {e.ref_party_name} ka
+        </span>
+      )}
     </div>
     {(e.description || e.cash_account_name) && (
       <div className="text-[10px] text-muted2 mt-0.5 truncate">

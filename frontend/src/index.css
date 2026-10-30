@@ -453,6 +453,8 @@ label.lbl {
 .dos-stmt .dos-settled { background: #E8F5E9; color: #1B5E20; font-weight: 700; border-bottom: 1px solid #1B5E20; }
 .dos-stmt .dos-settled .pt { letter-spacing: 0.04em; }
 .dos-settled-tag { display: inline-block; border: 2px solid #1B5E20; color: #1B5E20; font-weight: 700; padding: 1px 8px; letter-spacing: 0.06em; }
+.dos-stmt .dos-memo { color: #6b6b6b; font-style: italic; }
+.dos-stmt .dos-memo .am { color: #6b6b6b; }
 @media print { .dos-stmt .dos-settled { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 @media print {
   .dos-stmt-row { font-size: 8pt; border-bottom-color: #999; }

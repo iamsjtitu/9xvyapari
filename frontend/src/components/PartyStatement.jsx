@@ -40,12 +40,12 @@ export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFr
         <div className="dos-stmt-row"><span className="dt"></span><span className="pt">-- is period me koi entry nahi --</span></div>
       ) : rows.map((r, i) => (
         <div key={`${r.kind}-${r.id}-${i}`}>
-          <div className="dos-stmt-row">
+          <div className={`dos-stmt-row${r.memo ? " dos-memo" : ""}`} data-testid={r.memo ? "stmt-memo-row" : undefined}>
             <span className="dt">{fmtDate((r.date || "").slice(0, 10))}</span>
-            <span className="pt" title={r.label}>{r.label}</span>
+            <span className="pt" title={r.label}>{r.memo ? `* MEMO: ${r.memo.head}${r.label.includes(" · ") ? r.label.slice(r.label.indexOf(" · ")).replace(/ \(memo.*$/, "") : ""}` : r.label}</span>
             <span className="rf">{refOf(r)}</span><span className="iv">{r.inv || ""}</span>
-            <span className="am">{r.debit ? inr(r.debit) : ""}</span>
-            <span className="am">{r.credit ? inr(r.credit) : ""}</span>
+            <span className="am">{r.memo?.side === "debit" ? `(${inr(r.memo.amount)})` : r.debit ? inr(r.debit) : ""}</span>
+            <span className="am">{r.memo?.side === "credit" ? `(${inr(r.memo.amount)})` : r.credit ? inr(r.credit) : ""}</span>
             <span className="bl">{drcr(r.balance)}</span>
           </div>
           {r.settles_rokad_id && (
@@ -58,9 +58,16 @@ export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFr
         </div>
       ))}
       <div className="dos-stmt-row dos-total" data-testid="stmt-total-row">
-        <span className="dt"></span><span className="pt">TOTAL ({rows.length} entries)</span><span className="rf"></span><span className="iv"></span>
+        <span className="dt"></span><span className="pt">TOTAL ({rows.filter((r) => !r.memo).length} entries)</span><span className="rf"></span><span className="iv"></span>
         <span className="am">{inr(totalDr)}</span><span className="am">{inr(totalCr)}</span><span className="bl"></span>
       </div>
+      {rows.some((r) => r.memo) && (
+        <div className="dos-stmt-row dos-memo" data-testid="stmt-memo-total-row">
+          <span className="dt"></span><span className="pt">* MEMO TOTAL (byaj etc. — balance me nahi juda)</span><span className="rf"></span><span className="iv"></span>
+          <span className="am">({inr(rows.filter((r) => r.memo?.side === "debit").reduce((s, r) => s + r.memo.amount, 0))})</span>
+          <span className="am">({inr(rows.filter((r) => r.memo?.side === "credit").reduce((s, r) => s + r.memo.amount, 0))})</span><span className="bl"></span>
+        </div>
+      )}
       <div className="dos-stmt-row dos-close" data-testid="stmt-closing-row">
         <span className="dt">{fmtDate(asOn)}</span><span className="pt">CLOSING BALANCE AS ON {fmtDate(asOn)}</span><span className="rf"></span><span className="iv"></span>
         <span className="am"></span><span className="am"></span><span className="bl">{drcr(closing)}</span>

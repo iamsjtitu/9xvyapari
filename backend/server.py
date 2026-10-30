@@ -239,6 +239,8 @@ class RokadIn(BaseModel):
     voucher_no: Optional[str] = ""        # per-cash-account voucher number
     inv_no: Optional[str] = ""            # party's invoice / bill number (free text, shown next to V.No.)
     chq_no: Optional[str] = ""             # cheque number
+    ref_party_id: Optional[str] = None     # "kiska?" — eg. INTEREST RECEIVED entry tagged with the party who paid (memo only)
+    ref_party_name: Optional[str] = ""
 
     @field_validator("inv_no", mode="before")
     @classmethod
@@ -852,6 +854,12 @@ async def _require_party(doc: dict):
         raise HTTPException(400, "Party nahi mili — list se chunein ya nayi party banayein")
     doc["party_id"] = pid
     doc["party_name"] = (doc.get("party_name") or "").strip() or p["name"]
+    rid = (doc.get("ref_party_id") or "").strip()
+    if rid and rid != pid:
+        rp = await db.parties.find_one({"id": rid}, {"_id": 0, "name": 1})
+        doc["ref_party_id"], doc["ref_party_name"] = (rid, (doc.get("ref_party_name") or "").strip() or rp["name"]) if rp else (None, "")
+    else:
+        doc["ref_party_id"], doc["ref_party_name"] = None, ""
     cid = doc.get("cash_account_id")
     if cid and not (doc.get("cash_account_name") or "").strip():
         c = await db.parties.find_one({"id": cid}, {"_id": 0, "name": 1}) or await db.accounts.find_one({"id": cid}, {"_id": 0, "name": 1})
@@ -1484,8 +1492,11 @@ async def party_ledger(pid: str, as_on: Optional[str] = None, date_from: Optiona
     if date_from:
         day_before = (datetime.fromisoformat(date_from).date() - timedelta(days=1)).isoformat()
         opening = await _compute_party_balance(pid, opening, day_before)
+    # Memo rows: Rokad booked to an income/expense ledger (eg. INTEREST RECEIVED) with this party as "kiska" reference —
+    # informational only, never touches this party's balance
+    memo_rokad = await db.rokad.find({"ref_party_id": pid, **upto}, {"_id": 0}).sort("date", 1).to_list(5000)
     return {"party": party, "as_on": as_on, "date_from": date_from, "opening": opening, "bills": bills, "rokad": rokads,
-            "cash_rokad": cash_rokad, "journal": journal, "dos_journal": dos_journal,
+            "cash_rokad": cash_rokad, "journal": journal, "dos_journal": dos_journal, "memo_rokad": memo_rokad,
             "settled_upto": await _settled_upto(pid, as_on)}
 
 

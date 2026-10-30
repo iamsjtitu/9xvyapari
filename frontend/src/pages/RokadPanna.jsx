@@ -74,8 +74,18 @@ export default function RokadPanna() {
     chq_no: "",
     settle: false,
     settle_account_id: "",
+    ref_party_id: "",
+    ref_party_name: "",
   };
   const [form, setForm] = useState(emptyForm);
+  // Account groups → nature (income / expense) to know when to show the "Kiska?" reference-party picker
+  const [groups, setGroups] = useState([]);
+  useEffect(() => { api.get("/account-groups").then((r) => setGroups(r.data || [])).catch(() => {}); }, []);
+  const natureOf = (p) => groups.find((g) => g.id === p?.group_id)?.nature || "";
+  const selectedParty = useMemo(() => parties.find((p) => p.id === form.party_id), [parties, form.party_id]);
+  const isIncomeExpenseLedger = ["income", "expense"].includes(natureOf(selectedParty));
+  const refPartyOptions = useMemo(() => parties.filter((p) => p.id !== form.party_id && !/cash|bank/i.test(p.group_name || "")
+    && !["income", "expense"].includes(natureOf(p))), [parties, groups, form.party_id]); // eslint-disable-line
 
   // Stale-response guard: a slow older request (other date range) must not overwrite the current one
   const rangeRef = useRef("");
@@ -252,6 +262,7 @@ export default function RokadPanna() {
       party_id: e.party_id || "", party_name: e.party_name || "", description: e.description || "",
       mode: e.mode || "Cash", cash_account_id: e.cash_account_id || "", cash_account_name: e.cash_account_name || "",
       voucher_no: e.voucher_no || "", inv_no: e.inv_no || "", chq_no: e.chq_no || "", settle: !!e.settle, settle_account_id: e.settle_account_id || "",
+      ref_party_id: e.ref_party_id || "", ref_party_name: e.ref_party_name || "",
     });
     setShowAdd(true);
   }, []);
@@ -809,6 +820,26 @@ export default function RokadPanna() {
                   testId="select-party"
                 />
                 <LedgerBalanceHint ledgerId={form.party_id} delta={liveDelta.party} className="mt-1" testId="rokad-party-balance" />
+                {isIncomeExpenseLedger && (
+                  <div className="mt-3 p-3 rounded-sm border border-dashed border-khaki bg-parchment/40" data-testid="ref-party-box">
+                    <label className="lbl">
+                      Kiska {natureOf(selectedParty) === "income" ? "aaya" : "gaya"}? — reference party <span className="normal-case tracking-normal text-muted2">(optional)</span>
+                    </label>
+                    <PartyAutocomplete
+                      value={form.ref_party_name}
+                      selectedId={form.ref_party_id}
+                      options={refPartyOptions}
+                      onChangeText={(txt) => setForm((f) => ({ ...f, ref_party_name: txt, ref_party_id: refPartyOptions.find((p) => p.name.toLowerCase() === txt.trim().toLowerCase())?.id || "" }))}
+                      onPick={(p) => setForm((f) => ({ ...f, ref_party_id: p.id, ref_party_name: p.name }))}
+                      placeholder="Jaise: SURAJ — jiska byaj/kharcha hai"
+                      testId="select-ref-party"
+                    />
+                    <div className="text-[10px] text-muted2 mt-1 leading-snug" data-testid="ref-party-note">
+                      Sirf jaankari ke liye: <b>{form.party_name || "is ledger"}</b> me hi hisab jayega; <b>{form.ref_party_name || "reference party"}</b> ke ledger me yeh line
+                      "memo" ki tarah dikhegi — uske balance (mool) par koi asar nahi.
+                    </div>
+                  </div>
+                )}
                 <SettleToggle form={form} onChange={(v) => setForm((f) => ({ ...f, settle: v }))}
                   onLedgerChange={(id) => setForm((f) => ({ ...f, settle_account_id: id }))}
                   editEntry={editId ? entries.find((x) => x.id === editId) : null} />

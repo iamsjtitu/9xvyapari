@@ -23,8 +23,15 @@ const KIND_ICON = {
 // Build chronological ledger rows — PASSBOOK columns (see lib/drcr.js):
 //   credit = AAYA (party ko maal/paisa mila · cash a/c me paisa aaya) → balance badhta hai
 //   debit  = GAYA (party ne diya · cash a/c se paisa gaya)           → balance ghatta hai
-function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = [] }) {
+function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = [], memo_rokad = [] }) {
   const rows = [];
+  // Memo rows: income/expense Rokad (eg. INTEREST RECEIVED) tagged with this party as reference — shown for information,
+  // debit/credit stay 0 so totals & running balance are untouched; `memo` carries the side + amount for display
+  memo_rokad.forEach((r) => rows.push({
+    kind: "memo", id: `memo-${r.id}`, refId: r.id, date: r.date, vno: r.voucher_no || "", inv: r.inv_no || "", created_at: r.created_at || "",
+    label: `${r.party_name || ""}${r.description ? " · " + r.description : ""}${r.cash_account_name ? ` · ${r.cash_account_name}` : ""} (memo — balance par asar nahi)`,
+    credit: 0, debit: 0, memo: { side: r.type === "jama" ? "debit" : "credit", amount: r.amount, head: r.party_name || "" },   // same column as a normal receipt/payment of this party
+  }));
   bills.forEach((b) => rows.push({
     kind: "bill", id: b.id, date: b.date, ref: b.id, vno: b.bill_no || "",
     label: `${b.bill_type === "sale" ? "Sale" : "Purchase"} Bill ${b.bill_no}`,
@@ -119,6 +126,10 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
   const rows = buildRows(data);
   let running = opening;
   const enriched = rows.map((r) => { running = running + r.credit - r.debit; return { ...r, balance: running }; });   // passbook: credit badhata hai
+  // memo rows (byaj etc.) — informational totals, never part of the balance
+  const memoIn = enriched.filter((r) => r.memo?.side === "credit").reduce((s, r) => s + r.memo.amount, 0);
+  const memoOut = enriched.filter((r) => r.memo?.side === "debit").reduce((s, r) => s + r.memo.amount, 0);
+  const memoTotal = memoIn + memoOut;
   const quick = [
     { l: "Aaj", d: todayISO(), tid: "ledger-quick-today" },
     { l: "FY Start", d: settings?.fy_start, tid: "ledger-quick-fystart" },
@@ -169,10 +180,11 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                 { key: "credit", label: COL_CREDIT(isAccount), width: 18, num: true },
                 { key: "balance_abs", label: "Balance", width: 15, num: true },
                 { key: "drcr", label: "Dr/Cr", width: 6 },
+                ...(memoTotal ? [{ key: "memo_amt", label: "Memo (byaj etc.)", width: 16, num: true }] : []),
               ],
               rows: [
                 { date: dateFrom || "", vno: "", label: `OPENING BALANCE${dateFrom ? " (B/F)" : ""}`, debit: "", credit: "", balance_abs: Math.abs(opening), drcr: drcr(opening), _style: "opening" },
-                ...enriched.map((r) => ({ ...r, balance_abs: Math.abs(r.balance), drcr: drcr(r.balance) })),
+                ...enriched.map((r) => ({ ...r, debit: r.debit || "", credit: r.credit || "", balance_abs: Math.abs(r.balance), drcr: drcr(r.balance), memo_amt: r.memo ? r.memo.amount : "" })),
                 { date: asOn, vno: "", label: `CLOSING BALANCE AS ON ${fmtDate(asOn)}`, debit: "", credit: "", balance_abs: Math.abs(party.balance), drcr: drcr(party.balance), _style: "closing" },
               ],
               rowStyle: (r) => r._style || null,
@@ -259,7 +271,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
             ) : (
               enriched.map((r) => (
                 <Fragment key={`${r.kind}-${r.id}`}>
-                <tr>
+                <tr className={r.memo ? "italic bg-parchment/30" : ""} data-testid={r.memo ? `ledger-memo-row-${r.refId}` : undefined}>
                   <td className="font-mono-data text-muted2 whitespace-nowrap">{fmtDate((r.date || "").slice(0, 10))}</td>
                   <td className="font-mono-data text-xs text-terracotta whitespace-nowrap" title={r.kind === "bill" ? "Bill No." : r.kind === "journal" ? "Journal Voucher No." : r.kind === "dos" ? "DOS Ref" : "Rokad Voucher No."}
                     data-testid={`ledger-vno-${r.id}`}>{r.kind === "bill" && r.vno ? `Bill ${r.vno}` : r.vno || r.ref_no || "—"}</td>
@@ -275,14 +287,23 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                           {r.label.replace(/^[A-Za-z ]+· /, "")}
                           {r.ref_no && <span className="text-[10px] text-muted2 font-mono-data ml-1">[#{r.ref_no}]</span>}
                         </span>
+                      ) : r.memo ? (
+                        <span className="truncate min-w-0 text-muted2">
+                          <span className="kbd !text-[9px] !px-1 !py-0 mr-1 not-italic" title="Memo — sirf jaankari, balance par asar nahi">MEMO</span>
+                          {r.label}
+                        </span>
                       ) : (
                         <span className="truncate min-w-0">{r.label}</span>
                       )}
                     </div>
                   </td>
-                  <td className="num amount-kharch whitespace-nowrap" data-testid={`ledger-debit-${r.id}`}>{r.debit ? `₹ ${inr(r.debit)}` : "—"}</td>
-                  <td className="num amount-jama whitespace-nowrap" data-testid={`ledger-credit-${r.id}`}>{r.credit ? `₹ ${inr(r.credit)}` : "—"}</td>
-                  <td className="num font-medium whitespace-nowrap" style={{ color: r.balance >= 0 ? "#1A1A1A" : "#1B5E20" }}>
+                  <td className={`num whitespace-nowrap ${r.memo ? "text-muted2" : "amount-kharch"}`} data-testid={`ledger-debit-${r.id}`}>
+                    {r.memo?.side === "debit" ? `(₹ ${inr(r.memo.amount)})` : r.debit ? `₹ ${inr(r.debit)}` : "—"}
+                  </td>
+                  <td className={`num whitespace-nowrap ${r.memo ? "text-muted2" : "amount-jama"}`} data-testid={`ledger-credit-${r.id}`}>
+                    {r.memo?.side === "credit" ? `(₹ ${inr(r.memo.amount)})` : r.credit ? `₹ ${inr(r.credit)}` : "—"}
+                  </td>
+                  <td className="num font-medium whitespace-nowrap" style={{ color: r.memo ? "#8a8a8a" : r.balance >= 0 ? "#1A1A1A" : "#1B5E20" }}>
                     ₹ {inr(Math.abs(r.balance))} <span className={`text-[10px] ml-1 ${r.balance < 0 ? "text-kharch" : "text-muted2"}`} data-testid={`ledger-bal-${r.id}`}>{drcr(r.balance)}</span>
                   </td>
                   <td className="print:hidden">
@@ -311,6 +332,15 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
           </tbody>
           {enriched.length > 0 && (
             <tfoot>
+              {memoTotal > 0 && (
+                <tr className="text-xs italic text-muted2" data-testid="ledger-memo-total-row">
+                  <td colSpan={4} className="text-right">MEMO TOTAL (byaj etc. — balance me nahi juda)</td>
+                  <td className="num font-mono-data">{memoOut ? `(₹ ${inr(memoOut)})` : "—"}</td>
+                  <td className="num font-mono-data">{memoIn ? `(₹ ${inr(memoIn)})` : "—"}</td>
+                  <td></td>
+                  <td className="print:hidden"></td>
+                </tr>
+              )}
               <tr className="bg-parchment/60 font-semibold" data-testid="ledger-closing-row">
                 <td colSpan={6} className="text-right">CLOSING BALANCE AS ON {fmtDate(asOn)}</td>
                 <td className="num font-mono-data" style={{ color: balColor }}>
