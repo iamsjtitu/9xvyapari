@@ -1,0 +1,29 @@
+{
+  "summary": "Tested the Tally standard Dr/Cr convention change on backend and frontend. Backend: 9/9 pytest pass. /ledgers/{id}/balance returns DIMPY -3250000 'Cr' and CASH IN HAND +ve 'Dr'. On /reports/outstanding every row is Dr when the balance is above 0 and Cr when below 0, and DIMPY shows in side=cr. Frontend: DIMPY Ledger view, Statement, Excel and T-Format, CASH IN HAND Ledger, Statement and T-Format, Rokad Register, T-format, Excel, accounts summary and summary bar, Day Book, Dashboard cash card, live Rokad form balance hints, Outstanding filters, cards and sheet columns, and Byaj, Trial Balance and Journal page loads all match the spec. One leftover old-convention label: the Outstanding print sheet's Grand Net line.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OutstandingSheet.jsx line 50 (grand total Net)", "issue": "The Net label still uses the old passbook rule: `grand_dr - grand_cr >= 0 ? \"Cr (lena)\" : \"Dr (dena)\"`. With side=cr it shows 'NET 40,22,32,56,130.00 DR (DENA)', which should be 'Cr (dena)'. A positive net (lena) would also wrongly show 'Cr (lena)'. Fix: `>= 0 ? \"Dr (lena)\" : \"Cr (dena)\"`.", "selector": "[data-testid='os-grand']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Party Statement (Print) view on screen", "issues": ["The 'Cr'/'Dr' suffix in the Balance column is cut off at the right edge of the sheet (e.g. '48,00,000.00 Cr' renders as 'Cr' cut short). Add right padding or widen the balance column."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_tally_drcr_v54.py", "/app/test_reports/pytest/pytest_v54.xml"],
+  "action_items": [
+    "Fix components/OutstandingSheet.jsx line 50: swap the Net suffix to `>= 0 ? \"Dr (lena)\" : \"Cr (dena)\"`.",
+    "Optional: stop the Dr/Cr suffix being cut off in the Balance column of the PartyStatement sheet."
+  ],
+  "critical_code_review_comments": [
+    "OutstandingSheet Net label is a leftover from the old passbook convention (see ui_bugs).",
+    "pages/RokadPanna.jsx is 886 lines, over the 700-line guideline; consider splitting it.",
+    "GET /ledgers/{CASH IN HAND id}/balance returns kind='party' (the account is stored in parties). LedgerBalanceHint works around this with a group_name regex (cash|bank); the label is correct, but the logic is fragile."
+  ],
+  "updated_files": ["/app/backend/tests/test_tally_drcr_v54.py"],
+  "success_rate": {"backend": "100%", "frontend": "~97% (1 label bug in the Outstanding print sheet Net line)"},
+  "seed_data_creation": "None. Used the main agent's fixtures from /tmp/demo_ids. No vouchers were saved (the Rokad form was opened only to check balance hints, then cancelled).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Standard Tally convention: positive balance = Dr everywhere. DIMPY id ebc8d047-...: R1 48L jama shows in party Credit and cash Debit; R2 15.5L kharch shows in party Debit and cash Credit; closing 32,50,000 Cr. CASH IN HAND closing on 18-10-2026 = 1,29,51,179 Dr (opening 97,01,179 Dr). Rokad form balance-hint testids are rokad-party-balance and rokad-cash-balance (not ledger-balance-hint). The Outstanding API response is {sections:[{rows}], grand_dr, grand_cr}; side param values are dr/cr/all. The Dashboard Byaj card renders nothing when there is no byaj ledger data; that is expected."
+}

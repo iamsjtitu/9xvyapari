@@ -47,7 +47,7 @@ export const OutstandingSheet = ({ data }) => {
       <div className="dos-grand" data-testid="os-grand">
         <div className="flex justify-between font-bold uppercase">
           <span>Grand Total · {count} parties</span>
-          <span>Lena (Dr) {inr(grand_dr)} &nbsp;|&nbsp; Dena (Cr) {inr(grand_cr)} &nbsp;|&nbsp; Net {inr(Math.abs(grand_dr - grand_cr))} {grand_dr - grand_cr >= 0 ? "Cr (lena)" : "Dr (dena)"}</span>
+          <span>Lena (Dr) {inr(grand_dr)} &nbsp;|&nbsp; Dena (Cr) {inr(grand_cr)} &nbsp;|&nbsp; Net {inr(Math.abs(grand_dr - grand_cr))} {grand_dr - grand_cr >= 0 ? "Dr (lena)" : "Cr (dena)"}</span>
         </div>
       </div>
       <div className="flex justify-between mt-3 text-[10px] uppercase">
