@@ -67,14 +67,17 @@ export const KhataModal = ({ khata, onClose, onSaved, title }) => {
         code: form.code ? parseInt(form.code) : null,
       };
       const { data } = isEdit ? await api.put(`/parties/${khata.id}`, payload) : await api.post("/parties", payload);
-      toast.success(isEdit ? "Khata update ho gaya" : `Khata "${data.name}" ban gaya`);
+      if (data?.moved_to === "accounts") toast.success(`"${data.name}" ab Accounts (Khate) me hai (group: ${data.group_name}) — Party Khata se hat gaya`, { duration: 6000 });
+      else toast.success(isEdit ? "Khata update ho gaya" : `Khata "${data.name}" ban gaya`);
       onSaved?.(data);
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
+      toast.error(formatApiErrorDetail(err.response?.data?.detail?.message || err.response?.data?.detail) || err.message, { duration: 8000 });
     } finally { setBusy(false); }
   };
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const setUpper = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value.toUpperCase() }));
+  const pickedGroup = groups.find((g) => g.id === form.group_id);
+  const movesToAccounts = isEdit && pickedGroup && pickedGroup.party_side === false && form.group_id !== khata?.group_id;
 
   return (
     <div className="fixed inset-0 bg-black/40 grid justify-items-center items-start z-[60] p-4 overflow-y-auto" {...backdropClose(onClose)} data-testid="modal-party">
@@ -91,6 +94,9 @@ export const KhataModal = ({ khata, onClose, onSaved, title }) => {
               <option value="">— Group chunein —</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.fcode}–{g.lcode} · {g.name}</option>)}
             </select>
+            {movesToAccounts && (
+              <div className="text-[10px] text-[#B45309] mt-1" data-testid="party-move-hint">Yeh Accounts (Khate) wala group hai — save karne par yeh ledger Party Khata se hat kar Accounts me chala jayega.</div>
+            )}
           </div>
           <div className="md:col-span-2">
             <label className="lbl">Code</label>

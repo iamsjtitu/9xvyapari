@@ -445,11 +445,16 @@ async def create_party(body: PartyIn, current=Depends(get_current_user)):
 
 @api.put("/parties/{pid}")
 async def update_party(pid: str, body: PartyIn, current=Depends(get_current_user)):
-    res = await db.parties.update_one({"id": pid}, {"$set": body.model_dump()})
-    if res.matched_count == 0:
+    old = await db.parties.find_one({"id": pid}, {"_id": 0})
+    if not old:
         raise HTTPException(404, "Party not found")
-    doc = await db.parties.find_one({"id": pid}, {"_id": 0})
-    return doc
+    upd = body.model_dump()
+    if upd.get("group_id") and upd["group_id"] != old.get("group_id"):
+        g = await db.account_groups.find_one({"id": upd["group_id"]}, {"_id": 0})
+        if g and not _is_party_group(g):                         # eg. SALES PARTY → CASH & BANK: ledger Accounts (Khate) me chala jayega
+            return await _move_ledger(old, upd, g, to="accounts")
+    await db.parties.update_one({"id": pid}, {"$set": upd})
+    return await db.parties.find_one({"id": pid}, {"_id": 0})
 
 @api.delete("/parties/{pid}")
 async def delete_party(pid: str, current=Depends(get_current_user)):
@@ -459,6 +464,44 @@ async def delete_party(pid: str, current=Depends(get_current_user)):
     await _ensure_ledger_unused(pid, party["name"])
     await db.parties.delete_one({"id": pid})
     return {"ok": True}
+
+
+PARTY_GROUP_RX = re.compile(r"party|debtor|creditor|loan|advance|deposit|staff|sundry|udhaar|karz|customer|supplier|vendor|client|byaj|interest|vyaj", re.I)
+ACCOUNT_GROUP_RX = re.compile(r"cash|bank|capital|fixed|asset|cold|stock|current|duties|tax|suspense", re.I)
+
+
+def _is_party_group(g: dict) -> bool:
+    """Party Khata wale groups = log/firms (debtors, creditors, loans, deposits, staff, byaj...). Baaki 'Accounts (Khate)'."""
+    name = g.get("name") or ""
+    if PARTY_GROUP_RX.search(name):
+        return True
+    if ACCOUNT_GROUP_RX.search(name) or g.get("nature") in ("income", "expense"):
+        return False
+    return g.get("nature") in ("asset", "liability")
+
+
+async def _move_ledger(old: dict, upd: dict, group: dict, to: str) -> dict:
+    """Group badalne par ledger ko parties ⇄ accounts collection me shift karo (id same rehti hai, saare references valid)."""
+    src, dst = (db.parties, db.accounts) if to == "accounts" else (db.accounts, db.parties)
+    usage = await _ledger_usage(old["id"])
+    c = usage["counts"]
+    if to == "parties":
+        cash_use = await db.rokad.count_documents({"cash_account_id": old["id"]})
+        blockers = ([f"{cash_use} Rokad entries me yeh Cash/Bank account ke roop me use hua hai"] if cash_use else []) + \
+                   (["Account Clear (settle) ledger ke roop me set hai"] if c.get("settings") else [])
+    else:
+        party_use = await db.rokad.count_documents({"party_id": old["id"]})
+        blockers = [f"{n} {lbl}" for lbl, n in (("Rokad entries (party)", party_use), ("bills", c.get("bills", 0)),
+                                                ("inward entries", c.get("inward", 0)), ("staff link", c.get("staff", 0))) if n]
+    if blockers:
+        where = "Party Khata" if to == "parties" else "Accounts (Khate)"
+        raise HTTPException(409, {"message": f"'{old['name']}' ko {where} me nahi le ja sakte — " + "; ".join(blockers)
+                                             + ". Pehle un entries ka account/party badlo, phir group badlo.", "usage": usage})
+    doc = {**old, **upd, "group_name": group.get("name", ""), "moved_at": now_iso(), "moved_from": "parties" if to == "accounts" else "accounts"}
+    await dst.insert_one(dict(doc))
+    await src.delete_one({"id": old["id"]})
+    doc.pop("_id", None)
+    return {**doc, "moved_to": to}
 
 
 async def _ledger_usage(lid: str) -> dict:
@@ -1625,6 +1668,8 @@ async def party_ledger(pid: str, as_on: Optional[str] = None, date_from: Optiona
 @api.get("/account-groups")
 async def list_groups(current=Depends(get_current_user)):
     groups = await db.account_groups.find({}, {"_id": 0}).sort("name", 1).to_list(500)
+    for g in groups:
+        g["party_side"] = _is_party_group(g)     # True → ledgers of this group live in Party Khata, else Accounts (Khate)
     return groups
 
 @api.post("/account-groups")
@@ -1680,9 +1725,16 @@ async def create_account(body: AccountIn, current=Depends(get_current_user)):
 
 @api.put("/accounts/{aid}")
 async def update_account(aid: str, body: AccountIn, current=Depends(get_current_user)):
-    res = await db.accounts.update_one({"id": aid}, {"$set": body.model_dump()})
-    if res.matched_count == 0:
+    old = await db.accounts.find_one({"id": aid}, {"_id": 0})
+    if not old:
         raise HTTPException(404, "Account not found")
+    upd = body.model_dump()
+    g = await db.account_groups.find_one({"id": upd["group_id"]}, {"_id": 0})
+    if not g:
+        raise HTTPException(400, "Group invalid hai")
+    if _is_party_group(g):                                       # eg. CASH & BANK → OTHER DEPOSITS: ledger Party Khata me chala jayega
+        return await _move_ledger(old, upd, g, to="parties")     # (also fixes ledgers already sitting here under a party group)
+    await db.accounts.update_one({"id": aid}, {"$set": upd})
     return await db.accounts.find_one({"id": aid}, {"_id": 0})
 
 @api.delete("/accounts/{aid}")

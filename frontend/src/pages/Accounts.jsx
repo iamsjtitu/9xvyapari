@@ -34,14 +34,18 @@ export default function Accounts() {
     e.preventDefault();
     try {
       const payload = { ...form, opening_balance: parseFloat(form.opening_balance || 0) };
-      if (editing?.id) await api.put(`/accounts/${editing.id}`, payload);
+      let data = null;
+      if (editing?.id) ({ data } = await api.put(`/accounts/${editing.id}`, payload));
       else await api.post("/accounts", payload);
-      toast.success("Saved");
+      if (data?.moved_to === "parties") toast.success(`"${data.name}" ab Party Khata me hai (group: ${data.group_name}) — yahan se hat gaya`, { duration: 6000 });
+      else toast.success("Saved");
       setEditing(null); setForm(EMPTY); load();
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
+      toast.error(formatApiErrorDetail(err.response?.data?.detail?.message || err.response?.data?.detail) || err.message, { duration: 8000 });
     }
   };
+  const pickedGroup = groups.find((g) => g.id === form.group_id);
+  const movesToParty = !!editing?.id && pickedGroup?.party_side;
 
   const del = async (id) => {
     if (!(await confirmBox("Delete this account?"))) return;
@@ -129,7 +133,11 @@ export default function Accounts() {
                 <td className="font-medium">
                   <Link to={`/parties/${a.id}`} className="hover:underline text-ink" onClick={(e) => e.stopPropagation()} data-testid={`account-ledger-link-${a.id}`}>{a.name}</Link>
                 </td>
-                <td className="text-muted2">{a.group_name || "—"}</td>
+                <td className="text-muted2">{a.group_name || "—"}
+                  {groups.find((g) => g.id === a.group_id)?.party_side && (
+                    <span className="block text-[10px] text-[#B45309]" data-testid={`account-party-group-${a.id}`} title="Yeh Party Khata wala group hai — pencil se kholkar Save karo, ledger Party Khata me chala jayega">Party Khata group · edit → Save karke bhejo</span>
+                  )}
+                </td>
                 <td className="font-mono-data text-muted2">{a.phone || "—"}</td>
                 <td className="num text-muted2">₹ {inr(a.opening_balance)}</td>
                 <td className="num font-medium" style={{ color: a.balance < 0 ? "#B71C1C" : "#1A1A1A" }}>
@@ -178,8 +186,14 @@ export default function Accounts() {
                   <select required className="input-dense" value={form.group_id}
                     onChange={(e) => setForm({ ...form, group_id: e.target.value })} data-testid="select-account-group">
                     <option value="">— Group chunein —</option>
-                    {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    {groups.map((g) => <option key={g.id} value={g.id}>{g.name}{g.party_side ? " · (Party Khata)" : ""}</option>)}
                   </select>
+                  {!editing?.id && pickedGroup?.party_side && (
+                    <div className="text-[10px] text-[#B45309] mt-1" data-testid="account-group-party-hint">Yeh Party Khata wala group hai — aise ledger Party Khata se banao.</div>
+                  )}
+                  {movesToParty && (
+                    <div className="text-[10px] text-[#B45309] mt-1" data-testid="account-move-hint">Save karne par yeh ledger <b>Party Khata</b> me chala jayega (yahan se hat jayega). Agar is account se Rokad me Cash/Bank entries hui hain to pehle unka account badalna hoga.</div>
+                  )}
                 </div>
                 <div>
                   <label className="lbl">Opening Balance</label>
