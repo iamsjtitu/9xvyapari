@@ -1,9 +1,15 @@
 import { Link } from "react-router-dom";
 import { inr } from "@/lib/api";
-import { drcr } from "@/lib/drcr";
+import { drcr, LEGEND_PARTY, LEGEND_CASH } from "@/lib/drcr";
 import { ArrowDown, ArrowUp, PencilSimple, Trash } from "@phosphor-icons/react";
 
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
+
+// Tally-style "Vch Type" tag — Receipt / Payment / Sale / Purchase / Journal / A/c Clear
+const VCH_STYLE = { Receipt: "#1B5E20", Payment: "#B71C1C", Sale: "#8B2520", Purchase: "#5B3A9E", Journal: "#595959", "A/c Clear": "#B45309" };
+export const VchTag = ({ vch }) => vch ? (
+  <span className="kbd !text-[10px] !px-1.5 !py-0 uppercase tracking-wide" style={{ color: VCH_STYLE[vch] || "#595959", borderColor: VCH_STYLE[vch] || "#999" }}>{vch}</span>
+) : null;
 
 // Split chronological ledger rows into the two sides of a party T-account (rows follow lib/drcr.js: debit = diya / aaya-in-cash).
 // Party: LEFT = Jama (party ne diya — paisa wapas / byaj = credit rows), RIGHT = Kharch (party ko diya — udhaar / maal = debit rows).
@@ -35,17 +41,17 @@ const Side = ({ side, t, color, bg, label, icon: Icon, asOn, dateFrom, editHref,
         <div className="font-mono-data text-lg font-medium" style={{ color }} data-testid={`ledger-tside-mool-${side}`}>₹ {inr(mool)}</div>
       </div>
       <table className="dense w-full">
-        <thead><tr><th style={{ width: 84 }}>Date</th><th style={{ width: 56 }}>V.No.</th><th style={{ width: 84 }}>INV No.</th><th>Vivran</th><th className="num" style={{ width: 120 }}>Amount</th><th style={{ width: 60 }} className="print:hidden"></th></tr></thead>
+        <thead><tr><th style={{ width: 84 }}>Date</th><th style={{ width: 56 }}>V.No.</th><th style={{ width: 84 }}>INV No.</th><th>Vivran</th><th style={{ width: 86 }}>Vch Type</th><th className="num" style={{ width: 120 }}>Amount</th><th style={{ width: 60 }} className="print:hidden"></th></tr></thead>
         <tbody>
           {t.bf.side === side && t.bf.amount > 0 && (
             <tr className="bg-parchment/40 font-semibold" data-testid={`ledger-t-bf-${side}`}>
               <td className="font-mono-data text-xs text-muted2">{dateFrom ? fmtDate(dateFrom) : ""}</td><td></td><td></td>
-              <td className="text-xs uppercase tracking-wider">Opening Balance B/F</td>
+              <td className="text-xs uppercase tracking-wider">Opening Balance B/F</td><td></td>
               <td className="num font-mono-data whitespace-nowrap">₹ {inr(t.bf.amount)}</td><td className="print:hidden"></td>
             </tr>
           )}
           {list.length === 0 && !(t.bf.side === side && t.bf.amount > 0) && (
-            <tr><td colSpan={6} className="text-center text-muted2 py-6 text-sm">Koi entry nahi.</td></tr>
+            <tr><td colSpan={7} className="text-center text-muted2 py-6 text-sm">Koi entry nahi.</td></tr>
           )}
           {list.map((r) => (
             <tr key={`${r.kind}-${r.id}`} data-testid={r.memo ? `ledger-t-memo-${r.refId}` : `ledger-t-row-${r.id}`}>
@@ -57,6 +63,7 @@ const Side = ({ side, t, color, bg, label, icon: Icon, asOn, dateFrom, editHref,
                   {r.kind === "bill" ? <Link to={`/bills/${r.ref}`} className="text-terracotta hover:underline">{r.label}</Link> : <span>{r.memo ? r.label.replace(/ \(memo[^)]*\)$/, "") : r.label}</span>}
                 </div>
               </td>
+              <td className="whitespace-nowrap" data-testid={`ledger-t-vch-${r.id}`}><VchTag vch={r.vch} /></td>
               <td className="num font-mono-data whitespace-nowrap" style={{ color }} data-testid={`ledger-t-amount-${r.id}`}>
                 ₹ {inr(r.amount)}
               </td>
@@ -73,24 +80,24 @@ const Side = ({ side, t, color, bg, label, icon: Icon, asOn, dateFrom, editHref,
         </tbody>
         <tfoot>
           <tr className="bg-parchment/60 font-semibold" data-testid={`ledger-t-mool-${side}`}>
-            <td colSpan={4} className="text-right text-xs uppercase">{moolLabel} ({list.filter((r) => !r.memo).length})</td>
+            <td colSpan={5} className="text-right text-xs uppercase">{moolLabel} ({list.filter((r) => !r.memo).length})</td>
             <td className="num font-mono-data" style={{ color }}>₹ {inr(mool)}</td><td className="print:hidden"></td>
           </tr>
           {memo > 0 && (
             <tr className="bg-parchment/40 font-semibold" data-testid={`ledger-t-memo-total-${side}`}>
-              <td colSpan={4} className="text-right text-xs uppercase">Total Byaj ({list.filter((r) => r.memo).length}) <span className="normal-case font-normal text-muted2">· mool me nahi juda</span></td>
+              <td colSpan={5} className="text-right text-xs uppercase">Total Byaj ({list.filter((r) => r.memo).length}) <span className="normal-case font-normal text-muted2">· mool me nahi juda</span></td>
               <td className="num font-mono-data" style={{ color }}>₹ {inr(memo)}</td><td className="print:hidden"></td>
             </tr>
           )}
           {t.cf.side === side && (
             <tr className="font-semibold" data-testid={`ledger-t-cf-${side}`}>
               <td className="font-mono-data text-xs text-muted2">{fmtDate(asOn)}</td><td></td><td></td>
-              <td className="text-xs uppercase tracking-wider">Closing Balance C/F <span className="normal-case text-muted2">· {drcr(t.cf.negative ? -t.cf.amount : t.cf.amount)}</span></td>
+              <td className="text-xs uppercase tracking-wider">Closing Balance C/F <span className="normal-case text-muted2">· {drcr(t.cf.negative ? -t.cf.amount : t.cf.amount)}</span></td><td></td>
               <td className="num font-mono-data whitespace-nowrap" style={{ color: "#8B2520" }}>₹ {inr(t.cf.amount)}</td><td className="print:hidden"></td>
             </tr>
           )}
           <tr className="bg-ink text-parchment font-semibold" data-testid={`ledger-t-grand-${side}`}>
-            <td colSpan={4} className="text-right text-xs uppercase tracking-wider">Total</td>
+            <td colSpan={5} className="text-right text-xs uppercase tracking-wider">Total</td>
             <td className="num font-mono-data">₹ {inr(side === "left" ? t.grandLeft : t.grandRight)}</td><td className="print:hidden"></td>
           </tr>
         </tfoot>
@@ -104,11 +111,14 @@ export function PartyTFormat({ rows, opening, closing, isAccount, asOn, dateFrom
   const t = splitT(rows, opening, closing, isAccount);
   const common = { t, asOn, dateFrom, editHref, onDelete };
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 cash-book-grid" data-testid="ledger-tformat">
-      <Side side="left" color="#1B5E20" bg="#E8F5E9" icon={ArrowDown} moolLabel={isAccount ? "Total Aaya" : "Total Jama (mool)"}
-        label={isAccount ? "Aaya / Jama (आमद) — Money In · Debit" : "Jama (आमद) — Party ne diya · wapas / byaj · Credit"} {...common} />
-      <Side side="right" color="#B71C1C" bg="#FFEBEE" icon={ArrowUp} moolLabel={isAccount ? "Total Gaya" : "Total Kharch (mool)"}
-        label={isAccount ? "Gaya / Kharch (खर्च) — Money Out · Credit" : "Kharch (खर्च) — Party ko diya · udhaar / maal · Debit"} {...common} />
+    <div className="space-y-2" data-testid="ledger-tformat">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 cash-book-grid">
+        <Side side="left" color="#1B5E20" bg="#E8F5E9" icon={ArrowDown} moolLabel={isAccount ? "Total Aaya" : "Total Jama (mool)"}
+          label={isAccount ? "Aaya / Jama (आमद) — Money In · Debit" : "Jama (आमद) — Party ne diya · wapas / byaj · Credit"} {...common} />
+        <Side side="right" color="#B71C1C" bg="#FFEBEE" icon={ArrowUp} moolLabel={isAccount ? "Total Gaya" : "Total Kharch (mool)"}
+          label={isAccount ? "Gaya / Kharch (खर्च) — Money Out · Credit" : "Kharch (खर्च) — Party ko diya · udhaar / maal · Debit"} {...common} />
+      </div>
+      <div className="text-[10px] uppercase tracking-wider text-muted2 font-mono-data px-1" data-testid="ledger-t-legend">{isAccount ? LEGEND_CASH : LEGEND_PARTY}</div>
     </div>
   );
 }

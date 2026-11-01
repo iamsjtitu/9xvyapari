@@ -7,7 +7,7 @@ import { ArrowLeft, Receipt, Notebook, BookOpen, BookOpenText, Wallet, Printer, 
 import { toast } from "sonner";
 import { ExportBar } from "@/components/ExportBar";
 import { PartyStatement } from "@/components/PartyStatement";
-import { PartyTFormat } from "@/components/PartyTFormat";
+import { PartyTFormat, VchTag } from "@/components/PartyTFormat";
 import { PartyTStatement } from "@/components/PartyTStatement";
 import { LoadState } from "@/components/LoadState";
 import { SettledMarkerRow, SettledBadge, reopenSettled } from "@/components/SettledMarker";
@@ -34,26 +34,27 @@ function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = 
     kind: "memo", id: `memo-${r.id}`, refId: r.id, date: r.date, vno: r.voucher_no || "", inv: r.inv_no || "", created_at: r.created_at || "",
     label: `${r.party_name || ""}${r.description ? " · " + r.description : ""}${r.cash_account_name ? ` · ${r.cash_account_name}` : ""}`,
     credit: 0, debit: 0, memo: { side: r.type === "jama" ? "credit" : "debit", amount: r.amount, head: r.party_name || "" },   // same column as a normal receipt/payment of this party
+    vch: r.type === "jama" ? "Receipt" : "Payment",
   }));
   bills.forEach((b) => rows.push({
     kind: "bill", id: b.id, date: b.date, ref: b.id, vno: b.bill_no || "",
     label: `${b.bill_type === "sale" ? "Sale" : "Purchase"} Bill ${b.bill_no}`,
-    debit: b.bill_type === "sale" ? b.total : 0, credit: b.bill_type === "purchase" ? b.total : 0,
+    debit: b.bill_type === "sale" ? b.total : 0, credit: b.bill_type === "purchase" ? b.total : 0, vch: b.bill_type === "sale" ? "Sale" : "Purchase",
   }));
   rokad.forEach((r) => rows.push({
     kind: "rokad", id: r.id, date: r.date, vno: r.voucher_no || "", inv: r.inv_no || "", created_at: r.created_at || "",
     label: `${r.description || (r.type === "jama" ? "Payment Received" : "Payment Paid")}${r.ref_party_name ? ` · ${r.ref_party_name} ka` : ""}${r.cash_account_name ? ` · ${r.cash_account_name}` : ""}`,
-    debit: r.type === "kharch" ? r.amount : 0, credit: r.type === "jama" ? r.amount : 0,
+    debit: r.type === "kharch" ? r.amount : 0, credit: r.type === "jama" ? r.amount : 0, vch: r.type === "jama" ? "Receipt" : "Payment",
   }));
   cash_rokad.forEach((r) => rows.push({
     kind: "cash", id: r.id, date: r.date, vno: r.voucher_no || "", inv: r.inv_no || "",
     label: `${r.type === "jama" ? "Receipt" : "Payment"} · ${r.party_name || ""}${r.description ? " · " + r.description : ""}`,
-    debit: r.type === "jama" ? r.amount : 0, credit: r.type === "kharch" ? r.amount : 0,
+    debit: r.type === "jama" ? r.amount : 0, credit: r.type === "kharch" ? r.amount : 0, vch: r.type === "jama" ? "Receipt" : "Payment",
   }));
   journal.forEach((j, i) => rows.push({
     kind: "journal", id: `${j.id}-${i}`, refId: j.id, date: j.date, vno: j.voucher_no || "", created_at: j.created_at || "",
     label: `Journal${j.narration ? " · " + j.narration : ""}${j.other ? " | vs " + j.other : ""}`,
-    debit: j.debit, credit: j.credit, settles_rokad_id: j.settles_rokad_id || null,
+    debit: j.debit, credit: j.credit, settles_rokad_id: j.settles_rokad_id || null, vch: j.settles_rokad_id ? "A/c Clear" : "Journal",
   }));
   dos_journal.forEach((j) => {
     const sgnLabel = { SR: "Sale Reg", PR: "Purchase Reg", CB: "Cash Book", JR: "Journal" }[j.sgn] || j.sgn || "DOS";
@@ -62,6 +63,7 @@ function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = 
       kind: "dos", id: `${j.imported_from}-${j.row_index}`, date: j.date, vno: j.ref_no || "",
       label: `${sgnLabel} · ${j.narration || ""}${counter ? " | vs " + counter : ""}${j.extra ? " (" + j.extra + ")" : ""}`,
       debit: Number(j.debit || 0), credit: Number(j.credit || 0), ref_no: j.ref_no, sgn: j.sgn,
+      vch: { SR: "Sale", PR: "Purchase", JR: "Journal" }[j.sgn] || (j.sgn === "CB" ? (Number(j.debit || 0) > 0 ? "Payment" : "Receipt") : "DOS"),
     });
   });
   // same date → entry order (created_at); salary journal (credit) lands before its payment, settlement after its receipt
@@ -190,6 +192,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                 { key: "vno", label: "V.No. / Ref", width: 11 },
                 { key: "inv", label: "INV No.", width: 12 },
                 { key: "label", label: "Particulars", width: 46 },
+                { key: "vch", label: "Vch Type", width: 11 },
                 { key: "debit", label: COL_DEBIT(isAccount), width: 18, num: true },
                 { key: "credit", label: COL_CREDIT(isAccount), width: 18, num: true },
                 { key: "balance_abs", label: "Balance", width: 15, num: true },
@@ -281,6 +284,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
               <th style={{ width: 70 }}>V.No.</th>
               <th style={{ width: 100 }}>INV No.</th>
               <th>Vivran</th>
+              <th style={{ width: 90 }} data-testid="ledger-th-vch">Vch Type</th>
               <th className="num" style={{ width: 150 }} data-testid="ledger-th-debit">{COL_DEBIT(isAccount)}</th>
               <th className="num" style={{ width: 150 }} data-testid="ledger-th-credit">{COL_CREDIT(isAccount)}</th>
               <th className="num" style={{ width: 130 }}>Balance</th>
@@ -292,6 +296,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
               <td className="font-mono-data text-muted2 whitespace-nowrap">{dateFrom ? fmtDate(dateFrom) : ""}</td>
               <td></td><td></td>
               <td className="font-semibold uppercase text-xs tracking-wider">Opening Balance{dateFrom ? " (B/F)" : ""}</td>
+              <td></td>
               <td className="num">—</td><td className="num">—</td>
               <td className="num font-medium whitespace-nowrap" style={{ color: opening >= 0 ? "#1A1A1A" : "#1B5E20" }}>
                 ₹ {inr(Math.abs(opening))} <span className={`text-[10px] ml-1 ${opening < 0 ? "text-kharch" : "text-muted2"}`}>{drcr(opening)}</span>
@@ -299,7 +304,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
               <td className="print:hidden"></td>
             </tr>
             {enriched.length === 0 ? (
-              <tr><td colSpan={8} className="py-10 text-center text-muted2">Is period me koi transaction nahi.</td></tr>
+              <tr><td colSpan={9} className="py-10 text-center text-muted2">Is period me koi transaction nahi.</td></tr>
             ) : (
               enriched.map((r) => (
                 <Fragment key={`${r.kind}-${r.id}`}>
@@ -324,6 +329,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                       )}
                     </div>
                   </td>
+                  <td className="whitespace-nowrap" data-testid={`ledger-vch-${r.id}`}><VchTag vch={r.vch} /></td>
                   <td className={`num whitespace-nowrap ${clsDr}`} data-testid={`ledger-debit-${r.id}`}>
                     {r.memo?.side === "debit" ? `₹ ${inr(r.memo.amount)}` : r.debit ? `₹ ${inr(r.debit)}` : "—"}
                   </td>
@@ -350,7 +356,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                   </td>
                 </tr>
                 {r.settles_rokad_id && (
-                  <SettledMarkerRow colSpan={8} date={(r.date || "").slice(0, 10)} rokadId={r.settles_rokad_id} balance={r.balance}
+                  <SettledMarkerRow colSpan={9} date={(r.date || "").slice(0, 10)} rokadId={r.settles_rokad_id} balance={r.balance}
                     onReopen={async () => { if (await reopenSettled(r.settles_rokad_id, party.name)) setAttempt((a) => a + 1); }} />
                 )}
                 </Fragment>
@@ -361,7 +367,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
             <tfoot>
               {memoTotal > 0 && (
                 <tr className="bg-parchment/40 font-semibold" data-testid="ledger-memo-total-row">
-                  <td colSpan={4} className="text-right text-xs uppercase">Total Byaj <span className="normal-case font-normal text-muted2">· balance me nahi juda</span></td>
+                  <td colSpan={5} className="text-right text-xs uppercase">Total Byaj <span className="normal-case font-normal text-muted2">· balance me nahi juda</span></td>
                   <td className={`num font-mono-data ${clsDr}`}>{memoDr ? `₹ ${inr(memoDr)}` : "—"}</td>
                   <td className={`num font-mono-data ${clsCr}`}>{memoCr ? `₹ ${inr(memoCr)}` : "—"}</td>
                   <td></td>
@@ -369,7 +375,7 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                 </tr>
               )}
               <tr className="bg-parchment/60 font-semibold" data-testid="ledger-closing-row">
-                <td colSpan={6} className="text-right">CLOSING BALANCE AS ON {fmtDate(asOn)}</td>
+                <td colSpan={7} className="text-right">CLOSING BALANCE AS ON {fmtDate(asOn)}</td>
                 <td className="num font-mono-data" style={{ color: balColor }}>
                   ₹ {inr(Math.abs(party.balance))} {drcr(party.balance)}
                 </td>

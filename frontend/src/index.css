@@ -423,6 +423,7 @@ label.lbl {
 .db-side + .db-side { border-left: 1px dashed #777; padding-left: 14px; }
 .db-row .dt { width: 72px; }
 .db-row .rf { width: 56px; }
+.db-row .vt { width: 56px; font-size: 9px; }
 .db-row .iv { width: 64px; }
 .db-row .am { width: 112px; }
 .db-bold { font-weight: 700; background: #f6f2e8; }
@@ -434,6 +435,7 @@ label.lbl {
 @media print {
   .db-row .dt { width: 50pt; }
   .db-row .rf { width: 40pt; }
+  .db-row .vt { width: 40pt; font-size: 7pt; }
   .db-row .iv { width: 46pt; }
   .db-row .am { width: 70pt; }
   .db-bold { background: #eee !important; }
@@ -445,6 +447,7 @@ label.lbl {
 .dos-stmt-row .dt { width: 78px; flex: none; }
 .dos-stmt-row .pt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
 .dos-stmt-row .rf { width: 70px; flex: none; color: #555; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dos-stmt-row .vt { width: 64px; flex: none; align-self: center; color: #333; font-size: 10px; text-transform: uppercase; letter-spacing: .02em; overflow: hidden; white-space: nowrap; }
 .dos-stmt-row .iv { width: 84px; flex: none; color: #1B5E20; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
 .dos-stmt-row .am { width: 118px; flex: none; text-align: right; }
 .dos-stmt-row .bl { width: 150px; flex: none; text-align: right; font-weight: 600; white-space: nowrap; }
@@ -460,6 +463,7 @@ label.lbl {
   .dos-stmt-row { font-size: 8pt; border-bottom-color: #999; }
   .dos-stmt-row .dt { width: 58pt; }
   .dos-stmt-row .rf { width: 48pt; }
+  .dos-stmt-row .vt { width: 46pt; font-size: 7pt; }
   .dos-stmt-row .iv { width: 58pt; color: #000; }
   .dos-stmt-row .am { width: 80pt; }
   .dos-stmt-row .bl { width: 96pt; }
