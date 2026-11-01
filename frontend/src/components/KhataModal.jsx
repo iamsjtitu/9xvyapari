@@ -18,7 +18,8 @@ const fromParty = (p) => ({
 
 // Full "Naya Khata / Edit Khata" form. `khata` = null (closed) | {id:null, name?} (new) | existing party (edit).
 // onSaved(party) gets the saved record so callers (Rokad/Bill) can select it right away.
-export const KhataModal = ({ khata, onClose, onSaved, title }) => {
+// presetGroup = group to pre-select (Fix & Retry: back from correcting a blocking voucher → one more Save moves the ledger)
+export const KhataModal = ({ khata, onClose, onSaved, title, presetGroup }) => {
   const [groups, setGroups] = useState([]);
   const [form, setForm] = useState(EMPTY_KHATA);
   const [busy, setBusy] = useState(false);
@@ -27,9 +28,12 @@ export const KhataModal = ({ khata, onClose, onSaved, title }) => {
 
   useEffect(() => {
     if (!open) return;
-    setForm(fromParty(khata));
-    api.get("/account-groups").then((r) => { const d = r.data; d.sort((a, b) => (a.fcode || 0) - (b.fcode || 0)); setGroups(d); }).catch(() => {});
-  }, [open, khata]);
+    setForm({ ...fromParty(khata), ...(presetGroup ? { group_id: presetGroup } : {}) });
+    api.get("/account-groups").then((r) => {
+      const d = r.data; d.sort((a, b) => (a.fcode || 0) - (b.fcode || 0)); setGroups(d);
+      if (presetGroup) setForm((f) => ({ ...f, group_name: d.find((g) => g.id === presetGroup)?.name || f.group_name }));
+    }).catch(() => {});
+  }, [open, khata, presetGroup]);
 
   // ESC closes only this dialog; single-key page shortcuts (a / p / r …) must not reach the page underneath
   useEffect(() => {
@@ -90,6 +94,11 @@ export const KhataModal = ({ khata, onClose, onSaved, title }) => {
           <div className="font-heading font-semibold text-lg" data-testid="modal-party-title">{title || (isEdit ? "Edit Khata" : "Naya Khata / Ledger")}</div>
           <button type="button" className="btn-ghost p-1.5" onClick={onClose} data-testid="modal-party-close"><X size={16} /></button>
         </div>
+        {presetGroup && isEdit && (
+          <div className="mb-3 px-3 py-2 rounded-sm text-xs border" style={{ background: "#FFF4E0", color: "#7A3E00", borderColor: "#E8C48A" }} data-testid="party-retry-banner">
+            Entry sudhar kar wapas aaye — group <b>{pickedGroup?.name || "…"}</b> pehle se chuna hai. Ab bas <b>Save Khata</b> dabao{pickedGroup?.party_side === false ? ", ledger Accounts (Khate) me chala jayega" : ""}. (Koi aur entry rok rahi hogi to list phir dikhegi.)
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
           <div className="md:col-span-3">
@@ -152,7 +161,8 @@ export const KhataModal = ({ khata, onClose, onSaved, title }) => {
           <button type="submit" className="btn-primary" disabled={busy} data-testid="btn-save-party">{busy ? "Saving..." : "Save Khata"}</button>
         </div>
       </form>
-      <BlockedEntriesDialog info={blocked} onClose={() => setBlocked(null)} returnTo="/parties" />
+      <BlockedEntriesDialog info={blocked} onClose={() => setBlocked(null)}
+        returnTo={isEdit ? `/parties?edit=${khata.id}&group=${form.group_id}` : "/parties"} />
     </div>
   );
 };

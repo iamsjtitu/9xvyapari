@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { confirmBox } from "@/components/ConfirmHost";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import api, { inr, formatApiErrorDetail } from "@/lib/api";
 import { Plus, PencilSimple, Trash, MagnifyingGlass } from "@phosphor-icons/react";
 import { KhataModal } from "@/components/KhataModal";
@@ -18,10 +18,14 @@ export default function PartyKhata() {
   const [filterGroup, setFilterGroup] = useState("");
   const [settledFilter, setSettledFilter] = useState("all"); // all | only | hide
   const [editing, setEditing] = useState(null);
+  const [presetGroup, setPresetGroup] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  const [search, setSearch] = useSearchParams();
 
   const load = async () => {
     const { data } = await api.get("/parties");
     setParties(data);
+    setLoaded(true);
   };
   useEffect(() => { load(); }, []);
   useEffect(() => {
@@ -33,6 +37,18 @@ export default function PartyKhata() {
 
   const startNew = () => setEditing({ id: null });
   const startEdit = (p) => setEditing(p);
+  const closeEdit = () => { setEditing(null); setPresetGroup(null); };
+
+  // /parties?edit=<id>&group=<gid> → Rokad "Kholo" fix done → reopen the same Edit Khata with the wanted group pre-selected
+  useEffect(() => {
+    const id = search.get("edit");
+    if (!id || !loaded) return;
+    const p = parties.find((x) => x.id === id);
+    if (p) { setPresetGroup(search.get("group") || null); setEditing(p); }
+    else toast.error("Khata nahi mila — shayad pehle hi Accounts (Khate) me ja chuka hai");
+    setSearch((prev) => { const n = new URLSearchParams(prev); n.delete("edit"); n.delete("group"); return n; }, { replace: true });
+    // eslint-disable-next-line
+  }, [search, loaded]);
 
   const [inUse, setInUse] = useState(null);
   const del = async (p) => {
@@ -70,7 +86,7 @@ export default function PartyKhata() {
     { key: "a", action: startNew, description: "Add new ledger" },
     { key: "/", action: () => document.querySelector('[data-testid="input-search-party"]')?.focus(),
       description: "Focus search" },
-    editing ? { key: "Escape", action: () => setEditing(null), allowInInputs: true, description: "Close dialog" } : null,
+    editing ? { key: "Escape", action: closeEdit, allowInInputs: true, description: "Close dialog" } : null,
   ], []);
 
   // Arrow-key table navigation
@@ -233,7 +249,7 @@ export default function PartyKhata() {
         </table>
       </div>
 
-      <KhataModal khata={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />
+      <KhataModal khata={editing} presetGroup={presetGroup} onClose={closeEdit} onSaved={() => { closeEdit(); load(); }} />
       <LedgerInUseDialog info={inUse} onClose={() => setInUse(null)} />
     </div>
   );

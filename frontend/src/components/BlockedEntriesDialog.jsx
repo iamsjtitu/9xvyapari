@@ -38,8 +38,8 @@ export const BlockedEntriesDialog = ({ info, onClose, returnTo }) => {
         </div>
         <div className="text-xs text-muted2 mb-2">
           {info.to === "parties"
-            ? <>In Rokad entries me yeh ledger <b>Cash/Bank account (Mode)</b> ke roop me chuna gaya tha. Har entry kholkar sahi Cash/Bank account chunein (ya party badlein), phir yahan wapas aakar dobara Save karein.</>
-            : <>In entries me yeh ledger <b>party</b> ke roop me use hua hai. Pehle inhe sahi party par le jao ya hatao, phir dobara Save karein.</>}
+            ? <>In Rokad entries me yeh ledger <b>Cash/Bank account (Mode)</b> ke roop me chuna gaya tha. <b>Kholo</b> → sahi Cash/Bank account chunein (ya party badlein) → Update. Aap apne-aap isi Edit form par wapas aa jaoge (group pehle se chuna hoga) — phir ek baar <b>Save</b> dabao.</>
+            : <>In entries me yeh ledger <b>party</b> ke roop me use hua hai. <b>Kholo</b> → sahi party par le jao ya hatao → Update. Aap apne-aap isi Edit form par wapas aa jaoge — phir ek baar <b>Save</b> dabao.</>}
         </div>
         <div className="overflow-auto border border-khaki rounded-sm">
           <table className="dense w-full">

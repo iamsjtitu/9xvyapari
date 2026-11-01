@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { confirmBox } from "@/components/ConfirmHost";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api, { inr, formatApiErrorDetail } from "@/lib/api";
 import { Plus, PencilSimple, Trash, X, MagnifyingGlass, BookOpen } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -22,15 +22,37 @@ export default function Accounts() {
   const [form, setForm] = useState(EMPTY);
   const [inUse, setInUse] = useState(null);
   const [blocked, setBlocked] = useState(null);
+  const [retry, setRetry] = useState(false);   // came back from fixing a blocking Rokad voucher → group pre-selected, one more Save moves it
+  const [loaded, setLoaded] = useState(false);
+  const [search, setSearch] = useSearchParams();
 
   const load = async () => {
     const params = filterGroup ? `?group_id=${filterGroup}` : "";
     setAccounts((await api.get(`/accounts${params}`)).data);
+    setLoaded(true);
   };
   const loadGroups = async () => setGroups((await api.get("/account-groups")).data);
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [filterGroup]);
   useEffect(() => { loadGroups(); }, []);
+
+  const openEdit = (a, groupId) => {
+    setEditing(a);
+    setForm({ name: a.name, group_id: groupId || a.group_id, opening_balance: a.opening_balance, phone: a.phone || "", address: a.address || "", notes: a.notes || "" });
+    setRetry(!!groupId);
+  };
+  const closeForm = () => { setEditing(null); setRetry(false); };
+
+  // /accounts?edit=<id>&group=<gid> → Rokad "Kholo" fix done → reopen the same Edit Account form with the wanted group pre-selected
+  useEffect(() => {
+    const id = search.get("edit");
+    if (!id || !loaded) return;
+    const a = accounts.find((x) => x.id === id);
+    if (a) openEdit(a, search.get("group") || "");
+    else toast.error("Account nahi mila — shayad pehle hi Party Khata me ja chuka hai");
+    setSearch((prev) => { const n = new URLSearchParams(prev); n.delete("edit"); n.delete("group"); return n; }, { replace: true });
+    // eslint-disable-next-line
+  }, [search, loaded]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -41,7 +63,7 @@ export default function Accounts() {
       else await api.post("/accounts", payload);
       if (data?.moved_to === "parties") toast.success(`"${data.name}" ab Party Khata me hai (group: ${data.group_name}) — yahan se hat gaya`, { duration: 6000 });
       else toast.success("Saved");
-      setEditing(null); setForm(EMPTY); load();
+      closeForm(); setForm(EMPTY); load();
     } catch (err) {
       const d = err.response?.data?.detail;
       if (err.response?.status === 409 && d?.blocking) { setBlocked(d); return; }
@@ -72,7 +94,7 @@ export default function Accounts() {
   useKeyboardShortcuts([
     { key: "a", action: () => { setEditing({ id: null }); setForm(EMPTY); },
       description: "Add new account" },
-    editing ? { key: "Escape", action: () => setEditing(null), allowInInputs: true, description: "Close modal" } : null,
+    editing ? { key: "Escape", action: closeForm, allowInInputs: true, description: "Close modal" } : null,
   ], []);
 
   return (
@@ -152,10 +174,7 @@ export default function Accounts() {
                     <button className="btn-ghost p-1.5" title="Ledger" data-testid={`btn-ledger-account-${a.id}`} onClick={() => navigate(`/parties/${a.id}`)}>
                       <BookOpen size={14} />
                     </button>
-                    <button className="btn-ghost p-1.5" data-testid={`btn-edit-account-${a.id}`} onClick={() => { setEditing(a); setForm({
-                      name: a.name, group_id: a.group_id, opening_balance: a.opening_balance,
-                      phone: a.phone || "", address: a.address || "", notes: a.notes || "",
-                    }); }}>
+                    <button className="btn-ghost p-1.5" data-testid={`btn-edit-account-${a.id}`} onClick={() => openEdit(a)}>
                       <PencilSimple size={14} />
                     </button>
                     <button className="btn-ghost p-1.5" onClick={() => del(a.id)} data-testid={`btn-delete-account-${a.id}`}>
@@ -170,15 +189,21 @@ export default function Accounts() {
       </div>
 
       <LedgerInUseDialog info={inUse} onClose={() => setInUse(null)} />
-      <BlockedEntriesDialog info={blocked} onClose={() => setBlocked(null)} returnTo="/accounts" />
+      <BlockedEntriesDialog info={blocked} onClose={() => setBlocked(null)}
+        returnTo={editing?.id ? `/accounts?edit=${editing.id}&group=${form.group_id}` : "/accounts"} />
 
       {editing && (
-        <div className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4" {...backdropClose(() => setEditing(null))}>
+        <div className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4" {...backdropClose(closeForm)}>
           <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="card-flat w-full max-w-lg p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="font-heading font-semibold text-lg">{editing.id ? "Edit Account" : "Naya Account"}</div>
-              <button type="button" className="btn-ghost p-1.5" onClick={() => setEditing(null)}><X size={16} /></button>
+              <button type="button" className="btn-ghost p-1.5" onClick={closeForm}><X size={16} /></button>
             </div>
+            {retry && editing.id && (
+              <div className="mb-3 px-3 py-2 rounded-sm text-xs border" style={{ background: "#FFF4E0", color: "#7A3E00", borderColor: "#E8C48A" }} data-testid="account-retry-banner">
+                Rokad entry sudhar kar wapas aaye — group <b>{pickedGroup?.name || "…"}</b> pehle se chuna hai. Ab bas <b>Save</b> dabao, ledger Party Khata me chala jayega. (Koi aur entry rok rahi hogi to list phir dikhegi.)
+              </div>
+            )}
             <div className="space-y-3">
               <div>
                 <label className="lbl">Account Name *</label>
@@ -223,7 +248,7 @@ export default function Accounts() {
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-5">
-              <button type="button" className="btn-outline" onClick={() => setEditing(null)}>Cancel</button>
+              <button type="button" className="btn-outline" onClick={closeForm}>Cancel</button>
               <button type="submit" className="btn-primary" data-testid="btn-save-account">Save</button>
             </div>
           </form>
