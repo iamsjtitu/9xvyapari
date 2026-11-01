@@ -495,8 +495,20 @@ async def _move_ledger(old: dict, upd: dict, group: dict, to: str) -> dict:
                                                 ("inward entries", c.get("inward", 0)), ("staff link", c.get("staff", 0))) if n]
     if blockers:
         where = "Party Khata" if to == "parties" else "Accounts (Khate)"
+        blocking = []                                            # exact vouchers → frontend dialog with one-click open
+        rk_q = {"cash_account_id": old["id"]} if to == "parties" else {"party_id": old["id"]}
+        async for r in db.rokad.find(rk_q, {"_id": 0, "id": 1, "date": 1, "voucher_no": 1, "type": 1, "amount": 1, "party_name": 1, "cash_account_name": 1, "description": 1}).sort("date", -1).limit(100):
+            blocking.append({"kind": "rokad", "id": r["id"], "date": r.get("date"), "ref": r.get("voucher_no") or "", "type": r.get("type"), "amount": r.get("amount"),
+                             "other": r.get("party_name") if to == "parties" else r.get("cash_account_name"), "description": r.get("description") or ""})
+        if to == "accounts":
+            async for b in db.bills.find({"$or": [{"party_id": old["id"]}, {"agent_id": old["id"]}, {"buyer_id": old["id"]}]}, {"_id": 0, "id": 1, "date": 1, "bill_no": 1, "bill_type": 1, "total": 1, "party_name": 1}).sort("date", -1).limit(100):
+                blocking.append({"kind": "bill", "id": b["id"], "date": b.get("date"), "ref": b.get("bill_no") or "", "type": b.get("bill_type"), "amount": b.get("total"), "other": b.get("party_name"), "description": ""})
+            async for i in db.inward.find({"$or": [{"cold_storage_id": old["id"]}, {"party_id": old["id"]}]}, {"_id": 0, "id": 1, "date": 1, "lot_no": 1, "party_name": 1, "bags": 1}).sort("date", -1).limit(50):
+                blocking.append({"kind": "inward", "id": i["id"], "date": i.get("date"), "ref": i.get("lot_no") or "", "type": "inward", "amount": i.get("bags"), "other": i.get("party_name"), "description": ""})
+            async for s in db.staff.find({"ledger_id": old["id"]}, {"_id": 0, "id": 1, "name": 1}):
+                blocking.append({"kind": "staff", "id": s["id"], "date": "", "ref": "", "type": "staff", "amount": None, "other": s.get("name"), "description": "Staff ledger link"})
         raise HTTPException(409, {"message": f"'{old['name']}' ko {where} me nahi le ja sakte — " + "; ".join(blockers)
-                                             + ". Pehle un entries ka account/party badlo, phir group badlo.", "usage": usage})
+                                             + ". Pehle un entries ka account/party badlo, phir group badlo.", "usage": usage, "blocking": blocking, "ledger": old["name"], "to": to})
     doc = {**old, **upd, "group_name": group.get("name", ""), "moved_at": now_iso(), "moved_from": "parties" if to == "accounts" else "accounts"}
     await dst.insert_one(dict(doc))
     await src.delete_one({"id": old["id"]})

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ExportBar, FoxProPrintHeader } from "@/components/ExportBar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { LedgerInUseDialog, inUseInfo } from "@/components/LedgerInUseDialog";
+import { BlockedEntriesDialog } from "@/components/BlockedEntriesDialog";
 import { backdropClose } from "@/lib/backdrop";
 
 const EMPTY = { name: "", group_id: "", opening_balance: 0, phone: "", address: "", notes: "" };
@@ -20,6 +21,7 @@ export default function Accounts() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
   const [inUse, setInUse] = useState(null);
+  const [blocked, setBlocked] = useState(null);
 
   const load = async () => {
     const params = filterGroup ? `?group_id=${filterGroup}` : "";
@@ -41,7 +43,9 @@ export default function Accounts() {
       else toast.success("Saved");
       setEditing(null); setForm(EMPTY); load();
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail?.message || err.response?.data?.detail) || err.message, { duration: 8000 });
+      const d = err.response?.data?.detail;
+      if (err.response?.status === 409 && d?.blocking) { setBlocked(d); return; }
+      toast.error(formatApiErrorDetail(d?.message || d) || err.message, { duration: 8000 });
     }
   };
   const pickedGroup = groups.find((g) => g.id === form.group_id);
@@ -166,6 +170,7 @@ export default function Accounts() {
       </div>
 
       <LedgerInUseDialog info={inUse} onClose={() => setInUse(null)} />
+      <BlockedEntriesDialog info={blocked} onClose={() => setBlocked(null)} returnTo="/accounts" />
 
       {editing && (
         <div className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4" {...backdropClose(() => setEditing(null))}>

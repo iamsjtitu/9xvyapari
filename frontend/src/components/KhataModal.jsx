@@ -3,6 +3,7 @@ import api, { formatApiErrorDetail } from "@/lib/api";
 import { X } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { backdropClose } from "@/lib/backdrop";
+import { BlockedEntriesDialog } from "@/components/BlockedEntriesDialog";
 
 export const EMPTY_KHATA = {
   code: "", name: "", alt_name: "", group_id: "", group_name: "", type: "both", place: "", phone: "",
@@ -21,6 +22,7 @@ export const KhataModal = ({ khata, onClose, onSaved, title }) => {
   const [groups, setGroups] = useState([]);
   const [form, setForm] = useState(EMPTY_KHATA);
   const [busy, setBusy] = useState(false);
+  const [blocked, setBlocked] = useState(null);
   const open = khata !== null && khata !== undefined;
 
   useEffect(() => {
@@ -71,7 +73,9 @@ export const KhataModal = ({ khata, onClose, onSaved, title }) => {
       else toast.success(isEdit ? "Khata update ho gaya" : `Khata "${data.name}" ban gaya`);
       onSaved?.(data);
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail?.message || err.response?.data?.detail) || err.message, { duration: 8000 });
+      const d = err.response?.data?.detail;
+      if (err.response?.status === 409 && d?.blocking) { setBlocked(d); return; }
+      toast.error(formatApiErrorDetail(d?.message || d) || err.message, { duration: 8000 });
     } finally { setBusy(false); }
   };
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -148,6 +152,7 @@ export const KhataModal = ({ khata, onClose, onSaved, title }) => {
           <button type="submit" className="btn-primary" disabled={busy} data-testid="btn-save-party">{busy ? "Saving..." : "Save Khata"}</button>
         </div>
       </form>
+      <BlockedEntriesDialog info={blocked} onClose={() => setBlocked(null)} returnTo="/parties" />
     </div>
   );
 };
