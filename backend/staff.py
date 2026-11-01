@@ -22,6 +22,7 @@ class StaffIn(BaseModel):
     active: bool = True
     notes: Optional[str] = ""
     ledger_id: Optional[str] = None     # link an existing ledger; else auto-created in the STAFF group
+    salary_from: Optional[str] = None   # YYYY-MM — "nayi salary kab se lagu?" (only used when salary / type changed on edit)
 
 
 class MarkIn(BaseModel):
@@ -66,6 +67,25 @@ def _month_ok(m: str) -> bool:
 
 def _month_label(m: str) -> str:
     y, mm = m.split("-"); return f"{MONTHS[int(mm) - 1]} {y}"
+
+
+def _history(st: dict) -> list:
+    """Salary history [{from: YYYY-MM, salary, salary_type}] — old staff docs get one entry from their current salary."""
+    hist = [h for h in (st.get("salary_history") or []) if h.get("from")]
+    if not hist:
+        hist = [{"from": (st.get("join_date") or "")[:7] or "0001-01", "salary": float(st.get("salary") or 0),
+                 "salary_type": st.get("salary_type") or "monthly", "changed_at": st.get("created_at") or ""}]
+    return sorted(hist, key=lambda h: h["from"])
+
+
+def _rate_for(st: dict, month: str) -> dict:
+    """Salary effective for a month = latest history entry with from <= month; months before the first entry use the first."""
+    hist = _history(st)
+    eff = hist[0]
+    for h in hist:
+        if h["from"] <= month:
+            eff = h
+    return {"salary": float(eff.get("salary") or 0), "salary_type": eff.get("salary_type") or "monthly", "salary_from": eff["from"]}
 
 
 def make_staff_router(db, get_current_user, now_iso, compute_party_balance, next_voucher, next_journal_vno, is_date, default_cash_account):
@@ -286,13 +306,14 @@ def make_staff_router(db, get_current_user, now_iso, compute_party_balance, next
                 continue
             counts = {k: sum(1 for v in mm.values() if v == k) for k in MARKS}
             paid_days = sum(PAID_WEIGHT[v] for v in mm.values())
-            rate = float(st.get("salary") or 0)
-            per_day = round(rate / 30.0, 2) if st.get("salary_type") == "monthly" else rate
+            eff = _rate_for(st, month)                      # salary as it stood in THIS month (raise from Nov → Oct still old)
+            rate = eff["salary"]
+            per_day = round(rate / 30.0, 2) if eff["salary_type"] == "monthly" else rate
             gross = round(per_day * paid_days, 2)
             bal = await _ledger_balance(st["ledger_id"], month_end) if st.get("ledger_id") else 0.0
             advance_due = round(bal, 2) if bal > 0 else 0.0
             suggested = round(min(advance_due, gross), 2)
-            row = {**st, "counts": counts, "paid_days": paid_days, "unmarked": days - len(mm), "per_day": per_day, "gross": gross,
+            row = {**st, **eff, "counts": counts, "paid_days": paid_days, "unmarked": days - len(mm), "per_day": per_day, "gross": gross,
                    "advance_due": advance_due, "salary_due": round(-bal, 2) if bal < 0 else 0.0,
                    "suggested_deduct": suggested, "net": round(gross - suggested, 2), "paid": rec}
             if rec:
@@ -412,8 +433,10 @@ def make_staff_router(db, get_current_user, now_iso, compute_party_balance, next
     @r.get("")
     async def list_staff(current=Depends(get_current_user)):
         setup = await _ensure_setup()
-        out = []
+        out, now_m = [], datetime.now().strftime("%Y-%m")
         for st in await db.staff.find({}, {"_id": 0}).sort("name", 1).to_list(1000):
+            st["salary_history"] = _history(st)
+            st["effective"] = _rate_for(st, now_m)           # salary chal rahi is mahine (future raise → still old here)
             out.append(_with_dues(st, await _ledger_balance(st["ledger_id"]) if st.get("ledger_id") else 0.0))
         return {"staff": out, "setup": setup}
 
@@ -440,7 +463,9 @@ def make_staff_router(db, get_current_user, now_iso, compute_party_balance, next
                        "group_id": setup["staff_group_id"], "group_name": setup["staff_group_name"], "remark": "Staff ledger", "created_at": now_iso()}
                 await db.parties.insert_one(dict(led))
                 ledger_id = led["id"]
-        doc = {**body.model_dump(), "name": name, "id": str(uuid.uuid4()), "ledger_id": ledger_id, "created_at": now_iso()}
+        doc = {**body.model_dump(exclude={"salary_from"}), "name": name, "id": str(uuid.uuid4()), "ledger_id": ledger_id, "created_at": now_iso(),
+               "salary_history": [{"from": (body.join_date or "")[:7] or datetime.now().strftime("%Y-%m"), "salary": float(body.salary or 0),
+                                   "salary_type": body.salary_type, "changed_at": now_iso()}]}
         await db.staff.insert_one(dict(doc))
         doc.pop("_id", None)
         return _with_dues(doc, await _ledger_balance(ledger_id))
@@ -453,7 +478,17 @@ def make_staff_router(db, get_current_user, now_iso, compute_party_balance, next
             raise HTTPException(422, "Naam zaroori hai")
         if await db.staff.find_one({"name": name, "id": {"$ne": sid}}):
             raise HTTPException(409, f"Staff '{name}' pehle se hai")
-        upd = {**body.model_dump(), "name": name, "ledger_id": st.get("ledger_id"), "updated_at": now_iso()}
+        hist = _history(st)
+        changed = abs(float(body.salary or 0) - float(st.get("salary") or 0)) > 0.005 or body.salary_type != (st.get("salary_type") or "monthly")
+        if changed:
+            frm = body.salary_from or datetime.now().strftime("%Y-%m")
+            if not _month_ok(frm):
+                raise HTTPException(400, "Salary 'kab se' YYYY-MM format me do")
+            hist = sorted([h for h in hist if h["from"] != frm] + [{"from": frm, "salary": float(body.salary or 0), "salary_type": body.salary_type, "changed_at": now_iso()}],
+                          key=lambda h: h["from"])
+        latest = hist[-1]
+        upd = {**body.model_dump(exclude={"salary_from"}), "name": name, "ledger_id": st.get("ledger_id"), "updated_at": now_iso(),
+               "salary": latest["salary"], "salary_type": latest["salary_type"], "salary_history": hist}
         await db.staff.update_one({"id": sid}, {"$set": upd})
         if st.get("ledger_id") and name != st.get("name"):
             await db.parties.update_one({"id": st["ledger_id"]}, {"$set": {"name": name}})

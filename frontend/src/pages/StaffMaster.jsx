@@ -6,23 +6,27 @@ import { toast } from "sonner";
 import { Plus, PencilSimple, Trash, X, UsersThree, LinkSimple } from "@phosphor-icons/react";
 import { backdropClose } from "@/lib/backdrop";
 import { useEscClose } from "@/hooks/useEscClose";
-import { StaffPageHeader } from "@/components/staff/common";
+import { StaffPageHeader, thisMonth, monthLabel } from "@/components/staff/common";
 
-const EMPTY = { name: "", phone: "", salary_type: "monthly", salary: "", join_date: todayISO(), active: true, notes: "" };
+const EMPTY = { name: "", phone: "", salary_type: "monthly", salary: "", join_date: todayISO(), active: true, notes: "", salary_from: "" };
 
 const StaffForm = ({ editing, onClose, onSaved }) => {
   const [form, setForm] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
   useEscClose(onClose);
-  useEffect(() => { setForm(editing?.id ? { ...EMPTY, ...editing, salary: String(editing.salary ?? "") } : EMPTY); }, [editing]);
+  useEffect(() => { setForm(editing?.id ? { ...EMPTY, ...editing, salary: String(editing.salary ?? ""), salary_from: thisMonth() } : EMPTY); }, [editing]);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
+  // salary / system badla? → "kab se lagu" poochho; pichhle mahine purani salary se hi banenge
+  const salaryChanged = !!editing?.id && (Number(form.salary || 0) !== Number(editing.salary || 0) || form.salary_type !== editing.salary_type);
+  const history = editing?.salary_history || [];
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
     try {
-      const payload = { ...form, name: form.name.trim().toUpperCase(), salary: parseFloat(form.salary || 0) };
+      const payload = { ...form, name: form.name.trim().toUpperCase(), salary: parseFloat(form.salary || 0), salary_from: salaryChanged ? form.salary_from || thisMonth() : null };
+      delete payload.salary_history; delete payload.effective; delete payload.ledger_balance; delete payload.advance_due; delete payload.salary_due;
       const { data } = editing?.id ? await api.put(`/staff/${editing.id}`, payload) : await api.post("/staff", payload);
-      toast.success(editing?.id ? "Staff update ho gaya" : `${data.name} add ho gaya · ledger ban gaya (Rokad me naam select kar sakte ho)`);
+      toast.success(editing?.id ? (salaryChanged ? `Salary ${monthLabel(payload.salary_from)} se ₹${inr(payload.salary)} — pichhle mahine purani salary par hi` : "Staff update ho gaya") : `${data.name} add ho gaya · ledger ban gaya (Rokad me naam select kar sakte ho)`);
       onSaved(data);
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail) || err.message);
@@ -48,6 +52,22 @@ const StaffForm = ({ editing, onClose, onSaved }) => {
           <div><label className="lbl">{form.salary_type === "monthly" ? "Monthly Salary (₹)" : "Daily Rate (₹)"} *</label>
             <input required type="number" min="0" step="1" className="input-dense num" value={form.salary} onChange={set("salary")} data-testid="input-staff-salary" />
             {form.salary_type === "monthly" && Number(form.salary) > 0 && <div className="text-[10px] text-muted2 mt-1">1 din = ₹ {inr(Number(form.salary) / 30)}</div>}</div>
+          {salaryChanged && (
+            <div className="col-span-2 rounded-sm border border-[#F0C674] bg-[#FFF8E1] p-3" data-testid="salary-from-box">
+              <label className="lbl">Nayi salary kab se lagu? *</label>
+              <input type="month" required className="input-dense font-mono-data !w-[180px]" value={form.salary_from || ""} onChange={set("salary_from")} data-testid="input-staff-salary-from" />
+              <div className="text-[11px] text-muted2 mt-1.5">
+                {monthLabel(form.salary_from || thisMonth())} se ₹ {inr(Number(form.salary || 0))} ({form.salary_type === "monthly" ? "monthly" : "daily"}) lagegi.
+                Isse pehle ke mahine <b>purani salary ₹ {inr(editing.salary)}</b> se hi banenge — ban chuki salary entries par koi asar nahi.
+              </div>
+            </div>
+          )}
+          {history.length > 1 && (
+            <div className="col-span-2 text-[11px] text-muted2" data-testid="salary-history">
+              <span className="uppercase tracking-wider text-[10px]">Salary history:</span>{" "}
+              {history.map((h, i) => <span key={h.from} className="font-mono-data">{i ? " → " : ""}₹{inr(h.salary)} <span className="opacity-70">({monthLabel(h.from)} se{h.salary_type === "daily" ? " · daily" : ""})</span></span>)}
+            </div>
+          )}
           <div className="col-span-2"><label className="lbl">Note</label><input className="input-dense" value={form.notes || ""} onChange={set("notes")} placeholder="Kaam / duty" data-testid="input-staff-notes" /></div>
           {editing?.id && (
             <label className="col-span-2 flex items-center gap-2 text-sm cursor-pointer">
@@ -103,7 +123,14 @@ export default function StaffMaster() {
                   <td><Link to={`/parties/${s.ledger_id}`} className="font-medium text-ink hover:text-terracotta" title="Staff ledger">{s.name}</Link>{s.notes && <div className="text-xs text-muted2">{s.notes}</div>}</td>
                   <td className="font-mono-data">{s.phone || "—"}</td>
                   <td>{s.salary_type === "monthly" ? "Monthly" : "Daily"}</td>
-                  <td className="num font-mono-data">₹ {inr(s.salary)}{s.salary_type === "monthly" ? <span className="text-[10px] text-muted2 block">₹ {inr(s.salary / 30)}/din</span> : null}</td>
+                  <td className="num font-mono-data">₹ {inr(s.salary)}{s.salary_type === "monthly" ? <span className="text-[10px] text-muted2 block">₹ {inr(s.salary / 30)}/din</span> : null}
+                    {s.effective && Math.abs((s.effective.salary || 0) - (s.salary || 0)) > 0.005 && (
+                      <span className="text-[10px] text-[#B45309] block" data-testid={`staff-salary-eff-${s.id}`}>abhi ₹ {inr(s.effective.salary)} · nayi {monthLabel((s.salary_history || []).slice(-1)[0]?.from)} se</span>
+                    )}
+                    {s.effective && Math.abs((s.effective.salary || 0) - (s.salary || 0)) <= 0.005 && (s.salary_history || []).length > 1 && (
+                      <span className="text-[10px] text-muted2 block" data-testid={`staff-salary-eff-${s.id}`}>{monthLabel(s.effective.salary_from)} se</span>
+                    )}
+                  </td>
                   <td className="font-mono-data text-muted2">{s.join_date ? s.join_date.split("-").reverse().join("-") : "—"}</td>
                   <td className="num font-mono-data amount-kharch" data-testid={`staff-adv-${s.id}`}>{s.advance_due ? `₹ ${inr(s.advance_due)}` : "—"}</td>
                   <td className="num font-mono-data amount-jama" data-testid={`staff-due-${s.id}`}>{s.salary_due ? `₹ ${inr(s.salary_due)}` : "—"}</td>

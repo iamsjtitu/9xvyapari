@@ -133,7 +133,7 @@ export default function StaffSalary() {
                 const p = r.paid; const c = r.counts;
                 return (
                   <tr key={r.id} data-testid={`sal-row-${r.id}`} className={p ? "bg-jama-bg/40" : ""}>
-                    <td><Link to={`/parties/${r.ledger_id}`} className="font-medium text-ink hover:text-terracotta">{r.name}</Link><div className="text-[10px] text-muted2">{r.salary_type === "monthly" ? `Monthly ₹${inr(r.salary)}` : `Daily ₹${inr(r.salary)}`}{r.unmarked ? ` · ${r.unmarked} din bina mark` : ""}</div></td>
+                    <td><Link to={`/parties/${r.ledger_id}`} className="font-medium text-ink hover:text-terracotta">{r.name}</Link><div className="text-[10px] text-muted2">{r.salary_type === "monthly" ? `Monthly ₹${inr(r.salary)}` : `Daily ₹${inr(r.salary)}`}{(r.salary_history || []).length > 1 && r.salary_from ? ` (${monthLabel(r.salary_from)} se)` : ""}{r.unmarked ? ` · ${r.unmarked} din bina mark` : ""}</div></td>
                     <td className="num font-mono-data">{c.P}</td><td className="num font-mono-data">{c.H}</td><td className="num font-mono-data text-[#B71C1C]">{c.A}</td><td className="num font-mono-data text-[#1565C0]">{c.C}</td>
                     <td className="num font-mono-data font-semibold" data-testid={`sal-days-${r.id}`}>{r.paid_days}</td>
                     <td className="num font-mono-data">₹ {inr(r.per_day)}</td>
