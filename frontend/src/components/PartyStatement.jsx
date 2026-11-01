@@ -3,11 +3,11 @@ import { BRAND, appVersionLabel } from "@/lib/brand";
 import { fmtBal, LEGEND_PARTY, LEGEND_CASH } from "@/lib/drcr";
 
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
-const drcr = (n) => (Math.abs(n || 0) < 0.005 ? `${inr(0)}   ` : fmtBal(n, false));   // passbook: +ve = Cr
+const drcr = (n) => (Math.abs(n || 0) < 0.005 ? `${inr(0)}   ` : fmtBal(n, false));   // standard: +ve = Dr
 const refOf = (r) => r.vno || r.voucher_no || r.ref_no || r.bill_no || "";
 
 // DOS-style printable ledger statement: opening → entries → totals → closing, one page.
-// Columns follow the PASSBOOK rule (lib/drcr.js): Debit = gaya, Credit = aaya, balance Cr = lena / paisa hai.
+// Columns follow the STANDARD (Tally) rule (lib/drcr.js): party → Debit = diya, Credit = mila · cash → Debit = aaya, Credit = gaya.
 export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFrom, asOn, settledUpto, isCash = false }) => {
   const totalDr = rows.reduce((t, r) => t + (r.debit || 0), 0);
   const totalCr = rows.reduce((t, r) => t + (r.credit || 0), 0);
@@ -29,7 +29,7 @@ export const PartyStatement = ({ firmName, party, rows, opening, closing, dateFr
       </div>
       <div className="dos-stmt-row dos-head mt-2">
         <span className="dt">Date</span><span className="pt">Particulars</span><span className="rf">V.No</span><span className="iv">INV No</span>
-        <span className="am">{isCash ? "Debit (Gaya)" : "Debit (Diya)"}</span><span className="am">{isCash ? "Credit (Aaya)" : "Credit (Mila)"}</span><span className="bl">Balance</span>
+        <span className="am">{isCash ? "Debit (Aaya)" : "Debit (Diya)"}</span><span className="am">{isCash ? "Credit (Gaya)" : "Credit (Mila)"}</span><span className="bl">Balance</span>
       </div>
       <div className="dos-stmt-row dos-open" data-testid="stmt-opening-row">
         <span className="dt">{dateFrom ? fmtDate(dateFrom) : ""}</span>

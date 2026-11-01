@@ -71,7 +71,7 @@ export const ByajDueCard = () => {
                   {p.group_name && <span className="text-[10px] text-muted2 ml-2 uppercase">{p.group_name}</span>}
                 </td>
                 <td className="num font-mono-data whitespace-nowrap" style={{ color: p.side === "dena" ? "#B71C1C" : "#1A1A1A" }}>
-                  ₹ {inr(Math.abs(p.balance))} <span className="text-[10px] text-muted2">{p.side === "dena" ? "Dr · dena" : "Cr · lena"}</span>
+                  ₹ {inr(Math.abs(p.balance))} <span className="text-[10px] text-muted2">{p.side === "dena" ? "Cr · dena" : "Dr · lena"}</span>
                 </td>
                 <td className="text-xs text-muted2" title={p.remark}>{p.rate != null ? `${p.rate}%` : <span className="opacity-60">— remark me % likho</span>}</td>
                 <td className="num font-mono-data whitespace-nowrap" data-testid={`byaj-due-expected-${p.id}`}>{p.expected != null ? `₹ ${inr(p.expected)}` : "—"}</td>

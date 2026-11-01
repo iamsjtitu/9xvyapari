@@ -5,12 +5,12 @@ import { ArrowDown, ArrowUp, PencilSimple, Trash } from "@phosphor-icons/react";
 
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
 
-// Split chronological ledger rows into the two sides of a party T-account.
-// Party: LEFT = Jama (party ne diya — paisa wapas / byaj memo), RIGHT = Kharch (party ko diya — udhaar / maal).
-// Cash & bank a/c: LEFT = Aaya (credit), RIGHT = Gaya (debit). Opening/closing sit on the side that balances the T.
+// Split chronological ledger rows into the two sides of a party T-account (rows follow lib/drcr.js: debit = diya / aaya-in-cash).
+// Party: LEFT = Jama (party ne diya — paisa wapas / byaj = credit rows), RIGHT = Kharch (party ko diya — udhaar / maal = debit rows).
+// Cash & bank a/c: LEFT = Aaya (debit), RIGHT = Gaya (credit). Opening/closing sit on the side that balances the T.
 export function splitT(rows, opening, closing, isAccount) {
-  const amt = (r, side) => (side === "left" ? (isAccount ? r.credit : r.debit) : (isAccount ? r.debit : r.credit)) || 0;
-  const memoSide = (r) => (r.memo ? ((r.memo.side === "debit") !== isAccount ? "left" : "right") : null);
+  const amt = (r, side) => (side === "left" ? (isAccount ? r.debit : r.credit) : (isAccount ? r.credit : r.debit)) || 0;
+  const memoSide = (r) => (r.memo ? ((r.memo.side === "credit") !== isAccount ? "left" : "right") : null);
   const pick = (side) => rows.filter((r) => amt(r, side) > 0 || memoSide(r) === side).map((r) => ({ ...r, amount: r.memo ? r.memo.amount : amt(r, side) }));
   const left = pick("left"), right = pick("right");
   const sum = (list, memo) => list.filter((r) => !!r.memo === memo).reduce((s, r) => s + r.amount, 0);
@@ -106,9 +106,9 @@ export function PartyTFormat({ rows, opening, closing, isAccount, asOn, dateFrom
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 cash-book-grid" data-testid="ledger-tformat">
       <Side side="left" color="#1B5E20" bg="#E8F5E9" icon={ArrowDown} moolLabel={isAccount ? "Total Aaya" : "Total Jama (mool)"}
-        label={isAccount ? "Aaya / Jama (आमद) — Money In · Credit" : "Jama (आमद) — Party ne diya · wapas / byaj"} {...common} />
+        label={isAccount ? "Aaya / Jama (आमद) — Money In · Debit" : "Jama (आमद) — Party ne diya · wapas / byaj · Credit"} {...common} />
       <Side side="right" color="#B71C1C" bg="#FFEBEE" icon={ArrowUp} moolLabel={isAccount ? "Total Gaya" : "Total Kharch (mool)"}
-        label={isAccount ? "Gaya / Kharch (खर्च) — Money Out · Debit" : "Kharch (खर्च) — Party ko diya · udhaar / maal"} {...common} />
+        label={isAccount ? "Gaya / Kharch (खर्च) — Money Out · Credit" : "Kharch (खर्च) — Party ko diya · udhaar / maal · Debit"} {...common} />
     </div>
   );
 }

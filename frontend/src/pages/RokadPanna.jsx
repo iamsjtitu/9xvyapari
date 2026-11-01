@@ -392,7 +392,7 @@ export default function RokadPanna() {
                 { key: "debit", label: COL_DEBIT(true), width: 15, num: true },
                 { key: "credit", label: COL_CREDIT(true), width: 15, num: true },
               ],
-              rows: registerRows.map((e) => ({ ...e, debit: e.type === "kharch" ? e.amount : 0, credit: e.type === "jama" ? e.amount : 0 })),
+              rows: registerRows.map((e) => ({ ...e, debit: e.type === "jama" ? e.amount : 0, credit: e.type === "kharch" ? e.amount : 0 })),
             },
           ]} />
           <VoucherSearch accountId={bankFilter} accountName={selectedBank?.name}
@@ -574,8 +574,8 @@ export default function RokadPanna() {
                   <td className="num font-mono-data" style={{ color: r.opening < 0 ? "#B71C1C" : "#1A1A1A" }} data-testid={`acct-opening-${r.id}`}>
                     ₹ {inr(Math.abs(r.opening))} {drcr(r.opening)}
                   </td>
-                  <td className="num font-mono-data amount-kharch">{r.kharch ? `₹ ${inr(r.kharch)}` : "—"}</td>
                   <td className="num font-mono-data amount-jama">{r.jama ? `₹ ${inr(r.jama)}` : "—"}</td>
+                  <td className="num font-mono-data amount-kharch">{r.kharch ? `₹ ${inr(r.kharch)}` : "—"}</td>
                   {allAccountsSummary.hasOther && (
                     <td className="num font-mono-data text-muted2">{Math.abs(r.other) >= 0.005 ? `${r.other > 0 ? "+" : "−"}₹ ${inr(Math.abs(r.other))}` : "—"}</td>
                   )}
@@ -594,8 +594,8 @@ export default function RokadPanna() {
               <tr className="bg-parchment/60 font-semibold" data-testid="acct-total-row">
                 <td>TOTAL</td>
                 <td className="num font-mono-data">₹ {inr(Math.abs(allAccountsSummary.total.opening))} {drcr(allAccountsSummary.total.opening)}</td>
-                <td className="num font-mono-data amount-kharch">₹ {inr(allAccountsSummary.total.kharch)}</td>
                 <td className="num font-mono-data amount-jama">₹ {inr(allAccountsSummary.total.jama)}</td>
+                <td className="num font-mono-data amount-kharch">₹ {inr(allAccountsSummary.total.kharch)}</td>
                 {allAccountsSummary.hasOther && <td className="num font-mono-data text-muted2">{allAccountsSummary.total.other > 0 ? "+" : "−"}₹ {inr(Math.abs(allAccountsSummary.total.other))}</td>}
                 <td className="num font-mono-data" data-testid="acct-total-closing">₹ {inr(Math.abs(allAccountsSummary.total.closing))} {drcr(allAccountsSummary.total.closing)}</td>
                 <td className="print:hidden"></td>
@@ -610,14 +610,14 @@ export default function RokadPanna() {
         <div className="flex gap-6">
           <div>
             <div className="text-[11px] uppercase tracking-wider text-muted2">{COL_DEBIT(true)}</div>
-            <div className="amount-kharch text-lg font-medium" data-testid="total-kharch">
-              ₹ {inr(totals.kharch)}
+            <div className="amount-jama text-lg font-medium" data-testid="total-jama">
+              ₹ {inr(totals.jama)}
             </div>
           </div>
           <div>
             <div className="text-[11px] uppercase tracking-wider text-muted2">{COL_CREDIT(true)}</div>
-            <div className="amount-jama text-lg font-medium" data-testid="total-jama">
-              ₹ {inr(totals.jama)}
+            <div className="amount-kharch text-lg font-medium" data-testid="total-kharch">
+              ₹ {inr(totals.kharch)}
             </div>
           </div>
           <div>
@@ -643,7 +643,7 @@ export default function RokadPanna() {
             T-Format · Jama | Kharch
           </button>
           <button className={`btn-ghost text-xs px-3 py-1.5 ${layout === "pb" ? "!bg-ink !text-parchment" : ""}`} onClick={() => setLayout("pb")} data-testid="rokad-view-pb" aria-pressed={layout === "pb"}>
-            Passbook · Debit | Credit | Balance
+            Register · Debit | Credit | Balance
           </button>
         </div>
         {layout === "pb" && bankFilter && !showRunning && (

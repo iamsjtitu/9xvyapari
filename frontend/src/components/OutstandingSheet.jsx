@@ -2,7 +2,7 @@ import { inr } from "@/lib/api";
 import { BRAND, appVersionLabel } from "@/lib/brand";
 
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("-") : "");
-const SIDE_TITLE = { dr: "LENA HAI (Cr) — Collection List", cr: "DENA HAI (Dr) — Payable List", all: "OUTSTANDING (Lena / Dena)" };
+const SIDE_TITLE = { dr: "LENA HAI (Dr) — Collection List", cr: "DENA HAI (Cr) — Payable List", all: "OUTSTANDING (Lena / Dena)" };
 
 // DOS-style collection-round list: parties with pending balance, grouped by account group
 export const OutstandingSheet = ({ data }) => {
@@ -16,7 +16,7 @@ export const OutstandingSheet = ({ data }) => {
       </div>
       <div className="dos-stmt-row dos-head os-row mt-2">
         <span className="c">Code</span><span className="n">Party</span><span className="pl">Place</span><span className="ph">Phone</span>
-        <span className="lt">Last Txn</span><span className="dy">Days</span><span className="am">Lena (Cr)</span><span className="am">Dena (Dr)</span><span className="tk">Vasooli / Remark</span>
+        <span className="lt">Last Txn</span><span className="dy">Days</span><span className="am">Lena (Dr)</span><span className="am">Dena (Cr)</span><span className="tk">Vasooli / Remark</span>
       </div>
       {sections.length === 0 && <div className="dos-stmt-row os-row"><span className="n">-- koi outstanding nahi --</span></div>}
       {sections.map((sec) => (
@@ -47,7 +47,7 @@ export const OutstandingSheet = ({ data }) => {
       <div className="dos-grand" data-testid="os-grand">
         <div className="flex justify-between font-bold uppercase">
           <span>Grand Total · {count} parties</span>
-          <span>Lena (Cr) {inr(grand_dr)} &nbsp;|&nbsp; Dena (Dr) {inr(grand_cr)} &nbsp;|&nbsp; Net {inr(Math.abs(grand_dr - grand_cr))} {grand_dr - grand_cr >= 0 ? "Cr (lena)" : "Dr (dena)"}</span>
+          <span>Lena (Dr) {inr(grand_dr)} &nbsp;|&nbsp; Dena (Cr) {inr(grand_cr)} &nbsp;|&nbsp; Net {inr(Math.abs(grand_dr - grand_cr))} {grand_dr - grand_cr >= 0 ? "Cr (lena)" : "Dr (dena)"}</span>
         </div>
       </div>
       <div className="flex justify-between mt-3 text-[10px] uppercase">

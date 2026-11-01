@@ -53,8 +53,8 @@ const DateCells = ({ e }) => (
   </>
 );
 
-// Passbook-style Cash Book register: Debit (Gaya) | Credit (Aaya) | Balance (single a/c only)
-// rows must be chronological; running balance = opening + credit − debit (lib/drcr.js rule)
+// Standard Cash Book register (Tally): Debit (Aaya) | Credit (Gaya) | Balance (single a/c only)
+// rows must be chronological; running balance = opening + debit − credit (lib/drcr.js rule)
 const RokadRegisterImpl = ({ rows, opening, showBalance, totals, ...actions }) => {
   let running = opening || 0;
   const withBal = rows.map((e) => {
@@ -96,8 +96,8 @@ const RokadRegisterImpl = ({ rows, opening, showBalance, totals, ...actions }) =
             <tr key={e.id} data-testid={`rokad-row-${e.id}`}>
               <DateCells e={e} />
               <RowInfo e={e} />
-              <td className="num amount-kharch whitespace-nowrap" data-testid={`rokad-debit-${e.id}`}>{e.type === "kharch" ? `₹ ${inr(e.amount)}` : "—"}</td>
-              <td className="num amount-jama whitespace-nowrap" data-testid={`rokad-credit-${e.id}`}>{e.type === "jama" ? `₹ ${inr(e.amount)}` : "—"}</td>
+              <td className="num amount-jama whitespace-nowrap" data-testid={`rokad-debit-${e.id}`}>{e.type === "jama" ? `₹ ${inr(e.amount)}` : "—"}</td>
+              <td className="num amount-kharch whitespace-nowrap" data-testid={`rokad-credit-${e.id}`}>{e.type === "kharch" ? `₹ ${inr(e.amount)}` : "—"}</td>
               {showBalance && (
                 <td className="num font-mono-data whitespace-nowrap" style={{ color: e.balance < 0 ? "#B71C1C" : "#1A1A1A" }} data-testid={`rokad-bal-${e.id}`}>
                   ₹ {inr(Math.abs(e.balance))} <span className="text-[10px] ml-1">{drcr(e.balance)}</span>
@@ -109,8 +109,8 @@ const RokadRegisterImpl = ({ rows, opening, showBalance, totals, ...actions }) =
           <tr className="bg-parchment/60 font-semibold" data-testid="rokad-total-row">
             <td colSpan={3}></td>
             <td className="text-xs uppercase">Total ({withBal.length} entries)</td>
-            <td className="num amount-kharch font-mono-data" data-testid="rokad-total-debit">₹ {inr(totals.kharch)}</td>
-            <td className="num amount-jama font-mono-data" data-testid="rokad-total-credit">₹ {inr(totals.jama)}</td>
+            <td className="num amount-jama font-mono-data" data-testid="rokad-total-debit">₹ {inr(totals.jama)}</td>
+            <td className="num amount-kharch font-mono-data" data-testid="rokad-total-credit">₹ {inr(totals.kharch)}</td>
             {showBalance && (
               <td className="num font-mono-data" style={{ color: running < 0 ? "#B71C1C" : "#1B5E20" }} data-testid="rokad-closing-cell">
                 ₹ {inr(Math.abs(running))} <span className="text-[10px] ml-1">{drcr(running)}</span>
@@ -164,9 +164,9 @@ const TSide = ({ side, list, total, color, bg, label, icon: Icon, ...actions }) 
 const RokadTFormatImpl = ({ rows, totals, ...actions }) => (
   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 cash-book-grid" data-testid="rokad-tformat">
     <TSide side="jama" list={rows.filter((e) => e.type === "jama")} total={totals.jama} color="#1B5E20" bg="#E8F5E9"
-      label="Receipt / Jama (आमद) — Money In · Credit" icon={ArrowDown} {...actions} />
+      label="Receipt / Jama (आमद) — Money In · Debit" icon={ArrowDown} {...actions} />
     <TSide side="kharch" list={rows.filter((e) => e.type === "kharch")} total={totals.kharch} color="#B71C1C" bg="#FFEBEE"
-      label="Payment / Kharch (खर्च) — Money Out · Debit" icon={ArrowUp} {...actions} />
+      label="Payment / Kharch (खर्च) — Money Out · Credit" icon={ArrowUp} {...actions} />
   </div>
 );
 

@@ -18,7 +18,7 @@ function buildSides(acct, entries, single = true) {
   const kharchTotal = kharch.reduce((t, r) => t + r.amount, 0);
   const left = [], right = [];
   if (acct.opening >= 0) left.push({ text: "OPENING BALANCE B/F", amount: acct.opening, bold: true });
-  else right.push({ text: "OPENING BALANCE B/F (Dr · overdraft)", amount: -acct.opening, bold: true });
+  else right.push({ text: "OPENING BALANCE B/F (Cr · overdraft)", amount: -acct.opening, bold: true });
   left.push(...jama);
   right.push(...kharch);
   if (Math.abs(acct.other || 0) >= 0.005) {
@@ -27,7 +27,7 @@ function buildSides(acct, entries, single = true) {
   left.push({ text: `TOTAL ${tag}JAMA (${jama.length})`, amount: jamaTotal, bold: true, total: true, testId: "jama-total" });
   right.push({ text: `TOTAL ${tag}KHARCH (${kharch.length})`, amount: kharchTotal, bold: true, total: true, testId: "kharch-total" });
   if (acct.closing >= 0) right.push({ text: "CLOSING BALANCE C/F", amount: acct.closing, bold: true, closing: true, testId: "closing" });
-  else left.push({ text: "CLOSING BALANCE C/F (Dr · overdraft)", amount: -acct.closing, bold: true, closing: true, testId: "closing" });
+  else left.push({ text: "CLOSING BALANCE C/F (Cr · overdraft)", amount: -acct.closing, bold: true, closing: true, testId: "closing" });
   return { left, right, jamaTotal, kharchTotal };
 }
 

@@ -23,9 +23,9 @@ const KIND_ICON = {
   rokad: <Notebook size={14} color="#595959" />,
 };
 
-// Build chronological ledger rows — PASSBOOK columns (see lib/drcr.js):
-//   credit = AAYA (party ko maal/paisa mila · cash a/c me paisa aaya) → balance badhta hai
-//   debit  = GAYA (party ne diya · cash a/c se paisa gaya)           → balance ghatta hai
+// Build chronological ledger rows — STANDARD (Tally) columns (see lib/drcr.js):
+//   debit  = party KO diya / cash a/c me paisa AAYA → balance badhta hai
+//   credit = party NE diya / cash a/c se paisa GAYA → balance ghatta hai
 function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = [], memo_rokad = [] }) {
   const rows = [];
   // Memo rows: income/expense Rokad (eg. INTEREST RECEIVED) tagged with this party as reference — shown for information,
@@ -33,27 +33,27 @@ function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = 
   memo_rokad.forEach((r) => rows.push({
     kind: "memo", id: `memo-${r.id}`, refId: r.id, date: r.date, vno: r.voucher_no || "", inv: r.inv_no || "", created_at: r.created_at || "",
     label: `${r.party_name || ""}${r.description ? " · " + r.description : ""}${r.cash_account_name ? ` · ${r.cash_account_name}` : ""}`,
-    credit: 0, debit: 0, memo: { side: r.type === "jama" ? "debit" : "credit", amount: r.amount, head: r.party_name || "" },   // same column as a normal receipt/payment of this party
+    credit: 0, debit: 0, memo: { side: r.type === "jama" ? "credit" : "debit", amount: r.amount, head: r.party_name || "" },   // same column as a normal receipt/payment of this party
   }));
   bills.forEach((b) => rows.push({
     kind: "bill", id: b.id, date: b.date, ref: b.id, vno: b.bill_no || "",
     label: `${b.bill_type === "sale" ? "Sale" : "Purchase"} Bill ${b.bill_no}`,
-    credit: b.bill_type === "sale" ? b.total : 0, debit: b.bill_type === "purchase" ? b.total : 0,
+    debit: b.bill_type === "sale" ? b.total : 0, credit: b.bill_type === "purchase" ? b.total : 0,
   }));
   rokad.forEach((r) => rows.push({
     kind: "rokad", id: r.id, date: r.date, vno: r.voucher_no || "", inv: r.inv_no || "", created_at: r.created_at || "",
     label: `${r.description || (r.type === "jama" ? "Payment Received" : "Payment Paid")}${r.ref_party_name ? ` · ${r.ref_party_name} ka` : ""}${r.cash_account_name ? ` · ${r.cash_account_name}` : ""}`,
-    credit: r.type === "kharch" ? r.amount : 0, debit: r.type === "jama" ? r.amount : 0,
+    debit: r.type === "kharch" ? r.amount : 0, credit: r.type === "jama" ? r.amount : 0,
   }));
   cash_rokad.forEach((r) => rows.push({
     kind: "cash", id: r.id, date: r.date, vno: r.voucher_no || "", inv: r.inv_no || "",
     label: `${r.type === "jama" ? "Receipt" : "Payment"} · ${r.party_name || ""}${r.description ? " · " + r.description : ""}`,
-    credit: r.type === "jama" ? r.amount : 0, debit: r.type === "kharch" ? r.amount : 0,
+    debit: r.type === "jama" ? r.amount : 0, credit: r.type === "kharch" ? r.amount : 0,
   }));
   journal.forEach((j, i) => rows.push({
     kind: "journal", id: `${j.id}-${i}`, refId: j.id, date: j.date, vno: j.voucher_no || "", created_at: j.created_at || "",
     label: `Journal${j.narration ? " · " + j.narration : ""}${j.other ? " | vs " + j.other : ""}`,
-    credit: j.debit, debit: j.credit, settles_rokad_id: j.settles_rokad_id || null,
+    debit: j.debit, credit: j.credit, settles_rokad_id: j.settles_rokad_id || null,
   }));
   dos_journal.forEach((j) => {
     const sgnLabel = { SR: "Sale Reg", PR: "Purchase Reg", CB: "Cash Book", JR: "Journal" }[j.sgn] || j.sgn || "DOS";
@@ -61,7 +61,7 @@ function buildRows({ bills, rokad, cash_rokad = [], journal = [], dos_journal = 
     rows.push({
       kind: "dos", id: `${j.imported_from}-${j.row_index}`, date: j.date, vno: j.ref_no || "",
       label: `${sgnLabel} · ${j.narration || ""}${counter ? " | vs " + counter : ""}${j.extra ? " (" + j.extra + ")" : ""}`,
-      credit: Number(j.debit || 0), debit: Number(j.credit || 0), ref_no: j.ref_no, sgn: j.sgn,
+      debit: Number(j.debit || 0), credit: Number(j.credit || 0), ref_no: j.ref_no, sgn: j.sgn,
     });
   });
   // same date → entry order (created_at); salary journal (credit) lands before its payment, settlement after its receipt
@@ -131,11 +131,13 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
   const opening = data.opening ?? (party.opening_balance || 0);
   const rows = buildRows(data);
   let running = opening;
-  const enriched = rows.map((r) => { running = running + r.credit - r.debit; return { ...r, balance: running }; });   // passbook: credit badhata hai
+  const enriched = rows.map((r) => { running = running + r.debit - r.credit; return { ...r, balance: running }; });   // standard: debit badhata hai
   // memo rows (byaj etc.) — informational totals, never part of the balance
-  const memoIn = enriched.filter((r) => r.memo?.side === "credit").reduce((s, r) => s + r.memo.amount, 0);
-  const memoOut = enriched.filter((r) => r.memo?.side === "debit").reduce((s, r) => s + r.memo.amount, 0);
-  const memoTotal = memoIn + memoOut;
+  const memoCr = enriched.filter((r) => r.memo?.side === "credit").reduce((s, r) => s + r.memo.amount, 0);
+  const memoDr = enriched.filter((r) => r.memo?.side === "debit").reduce((s, r) => s + r.memo.amount, 0);
+  const memoTotal = memoCr + memoDr;
+  // column colours: money OUT red, money IN green — party: debit = diya (out) · cash a/c: debit = aaya (in)
+  const clsDr = isAccount ? "amount-jama" : "amount-kharch", clsCr = isAccount ? "amount-kharch" : "amount-jama";
   const quick = [
     { l: "Aaj", d: todayISO(), tid: "ledger-quick-today" },
     { l: "FY Start", d: settings?.fy_start, tid: "ledger-quick-fystart" },
@@ -322,10 +324,10 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
                       )}
                     </div>
                   </td>
-                  <td className="num whitespace-nowrap amount-kharch" data-testid={`ledger-debit-${r.id}`}>
+                  <td className={`num whitespace-nowrap ${clsDr}`} data-testid={`ledger-debit-${r.id}`}>
                     {r.memo?.side === "debit" ? `₹ ${inr(r.memo.amount)}` : r.debit ? `₹ ${inr(r.debit)}` : "—"}
                   </td>
-                  <td className="num whitespace-nowrap amount-jama" data-testid={`ledger-credit-${r.id}`}>
+                  <td className={`num whitespace-nowrap ${clsCr}`} data-testid={`ledger-credit-${r.id}`}>
                     {r.memo?.side === "credit" ? `₹ ${inr(r.memo.amount)}` : r.credit ? `₹ ${inr(r.credit)}` : "—"}
                   </td>
                   <td className="num font-medium whitespace-nowrap" style={{ color: r.balance >= 0 ? "#1A1A1A" : "#1B5E20" }}>
@@ -360,8 +362,8 @@ Yeh wapas nahi aayega${r.kind !== "bill" && r.kind !== "journal" ? " (Transfer e
               {memoTotal > 0 && (
                 <tr className="bg-parchment/40 font-semibold" data-testid="ledger-memo-total-row">
                   <td colSpan={4} className="text-right text-xs uppercase">Total Byaj <span className="normal-case font-normal text-muted2">· balance me nahi juda</span></td>
-                  <td className="num font-mono-data amount-kharch">{memoOut ? `₹ ${inr(memoOut)}` : "—"}</td>
-                  <td className="num font-mono-data amount-jama">{memoIn ? `₹ ${inr(memoIn)}` : "—"}</td>
+                  <td className={`num font-mono-data ${clsDr}`}>{memoDr ? `₹ ${inr(memoDr)}` : "—"}</td>
+                  <td className={`num font-mono-data ${clsCr}`}>{memoCr ? `₹ ${inr(memoCr)}` : "—"}</td>
                   <td></td>
                   <td className="print:hidden"></td>
                 </tr>

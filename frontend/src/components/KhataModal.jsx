@@ -124,7 +124,7 @@ export const KhataModal = ({ khata, onClose, onSaved, title }) => {
           <div className="md:col-span-4">
             <label className="lbl">Opening Balance (₹)</label>
             <input type="number" step="0.01" className="input-dense num" value={form.opening_balance} onChange={set("opening_balance")} data-testid="input-opening-balance" />
-            <div className="text-[10px] text-muted2 mt-1">+ve = party humein dena hai. −ve = humein party ko dena hai.</div>
+            <div className="text-[10px] text-muted2 mt-1">+ve = Dr — party humein dena hai (lena). −ve = Cr — humein party ko dena hai.</div>
           </div>
           <div className="md:col-span-4"><label className="lbl">Opening Qty</label><input type="number" step="0.001" className="input-dense num" value={form.opening_qty} onChange={set("opening_qty")} /></div>
           <div className="md:col-span-4"><label className="lbl">Default Rate</label><input type="number" step="0.01" className="input-dense num" value={form.rate} onChange={set("rate")} /></div>
